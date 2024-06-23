@@ -28,7 +28,7 @@ static __fi bool IsAutoFlushEnabled()
 	return GSIsHardwareRenderer() ? (GSConfig.UserHacks_AutoFlush != GSHWAutoFlushLevel::Disabled) : GSConfig.AutoFlushSW;
 }
 
-constexpr int GSState::GetSaveStateSize(int version)
+int GSState::GetSaveStateSize(int version)
 {
 	int size = 0;
 

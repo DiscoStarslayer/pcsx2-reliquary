@@ -20,6 +20,7 @@ enum class RenderAPI
 	Metal,
 	D3D12,
 	Vulkan,
+	Granite,
 	OpenGL
 };
 
@@ -109,6 +110,8 @@ void GSSetSoftwareRendering(bool software_renderer, GSInterlaceMode new_interlac
 bool GSSaveSnapshotToMemory(u32 window_width, u32 window_height, bool apply_aspect, bool crop_borders,
 	u32* width, u32* height, std::vector<u32>* pixels);
 void GSJoinSnapshotThreads();
+
+float GetCurrentAspectRatioFloat(bool is_progressive);
 
 namespace Host
 {

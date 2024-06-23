@@ -55,6 +55,15 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\d3d12memalloc\include</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\lzma\include</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\freesurround\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\gs</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\vulkan</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\util</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\math</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\filesystem</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\application\global</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\third_party\volk</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\third_party\renderdoc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)pcsx2\GS\parallel-gs\Granite\third_party\stb\stb</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Platform)'=='x64'">%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\xbyak</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Platform)'=='x64'">%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\zydis\include;$(SolutionDir)3rdparty\zydis\dependencies\zycore\include</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories Condition="'$(Platform)'=='ARM64'">%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\vixl\include</AdditionalIncludeDirectories>
@@ -63,7 +72,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>PrecompiledHeader.h</PrecompiledHeaderFile>
       <ForcedIncludeFiles>PrecompiledHeader.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
-      <PreprocessorDefinitions>C4_NO_DEBUG_BREAK;ST_NO_EXCEPTION_HANDLING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HAVE_PARALLEL_GS;C4_NO_DEBUG_BREAK;ST_NO_EXCEPTION_HANDLING;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Platform)'!='ARM64'">ENABLE_RAINTEGRATION;ENABLE_OPENGL;ENABLE_VULKAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Platform)'=='x64'">XBYAK_NO_EXCEPTION;ZYCORE_STATIC_BUILD;ZYDIS_STATIC_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Platform)'=='ARM64'">VIXL_INCLUDE_TARGET_AARCH64;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -264,6 +273,48 @@
     <ClCompile Include="Gif_Logger.cpp" />
     <ClCompile Include="Gif_Unit.cpp" />
     <ClCompile Include="GSDumpReplayer.cpp" />
+    <ClCompile Include="GS\Renderers\parallel-gs\GSRendererPGS.cpp" />
+    <ClCompile Include="GS\parallel-gs\gs\gs_interface.cpp" />
+    <ClCompile Include="GS\parallel-gs\gs\gs_renderer.cpp" />
+    <ClCompile Include="GS\parallel-gs\gs\gs_util.cpp" />
+    <ClCompile Include="GS\parallel-gs\gs\page_tracker.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\buffer.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\buffer_pool.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\command_buffer.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\command_pool.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\context.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\cookie.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\descriptor_set.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\device.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\event_manager.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\fence.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\fence_manager.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\image.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\indirect_layout.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\memory_allocator.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\pipeline_event.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\query_pool.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\render_pass.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\renderdoc_capture.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\sampler.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\semaphore.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\semaphore_manager.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\shader.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\wsi.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\pipeline_cache.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\texture\memory_mapped_texture.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\texture\texture_files.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\texture\texture_format.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\aligned_alloc.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\arena_allocator.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\logging.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\timer.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\environment.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\timeline_trace_file.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\thread_id.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\thread_name.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\thread_priority.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\util\slab_allocator.cpp" />
     <ClCompile Include="GS\Renderers\DX11\D3D.cpp" />
     <ClCompile Include="GS\Renderers\DX12\GSDevice12.cpp" />
     <ClCompile Include="GS\Renderers\DX12\GSTexture12.cpp" />

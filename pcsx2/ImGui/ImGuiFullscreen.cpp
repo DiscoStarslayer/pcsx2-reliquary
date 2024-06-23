@@ -801,6 +801,8 @@ ImGuiFullscreen::FocusResetType ImGuiFullscreen::GetQueuedFocusResetType()
 
 void ImGuiFullscreen::ForceKeyNavEnabled()
 {
+	if (!ImGui::GetCurrentContext())
+		return;
 	ImGuiContext& g = *ImGui::GetCurrentContext();
 	g.ActiveIdSource = (g.ActiveIdSource == ImGuiInputSource_Mouse) ? ImGuiInputSource_Keyboard : g.ActiveIdSource;
 	g.NavInputSource = (g.NavInputSource == ImGuiInputSource_Mouse) ? ImGuiInputSource_Keyboard : g.ActiveIdSource;

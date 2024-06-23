@@ -33,6 +33,14 @@ check_no_parenthesis_in_path()
 detect_operating_system()
 detect_compiler()
 
+# Need to make sure this is included early, so we can make sure we use our own Vulkan headers,
+# which are more recent than system headers.
+# Otherwise, Qt6 includes system Vulkan headers in SearchForStuff.
+if (IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pcsx2/GS/parallel-gs)
+	set(PARALLEL_GS_STANDALONE ON CACHE BOOL "" FORCE)
+	add_subdirectory(pcsx2/GS/parallel-gs EXCLUDE_FROM_ALL)
+endif()
+
 #-------------------------------------------------------------------------------
 # Include specific module
 include(BuildParameters)

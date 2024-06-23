@@ -288,7 +288,7 @@ float GSRenderer::GetModXYOffset()
 	return 0.0f;
 }
 
-static float GetCurrentAspectRatioFloat(bool is_progressive)
+float GetCurrentAspectRatioFloat(bool is_progressive)
 {
 	switch (GSConfig.AspectRatio)
 	{

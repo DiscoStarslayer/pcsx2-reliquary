@@ -663,12 +663,30 @@ if(USE_VULKAN)
 		GS/Renderers/Vulkan/VKEntryPoints.h
 		GS/Renderers/Vulkan/VKEntryPoints.inl
 		GS/Renderers/Vulkan/VKLoader.h
+		GS/Renderers/Vulkan/VKLoaderPlatformDefines.h
 		GS/Renderers/Vulkan/VKShaderCache.h
 		GS/Renderers/Vulkan/VKStreamBuffer.h
 		GS/Renderers/Vulkan/VKSwapChain.h
 	)
 	target_link_libraries(PCSX2_FLAGS INTERFACE vulkan-headers)
 	target_include_directories(PCSX2_FLAGS INTERFACE ${SHADERC_INCLUDE_DIR})
+endif()
+
+if (TARGET parallel-gs)
+	message("Adding support for paraLLEl-GS")
+	target_link_libraries(PCSX2_FLAGS INTERFACE parallel-gs)
+	target_compile_definitions(PCSX2_FLAGS INTERFACE HAVE_PARALLEL_GS)
+	list(APPEND pcsx2GSSources GS/Renderers/parallel-gs/GSRendererPGS.cpp)
+	list(APPEND pcsx2GSHeaders GS/Renderers/parallel-gs/GSRendererPGS.h)
+	if (X11_API)
+		target_compile_definitions(granite-volk PUBLIC VK_USE_PLATFORM_XLIB_KHR)
+	endif()
+	if (WAYLAND_API)
+		target_compile_definitions(granite-volk PUBLIC VK_USE_PLATFORM_WAYLAND_KHR)
+	endif()
+	if (WIN32)
+		target_compile_definitions(granite-volk PUBLIC VK_USE_PLATFORM_WIN32_KHR)
+	endif()
 endif()
 
 set(pcsx2GSMetalShaders

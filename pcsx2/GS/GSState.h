@@ -22,7 +22,7 @@ public:
 	GSState();
 	virtual ~GSState();
 
-	static constexpr int GetSaveStateSize(int version);
+	static int GetSaveStateSize(int version);
 
 private:
 	// RESTRICT prevents multiple loads of the same part of the register when accessing its bitfields (the compiler is happy to know that memory writes in-between will not go there)

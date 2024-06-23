@@ -471,6 +471,9 @@ void MainWindow::createRendererSwitchMenu()
 {
 	static constexpr const GSRendererType renderers[] = {
 		GSRendererType::Auto,
+#if defined(HAVE_PARALLEL_GS)
+		GSRendererType::ParallelGS,
+#endif
 #if defined(_WIN32)
 		GSRendererType::DX11,
 		GSRendererType::DX12,

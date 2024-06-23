@@ -21,6 +21,9 @@ struct RendererInfo
 
 static constexpr RendererInfo s_renderer_info[] = {
 	{QT_TRANSLATE_NOOP("GraphicsSettingsWidget", "Automatic (Default)"), GSRendererType::Auto},
+#ifdef HAVE_PARALLEL_GS
+	{QT_TRANSLATE_NOOP("GraphicsSettingsWidget", "paraLLEl-GS"), GSRendererType::ParallelGS},
+#endif
 #ifdef _WIN32
 	//: Graphics backend/engine type. Leave as-is.
 	{QT_TRANSLATE_NOOP("GraphicsSettingsWidget", "Direct3D 11 (Legacy)"), GSRendererType::DX11},
@@ -64,6 +67,7 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsWindow* settings_dialog, 
 	m_display_tab = setupTab(m_display, tr("Display"));
 	m_hardware_rendering_tab = setupTab(m_hw, tr("Rendering"));
 	m_software_rendering_tab = setupTab(m_sw, tr("Rendering"));
+	m_pgs_rendering_tab = setupTab(m_pgs, tr("Rendering"));
 	m_hardware_fixes_tab = setupTab(m_fixes, tr("Hardware Fixes"));
 	m_upscaling_fixes_tab = setupTab(m_upscaling, tr("Upscaling Fixes"));
 	m_texture_replacement_tab = setupTab(m_texture, tr("Texture Replacement"));
@@ -241,6 +245,17 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsWindow* settings_dialog, 
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_advanced.texturePreloading, "EmuCore/GS", "texture_preloading", static_cast<int>(TexturePreloadingLevel::Off));
 
 	setTabVisible(m_advanced_tab, QtHost::ShouldShowAdvancedSettings());
+
+	//////////////////////////////////////////////////////////////////////////
+	// PGS Settings
+	//////////////////////////////////////////////////////////////////////////
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsSuperSampling, "EmuCore/GS", "pgsSuperSampling", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsHighResScanout, "EmuCore/GS", "pgsHighResScanout", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsSuperSampleTextures, "EmuCore/GS", "pgsSuperSampleTextures", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsDisableMipmaps, "EmuCore/GS", "pgsDisableMipmaps", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsDisableReadbackSync, "EmuCore/GS", "pgsDisableReadbackSync", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsSharpBackbuffer, "EmuCore/GS", "pgsSharpBackbuffer", 0);
+	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_pgs.pgsBlendDemotion, "EmuCore/GS", "pgsBlendDemotion", 0);
 
 	//////////////////////////////////////////////////////////////////////////
 	// Non-trivial settings
@@ -556,6 +571,43 @@ GraphicsSettingsWidget::GraphicsSettingsWidget(SettingsWindow* settings_dialog, 
 
 		dialog()->registerWidgetHelp(
 			m_sw.swMipmap, tr("Mipmapping"), tr("Checked"), tr("Enables mipmapping, which some games require to render correctly."));
+
+		// parallel-gs
+		dialog()->registerWidgetHelp(m_pgs.pgsSuperSampling, tr("paraLLEl-GS Super Sampling"), tr("1x (native)"),
+			tr("Number of super samples used by paraLLEl-GS before down-sampling to native resolution. "
+				"More than 4x SSAA (sparse) is not recommended as there is diminishing returns in output quality. "
+				"16x SSAA yields a very nice result, but requires reasonably powerful hardware in some games."));
+
+		dialog()->registerWidgetHelp(m_pgs.pgsSharpBackbuffer, tr("Sharp backbuffer hacks (experimental)"), tr("Unchecked"),
+			tr("Some games perform a blit to the backbuffer. "
+				"This can significantly reduce image quality, since games tend to either scale the image, or convert the image to 16-bit colors. "
+				"This hack attempts to present the original image instead. This option may help alleviate that in lieu of a more proper game patch."));
+
+		dialog()->registerWidgetHelp(m_pgs.pgsBlendDemotion, tr("Blend demotion speed-hack (experimental)"), tr("Unchecked"),
+			tr("When super-sampling, some effect passes may become extremely expensive due to ridiculous overdraw. "
+				"Most of these passes don't really need super-sampling to achieve its effect. "
+				"Enabling this option tries to detect common cases and demotes those passes to single sampled. "
+				"This may dramatically improve performance for certain effects at cost of some image quality, especially around geometry edges. "
+				"Should not be used along high-res scanout or super-sampled textures since pixellation will be introduced."));
+
+		dialog()->registerWidgetHelp(m_pgs.pgsSuperSampleTextures, tr("Super-sample Textures (experimental)"), tr("Unchecked"),
+			tr("Ensures that frame buffer effects are sampled with all super-samples intact. "
+				"Costs significant GPU performance and VRAM, but may significantly improve image quality, especially when enabling high-res scanout. "
+				"This option is highly experimental and may show many rendering artifacts."));
+
+		dialog()->registerWidgetHelp(m_pgs.pgsHighResScanout, tr("High-res Scanout (experimental)"), tr("Unchecked"),
+			tr("When using SSAA, attempts to scan-out a higher resolution result based on stored super-samples. "
+				"Requires at least 4x SSAA (ordered) to work. Can benefit from 16x SSAA, at a steep GPU processing cost. "
+				"Highly game dependent if it works well. Common issues include pixellated output, or lack of sharpness. "
+				"When playing field rendered games, may eliminate most de-interlacing artifacts. "
+				"May need super-sampled texture option to be enabled for good results."));
+
+		dialog()->registerWidgetHelp(m_pgs.pgsDisableMipmaps, tr("Disable mip-mapping"), tr("Unchecked"),
+			tr("Disables mip-mapping. May give a sharper image in games using mip-mapping intended for native resolution. "
+				"May also break games which rely on mipmaps being used in esoteric ways."));
+
+		dialog()->registerWidgetHelp(m_pgs.pgsDisableReadbackSync, tr("Disable readback sync"), tr("Unchecked"),
+			tr("Disables sync for readbacks. Eliminates stalls, but will probably break things. Used for perf debug."));
 	}
 
 	// Hardware Fixes tab
@@ -996,6 +1048,7 @@ void GraphicsSettingsWidget::updateRendererDependentOptions()
 	const bool is_hardware = (type == GSRendererType::DX11 || type == GSRendererType::DX12 || type == GSRendererType::OGL ||
 							  type == GSRendererType::VK || type == GSRendererType::Metal);
 	const bool is_software = (type == GSRendererType::SW);
+	const bool is_pgs = (type == GSRendererType::ParallelGS);
 	const bool is_auto = (type == GSRendererType::Auto);
 	const bool is_vk = (type == GSRendererType::VK);
 	const bool is_disable_barriers = (type == GSRendererType::Metal || type == GSRendererType::SW);
@@ -1006,6 +1059,7 @@ void GraphicsSettingsWidget::updateRendererDependentOptions()
 	{
 		setTabVisible(m_hardware_rendering_tab, true);
 		setTabVisible(m_software_rendering_tab, false, m_hardware_rendering_tab);
+		setTabVisible(m_pgs_rendering_tab, false, m_hardware_rendering_tab);
 
 		prev_tab = m_hardware_rendering_tab;
 	}
@@ -1013,6 +1067,15 @@ void GraphicsSettingsWidget::updateRendererDependentOptions()
 	{
 		setTabVisible(m_software_rendering_tab, true);
 		setTabVisible(m_hardware_rendering_tab, false, m_software_rendering_tab);
+		setTabVisible(m_pgs_rendering_tab, false, m_software_rendering_tab);
+
+		prev_tab = m_software_rendering_tab;
+	}
+	else if (is_pgs)
+	{
+		setTabVisible(m_pgs_rendering_tab, true);
+		setTabVisible(m_hardware_rendering_tab, false, m_pgs_rendering_tab);
+		setTabVisible(m_software_rendering_tab, false, m_pgs_rendering_tab);
 
 		prev_tab = m_software_rendering_tab;
 	}
@@ -1020,6 +1083,7 @@ void GraphicsSettingsWidget::updateRendererDependentOptions()
 	{
 		setTabVisible(m_hardware_rendering_tab, false, m_display_tab);
 		setTabVisible(m_software_rendering_tab, false, m_display_tab);
+		setTabVisible(m_pgs_rendering_tab, false, m_display_tab);
 
 		prev_tab = m_display_tab;
 	}

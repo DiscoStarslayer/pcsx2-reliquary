@@ -666,6 +666,10 @@ bool GSRunner::ParseCommandLineArgs(int argc, char* argv[], VMBootParameters& pa
 				else if (StringUtil::Strcasecmp(rname, "dx12") == 0)
 					type = GSRendererType::DX12;
 #endif
+#ifdef HAVE_PARALLEL_GS
+				else if (StringUtil::Strcasecmp(rname, "parallel-gs") == 0)
+					type = GSRendererType::ParallelGS;
+#endif
 #ifdef ENABLE_OPENGL
 				else if (StringUtil::Strcasecmp(rname, "gl") == 0)
 					type = GSRendererType::OGL;

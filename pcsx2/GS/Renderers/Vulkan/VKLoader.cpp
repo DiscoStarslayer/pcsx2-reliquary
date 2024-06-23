@@ -16,6 +16,8 @@
 
 extern "C" {
 
+#ifndef HAVE_PARALLEL_GS
+// Crude hack, but this conflicts with volk.
 #define VULKAN_MODULE_ENTRY_POINT(name, required) PFN_##name name;
 #define VULKAN_INSTANCE_ENTRY_POINT(name, required) PFN_##name name;
 #define VULKAN_DEVICE_ENTRY_POINT(name, required) PFN_##name name;
@@ -23,6 +25,7 @@ extern "C" {
 #undef VULKAN_DEVICE_ENTRY_POINT
 #undef VULKAN_INSTANCE_ENTRY_POINT
 #undef VULKAN_MODULE_ENTRY_POINT
+#endif
 }
 
 void Vulkan::ResetVulkanLibraryFunctionPointers()
@@ -79,7 +82,10 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 
 	if (required_functions_missing)
 	{
+#ifndef HAVE_PARALLEL_GS
+		// FIXME: parallel-gs share volk global pointers.
 		ResetVulkanLibraryFunctionPointers();
+#endif
 		s_vulkan_library.Close();
 		return false;
 	}
@@ -89,7 +95,10 @@ bool Vulkan::LoadVulkanLibrary(Error* error)
 
 void Vulkan::UnloadVulkanLibrary()
 {
+#ifndef HAVE_PARALLEL_GS
+	// FIXME: parallel-gs share volk global pointers.
 	ResetVulkanLibraryFunctionPointers();
+#endif
 	s_vulkan_library.Close();
 }
 
@@ -97,8 +106,13 @@ bool Vulkan::LoadVulkanInstanceFunctions(VkInstance instance)
 {
 	bool required_functions_missing = false;
 	auto LoadFunction = [&required_functions_missing, instance](PFN_vkVoidFunction* func_ptr, const char* name, bool is_required) {
-		*func_ptr = vkGetInstanceProcAddr(instance, name);
-		if (!(*func_ptr) && is_required)
+		auto proc = vkGetInstanceProcAddr(instance, name);
+		// Only override the global pointer if the pointer is non-null. This avoids a problem where GetAdapters()
+		// tries to load KHR_surface functions but fails since VK_KHR_surface is not enabled.
+		// Temporary hack for parallel-gs interoperability since they share volk implementation.
+		if (proc)
+			*func_ptr = proc;
+		if (!proc && is_required)
 		{
 			std::fprintf(stderr, "Vulkan: Failed to load required instance function %s\n", name);
 			required_functions_missing = true;
