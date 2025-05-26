@@ -985,6 +985,7 @@ struct Pcsx2Config
 
 		bool HddEnable{false};
 		std::string HddFile;
+		std::string HddIdFile;
 
 		DEV9Options();
 
@@ -1473,6 +1474,10 @@ namespace EmuFolders
 // Change to 1 for console logs of SIF, GPU (PS1 mode) and MDEC (PS1 mode).
 // These do spam a lot though!
 #define PSX_EXTRALOGS 0
+
+// Make it easier to switch HDD and ILINK ID files without copying data
+extern std::string IlinkIdPath;
+extern std::string PatchFileOverridePath;
 
 #undef BITFIELD32
 #undef BITFIELD_END

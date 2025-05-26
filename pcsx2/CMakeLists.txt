@@ -41,6 +41,10 @@ if(USE_LINKED_FFMPEG)
 	target_link_libraries(PCSX2_FLAGS INTERFACE FFMPEG::avcodec FFMPEG::avformat FFMPEG::avutil FFMPEG::swscale FFMPEG::swresample)
 endif()
 
+find_package(LibUSB REQUIRED)
+include_directories(PCSX2_FLAGS INTERFACE ${LibUSB_INCLUDE_DIRS})
+target_link_libraries(PCSX2_FLAGS INTERFACE ${LibUSB_LIBRARIES})
+
 if(WIN32)
 	set(MIN_WIN32 0x0A00)
 	target_compile_definitions(PCSX2_FLAGS INTERFACE
@@ -376,6 +380,17 @@ set(pcsx2USBSources
 	USB/qemu-usb/input-keymap-qcode-to-qnum.cpp
 	USB/qemu-usb/usb-ohci.cpp
 	USB/shared/ringbuffer.cpp
+    USB/usb-python2/usb-python2.cpp
+    USB/usb-python2/devices/acio.cpp
+    USB/usb-python2/devices/ddr_extio.cpp
+    USB/usb-python2/devices/icca.cpp
+    USB/usb-python2/devices/thrilldrive_belt.cpp
+    USB/usb-python2/devices/thrilldrive_handle.cpp
+    USB/usb-python2/devices/toysmarch_drumpad.cpp
+    USB/usb-python2/inputs/passthrough/python2-config-passthrough.cpp
+    USB/usb-python2/inputs/passthrough/usb-python2-passthrough.cpp
+    USB/usb-python2/patches.cpp
+    USB/usb-python2/api_init_linux.cpp
 	USB/usb-eyetoy/cam-jpeg.cpp
 	USB/usb-eyetoy/jo_mpeg.cpp
 	USB/usb-eyetoy/usb-eyetoy-webcam.cpp
@@ -410,6 +425,16 @@ set(pcsx2USBHeaders
 	USB/qemu-usb/queue.h
 	USB/qemu-usb/qusb.h
 	USB/shared/ringbuffer.h
+    USB/usb-python2/noop.h
+    USB/usb-python2/devices/acio.h
+    USB/usb-python2/devices/ddr_extio.h
+    USB/usb-python2/devices/icca.h
+    USB/usb-python2/devices/input_device.h
+    USB/usb-python2/devices/thrilldrive_belt.h
+    USB/usb-python2/devices/thrilldrive_handle.h
+    USB/usb-python2/devices/toysmarch_drumpad.h
+    USB/usb-python2/inputs/passthrough/usb-python2-passthrough.h
+    USB/usb-python2/patches.h
 	USB/usb-eyetoy/cam-jpeg.h
 	USB/usb-eyetoy/jo_mpeg.h
 	USB/usb-eyetoy/ov519.h
@@ -1137,6 +1162,7 @@ endif()
 
 target_link_libraries(PCSX2_FLAGS INTERFACE
 	common
+	des
 	imgui
 	fmt::fmt
 	rapidyaml::rapidyaml
@@ -1159,6 +1185,7 @@ target_link_libraries(PCSX2_FLAGS INTERFACE
 	ccc
 	plutovg::plutovg
 	plutosvg::plutosvg
+	PkgConfig::DES
 	${LIBC_LIBRARIES}
 )
 
@@ -1201,6 +1228,7 @@ target_include_directories(PCSX2_FLAGS INTERFACE
 	"${CMAKE_BINARY_DIR}/pcsx2"
 	"${CMAKE_BINARY_DIR}/common/include"
 	"${FFMPEG_INCLUDE_DIRS}"
+	"${CMAKE_SOURCE_DIR}/3rdparty/des/"
 )
 
 set_source_files_properties(PrecompiledHeader.cpp PROPERTIES HEADER_FILE_ONLY TRUE)

@@ -403,6 +403,9 @@
             "required": ["pattern", "replacement"]
           },
           "minItems": 1
+        },
+        "cdvdOffset": {
+          "type": "integer"
         }
       },
       "required": ["name", "region"],

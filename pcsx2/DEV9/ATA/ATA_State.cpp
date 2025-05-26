@@ -61,6 +61,7 @@ int ATA::Open(const std::string& hddPath)
 	if (fileContent.has_value() && fileContent.value().size() <= sizeof(sceSec))
 	{
 		// Copy the content to sceSec
+		DevCon.WriteLn("DEV9: ATA: HddIdFile : %s", hddidPath.c_str());
 		std::copy(fileContent.value().begin(), fileContent.value().end(), sceSec);
 	}
 	else

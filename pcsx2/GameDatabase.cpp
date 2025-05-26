@@ -191,6 +191,13 @@ void GameDatabase::parseAndInsert(const std::string_view serial, const c4::yml::
 		}
 	}
 
+	if (node.has_child("cdvdOffset"))
+	{
+		int val = 0;
+		node["cdvdOffset"] >> val;
+		gameEntry.cdvdOffset = val;
+	}
+
 	// Validate game fixes, invalid ones will be dropped!
 	if (node.has_child("gameFixes") && node["gameFixes"].has_children())
 	{
