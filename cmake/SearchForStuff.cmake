@@ -26,6 +26,8 @@ if(USE_VULKAN)
 	find_package(Shaderc REQUIRED)
 endif()
 
+add_subdirectory(3rdparty/des)
+
 # Platform-specific dependencies.
 if (WIN32)
 	add_subdirectory(3rdparty/D3D12MemAlloc EXCLUDE_FROM_ALL)
@@ -144,3 +146,6 @@ if(MSVC)
 	# Don't warn about "deprecated" POSIX functions.
 	add_definitions("-D_CRT_NONSTDC_NO_WARNINGS" "-D_CRT_SECURE_NO_WARNINGS" "-DCRT_SECURE_NO_DEPRECATE")
 endif()
+
+# For P2IO fork
+include(FindLibUSB)

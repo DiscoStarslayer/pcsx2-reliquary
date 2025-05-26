@@ -21,6 +21,7 @@
 #include "Settings/HotkeySettingsWidget.h"
 #include "Settings/InterfaceSettingsWidget.h"
 #include "Settings/MemoryCardSettingsWidget.h"
+#include "Settings/Python2SettingsWidget.h"
 #include "SettingsWindow.h"
 
 #include "pcsx2/Achievements.h"
@@ -89,6 +90,12 @@ void SettingsWindow::setupUi(const GameList::Entry* game)
 				new QLabel(tr("Summary is unavailable for files not present in game list."), m_ui.settingsContainer);
 			placeholder_label->setAlignment(Qt::AlignLeft | Qt::AlignTop);
 			addWidget(placeholder_label, tr("Summary"), QStringLiteral("file-list-line"), std::move(summary));
+		}
+
+		if (isPerGameSettings() && game->type == GameList::EntryType::Python2)
+		{
+			addWidget(m_python2_settings = new Python2SettingsWidget(game, this, m_ui.settingsContainer), tr("Python 2"), QStringLiteral("dashboard-line"),
+				tr("<strong>Python 2 Settings</strong><hr>These options control the settings specific to Python 2 games."));
 		}
 
 		m_ui.restoreDefaultsButton->setVisible(false);

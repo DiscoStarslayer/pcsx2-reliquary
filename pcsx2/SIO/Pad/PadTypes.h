@@ -67,6 +67,7 @@ namespace Pad
 		Jogcon,
 		Negcon,
 		Popn,
+		Python2,
 		Count
 	};
 

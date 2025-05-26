@@ -279,6 +279,7 @@ private:
 	void populateSaveStateMenu(QMenu* menu, const QString& serial, quint32 crc);
 	void doStartFile(std::optional<CDVD_SourceType> source, const QString& path);
 	void doDiscChange(CDVD_SourceType source, const QString& path);
+	bool verifyPython2Configuration(const GameList::Entry* entry);
 
 	Ui::MainWindow m_ui;
 

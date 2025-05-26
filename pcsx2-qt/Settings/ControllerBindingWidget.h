@@ -250,6 +250,22 @@ private:
 	Ui::ControllerBindingWidget_Popn m_ui;
 };
 
+class ControllerBindingWidget_Python2 final : public ControllerBindingWidget_Base
+{
+	Q_OBJECT
+
+public:
+	ControllerBindingWidget_Python2(ControllerBindingWidget* parent);
+	~ControllerBindingWidget_Python2();
+
+	QIcon getIcon() const override;
+
+	static ControllerBindingWidget_Base* createInstance(ControllerBindingWidget* parent);
+
+private:
+	Ui::ControllerBindingWidget_Python2 m_ui;
+};
+
 //////////////////////////////////////////////////////////////////////////
 
 class USBDeviceWidget final : public QWidget

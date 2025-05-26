@@ -127,6 +127,10 @@ void ControllerBindingWidget::onTypeChanged()
 	{
 		m_bindings_widget = ControllerBindingWidget_Popn::createInstance(this);
 	}
+	else if (cinfo->type == Pad::ControllerType::Python2)
+	{
+		m_bindings_widget = ControllerBindingWidget_Python2::createInstance(this);
+	}
 	else
 	{
 		m_bindings_widget = new ControllerBindingWidget_Base(this);
@@ -979,6 +983,27 @@ QIcon ControllerBindingWidget_Popn::getIcon() const
 ControllerBindingWidget_Base* ControllerBindingWidget_Popn::createInstance(ControllerBindingWidget* parent)
 {
 	return new ControllerBindingWidget_Popn(parent);
+}
+
+ControllerBindingWidget_Python2::ControllerBindingWidget_Python2(ControllerBindingWidget* parent)
+	: ControllerBindingWidget_Base(parent)
+{
+	m_ui.setupUi(this);
+	initBindingWidgets();
+}
+
+ControllerBindingWidget_Python2::~ControllerBindingWidget_Python2()
+{
+}
+
+QIcon ControllerBindingWidget_Python2::getIcon() const
+{
+	return QIcon::fromTheme("Popn-line");
+}
+
+ControllerBindingWidget_Base* ControllerBindingWidget_Python2::createInstance(ControllerBindingWidget* parent)
+{
+	return new ControllerBindingWidget_Python2(parent);
 }
 
 //////////////////////////////////////////////////////////////////////////

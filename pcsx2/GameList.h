@@ -28,6 +28,7 @@ namespace GameList
 		PS2Disc,
 		PS1Disc,
 		ELF,
+		Python2,
 		Invalid,
 		Count
 	};

@@ -27,6 +27,7 @@ ZSTD=1.5.7
 LZ4=1.10.0
 LIBPNG=1.6.48
 LIBJPEGTURBO=3.1.0
+LIBUSB=1.0.26
 LIBWEBP=1.5.0
 FFMPEG=6.0
 MOLTENVK=1.2.9
@@ -79,6 +80,7 @@ aa27e4454ce631c5a17924ce0624eac736da19fc6f5a2ab15a6c58da7b36950f  shaderc-glslan
 b8529755b2d54205341766ae168e83177c6120660539f9afba71af6bca4b81ec  KDDockWidgets-$KDDOCKWIDGETS.tar.gz
 f49d62709d6bf1808ddc9b8f71e22a755484f75c7bbb0fb368f7fb2ffc7cf645  plutovg-$PLUTOVG.tar.gz
 01f8aee511bd587a602a166642a96522cc9522efd1e38c2d00e4fbc0aa22d7a0  plutosvg-$PLUTOSVG.tar.gz
+12ce7a61fc9854d1d2a1ffe095f7b5fac19ddba095c259e6067a46500381b5a5  libusb-$LIBUSB.tar.bz2
 EOF
 
 curl -L \
@@ -103,7 +105,8 @@ curl -L \
 	-o "shaderc-spirv-tools-$SHADERC_SPIRVTOOLS.tar.gz" "https://github.com/KhronosGroup/SPIRV-Tools/archive/$SHADERC_SPIRVTOOLS.tar.gz" \
 	-o "KDDockWidgets-$KDDOCKWIDGETS.tar.gz" "https://github.com/KDAB/KDDockWidgets/archive/v$KDDOCKWIDGETS.tar.gz" \
 	-o "plutovg-$PLUTOVG.tar.gz" "https://github.com/sammycage/plutovg/archive/v$PLUTOVG.tar.gz" \
-	-o "plutosvg-$PLUTOSVG.tar.gz" "https://github.com/sammycage/plutosvg/archive/v$PLUTOSVG.tar.gz"
+	-o "plutosvg-$PLUTOSVG.tar.gz" "https://github.com/sammycage/plutosvg/archive/v$PLUTOSVG.tar.gz" \
+	-o "https://github.com/libusb/libusb/releases/download/v$LIBUSB/libusb-$LIBUSB.tar.bz2" \
 
 shasum -a 256 --check SHASUMS
 
@@ -357,6 +360,14 @@ cd "plutosvg-$PLUTOSVG"
 cmake "${CMAKE_COMMON[@]}" -DBUILD_SHARED_LIBS=ON -DPLUTOSVG_ENABLE_FREETYPE=ON -DPLUTOSVG_BUILD_EXAMPLES=OFF -B build
 make -C build "-j$NPROCS"
 make -C build install
+cd ..
+
+echo "Installing libusb..."
+tar xf "libusb-$LIBUSB.tar.bz2"
+cd "libusb-$LIBUSB"
+./configure --prefix "$INSTALLDIR" --enable-mac-universal=no
+make "-j$NPROCS"
+make install
 cd ..
 
 echo "Cleaning up..."

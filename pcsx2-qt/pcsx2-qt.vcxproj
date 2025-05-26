@@ -57,7 +57,7 @@
       <PreprocessorDefinitions Condition="'$(Platform)'!='ARM64'">ENABLE_RAINTEGRATION;ENABLE_OPENGL;ENABLE_VULKAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>LZMA_API_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions>QT_NO_EXCEPTIONS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <PreprocessorDefinitions>KDDW_FRONTEND_QT;KDDW_FRONTEND_QTWIDGETS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>INCLUDE_BTOOLS;KDDW_FRONTEND_QT;KDDW_FRONTEND_QTWIDGETS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <!-- Needed for KDDockWidgets. -->
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
     </ClCompile>
@@ -72,6 +72,9 @@
     <ProjectReference Include="$(SolutionDir)3rdparty\fmt\fmt.vcxproj">
       <Project>{449ad25e-424a-4714-babc-68706cdcc33b}</Project>
     </ProjectReference>
+    <ProjectReference Include="$(SolutionDir)3rdparty\des\des.vcxproj">
+      <Project>{EB12076D-4CEF-4D9D-8F34-5D0043798051}</Project>
+    </ProjectReference>
     <ProjectReference Include="$(SolutionDir)common\common.vcxproj">
       <Project>{4639972e-424e-4e13-8b07-ca403c481346}</Project>
     </ProjectReference>
@@ -83,6 +86,9 @@
     </ProjectReference>
     <ProjectReference Include="..\3rdparty\lzma\lzma.vcxproj">
       <Project>{a4323327-3f2b-4271-83d9-7f9a3c66b6b2}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\3rdparty\libusb\libusb.vcxproj">
+      <Project>{349ee8f9-7d25-4909-aaf5-ff3fade72187}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
@@ -107,6 +113,7 @@
     <ClCompile Include="Settings\GameCheatSettingsWidget.cpp" />
     <ClCompile Include="Settings\GamePatchSettingsWidget.cpp" />
     <ClCompile Include="Settings\MemoryCardConvertWorker.cpp" />
+    <ClCompile Include="Settings\Python2SettingsWidget.cpp" />
     <ClCompile Include="SetupWizardDialog.cpp" />
     <ClCompile Include="Themes.cpp" />
     <ClCompile Include="Tools\InputRecording\InputRecordingViewer.cpp" />
@@ -257,6 +264,7 @@
     <QtMoc Include="Settings\ControllerBindingWidget.h" />
     <QtMoc Include="Settings\ControllerGlobalSettingsWidget.h" />
     <ClInclude Include="Settings\MemoryCardConvertWorker.h" />
+    <QtMoc Include="Settings\Python2SettingsWidget.h" />
     <ClInclude Include="SettingWidgetBinder.h" />
     <QtMoc Include="QtHost.h" />
     <ClInclude Include="PrecompiledHeader.h" />
@@ -297,6 +305,7 @@
     <ClCompile Include="$(IntDir)Settings\moc_DEV9SettingsWidget.cpp" />
     <ClCompile Include="$(IntDir)Settings\moc_DEV9UiCommon.cpp" />
     <ClCompile Include="$(IntDir)Settings\moc_GameSummaryWidget.cpp" />
+    <ClCompile Include="$(IntDir)Settings\moc_Python2SettingsWidget.cpp" />
     <ClCompile Include="$(IntDir)Settings\moc_AchievementLoginDialog.cpp" />
     <ClCompile Include="$(IntDir)Settings\moc_AchievementSettingsWidget.cpp" />
     <ClCompile Include="$(IntDir)Settings\moc_DebugAnalysisSettingsWidget.cpp" />
@@ -385,6 +394,7 @@
     <QtUi Include="Settings\ControllerBindingWidget_Jogcon.ui" />
     <QtUi Include="Settings\ControllerBindingWidget_Negcon.ui" />
     <QtUi Include="Settings\ControllerBindingWidget_Popn.ui" />
+    <QtUi Include="Settings\ControllerBindingWidget_Python2.ui" />
     <QtUi Include="Settings\ControllerGlobalSettingsWidget.ui" />
     <QtUi Include="Settings\ControllerLEDSettingsDialog.ui" />
     <QtUi Include="Settings\ControllerMacroEditWidget.ui" />
@@ -405,6 +415,7 @@
     <QtUi Include="Settings\GamePatchDetailsWidget.ui" />
     <QtUi Include="Settings\GamePatchSettingsWidget.ui" />
     <QtUi Include="Settings\GameSummaryWidget.ui" />
+    <QtUi Include="Settings\Python2SettingsWidget.ui" />
     <QtUi Include="Settings\GraphicsSettingsWidget.ui" />
     <QtUi Include="Settings\InputBindingDialog.ui" />
     <QtUi Include="Settings\InterfaceSettingsWidget.ui" />
