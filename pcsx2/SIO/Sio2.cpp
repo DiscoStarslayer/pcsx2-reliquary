@@ -360,11 +360,15 @@ void Sio2::Memcard()
 		case MemcardCommand::AUTH_XOR:
 			g_MemoryCardProtocol.AuthXor();
 			break;
-		case MemcardCommand::AUTH_F3:
-			g_MemoryCardProtocol.AuthF3();
+		case MemcardCommand::AUTH_CRYPT1:
+		case MemcardCommand::AUTH_CRYPT2:
+			g_MemoryCardProtocol.AuthCrypt();
 			break;
-		case MemcardCommand::AUTH_F7:
-			g_MemoryCardProtocol.AuthF7();
+		case MemcardCommand::AUTH_RESET:
+			g_MemoryCardProtocol.AuthReset();
+			break;
+		case MemcardCommand::AUTH_KEY_SELECT:
+			g_MemoryCardProtocol.AuthReset();
 			break;
 		default:
 			Console.Warning("%s() Unhandled memcard command %02X, things are about to break!", __FUNCTION__, commandByte);

@@ -74,6 +74,8 @@ namespace Patch
 		u32 addr;
 		u64 data;
 		u8* data_ptr;
+		bool hasOldData;
+		u64 oldData;
 
 		// needed because of the pointer
 		PatchCommand() { std::memset(this, 0, sizeof(*this)); }
@@ -106,7 +108,7 @@ namespace Patch
 				s_cpu_to_string[static_cast<u8>(cpu)], s_type_to_string[static_cast<u8>(type)], addr, data);
 		}
 	};
-	static_assert(sizeof(PatchCommand) == 24, "IniPatch has no padding");
+	static_assert(sizeof(PatchCommand) == 40, "IniPatch has no padding");
 
 	struct PatchGroup
 	{
@@ -134,6 +136,8 @@ namespace Patch
 		static void gsaspectratio(PatchGroup* group, const std::string_view cmd, const std::string_view param);
 		static void gsinterlacemode(PatchGroup* group, const std::string_view cmd, const std::string_view param);
 		static void dpatch(PatchGroup* group, const std::string_view cmd, const std::string_view param);
+		static void patchExtended(PatchGroup* group, const std::string_view cmd, const std::string_view param);
+		static void patchHelper(PatchGroup* group, const std::string_view cmd, const std::string_view param, bool isExtended);
 	} // namespace PatchFunc
 
 	static void TrimPatchLine(std::string& buffer);
@@ -142,6 +146,8 @@ namespace Patch
 	static void LoadPatchLine(PatchGroup* group, const std::string_view line);
 	static u32 LoadPatchesFromString(PatchList* patch_list, const std::string& patch_file);
 	static bool OpenPatchesZip();
+	static void LoadPatchFromMemory(PatchGroup* group, PatchCommand patch);
+	static u32 LoadPatchesFromFile(PatchList* patch_list, std::string filename);
 	static std::string GetPnachTemplate(
 		const std::string_view serial, u32 crc, bool include_serial, bool add_wildcard, bool all_crcs);
 	static std::vector<std::string> FindPatchFilesOnDisk(
@@ -194,6 +200,7 @@ namespace Patch
 		{0, "gsaspectratio", &Patch::PatchFunc::gsaspectratio},
 		{0, "gsinterlacemode", &Patch::PatchFunc::gsinterlacemode},
 		{0, "dpatch", &Patch::PatchFunc::dpatch},
+		{0, "patchExtended", &Patch::PatchFunc::patchExtended},
 		{0, nullptr, nullptr},
 	};
 } // namespace Patch
@@ -363,6 +370,16 @@ bool Patch::OpenPatchesZip()
 
 	std::atexit([]() { zip_close(s_patches_zip); });
 	return true;
+}
+
+u32 Patch::LoadPatchesFromFile(PatchList* patch_list, std::string filename)
+{
+	const std::optional<std::string> pnach_data(FileSystem::ReadFileToString(filename.c_str()));
+	if (!pnach_data.has_value())
+		return 0;
+
+	Console.WriteLn(Color_Green, "Loading patch '%s' from file.", filename.c_str());
+	return LoadPatchesFromString(patch_list, pnach_data.value());
 }
 
 std::string Patch::GetPnachTemplate(const std::string_view serial, u32 crc, bool include_serial, bool add_wildcard, bool all_crcs)
@@ -862,14 +879,14 @@ void Patch::UnloadPatches()
 }
 
 // PatchFunc Functions.
-void Patch::PatchFunc::patch(PatchGroup* group, const std::string_view cmd, const std::string_view param)
+void Patch::PatchFunc::patchHelper(PatchGroup* group, const std::string_view cmd, const std::string_view param, bool isExtended)
 {
 #define PATCH_ERROR(fstring, ...) \
 	Console.Error(fmt::format("(Patch) Error Parsing: {}={}: " fstring, cmd, param, __VA_ARGS__))
 
 	// [0]=PlaceToPatch,[1]=CpuType,[2]=MemAddr,[3]=OperandSize,[4]=WriteValue
 	const std::vector<std::string_view> pieces(StringUtil::SplitString(param, ',', false));
-	if (pieces.size() != 5)
+	if (pieces.size() < 5)
 	{
 		PATCH_ERROR("Expected 5 data parameters; only found {}", pieces.size());
 		return;
@@ -925,8 +942,18 @@ void Patch::PatchFunc::patch(PatchGroup* group, const std::string_view cmd, cons
 		data_ptr = static_cast<u8*>(std::malloc(bytes->size()));
 		std::memcpy(data_ptr, bytes->data(), bytes->size());
 	}
-
+	
 	PatchCommand iPatch;
+	if (isExtended && pieces.size() == 6)
+	{
+		iPatch.hasOldData = true;
+		iPatch.oldData = StringUtil::FromChars<u64>(pieces[5], 16).value_or(0);
+	}
+	else
+	{
+		iPatch.hasOldData = false;
+	}
+
 	iPatch.placetopatch = placetopatch.value();
 	iPatch.cpu = cpu.value();
 	iPatch.addr = addr.value();
@@ -936,6 +963,14 @@ void Patch::PatchFunc::patch(PatchGroup* group, const std::string_view cmd, cons
 	group->patches.push_back(std::move(iPatch));
 
 #undef PATCH_ERROR
+}
+
+void Patch::PatchFunc::patch(PatchGroup* group, const std::string_view cmd, const std::string_view param) { patchHelper(group, cmd, param, false); }
+void Patch::PatchFunc::patchExtended(PatchGroup* group, const std::string_view cmd, const std::string_view param) { patchHelper(group, cmd, param, true); }
+
+void Patch::LoadPatchFromMemory(PatchGroup* group, PatchCommand patch)
+{
+	group->patches.push_back(std::move(patch));
 }
 
 void Patch::PatchFunc::gsaspectratio(PatchGroup* group, const std::string_view cmd, const std::string_view param)
@@ -1603,22 +1638,22 @@ void Patch::ApplyPatch(const PatchCommand* p)
 			switch (p->type)
 			{
 				case BYTE_T:
-					if (memRead8(p->addr) != (u8)p->data)
+					if (memRead8(p->addr) != (u8)p->data && (!p->hasOldData || memRead8(p->addr) == (u8)p->oldData))
 						memWrite8(p->addr, (u8)p->data);
 					break;
 
 				case SHORT_T:
-					if (memRead16(p->addr) != (u16)p->data)
+					if (memRead16(p->addr) != (u16)p->data && (!p->hasOldData || memRead16(p->addr) == (u16)p->oldData))
 						memWrite16(p->addr, (u16)p->data);
 					break;
 
 				case WORD_T:
-					if (memRead32(p->addr) != (u32)p->data)
+					if (memRead32(p->addr) != (u32)p->data && (!p->hasOldData || memRead32(p->addr) == (u32)p->oldData))
 						memWrite32(p->addr, (u32)p->data);
 					break;
 
 				case DOUBLE_T:
-					if (memRead64(p->addr) != (u64)p->data)
+					if (memRead64(p->addr) != (u64)p->data && (!p->hasOldData || memRead64(p->addr) == p->oldData))
 						memWrite64(p->addr, (u64)p->data);
 					break;
 
@@ -1628,19 +1663,19 @@ void Patch::ApplyPatch(const PatchCommand* p)
 
 				case SHORT_BE_T:
 					ledata = ByteSwap(static_cast<u16>(p->data));
-					if (memRead16(p->addr) != (u16)ledata)
+					if (memRead16(p->addr) != (u16)ledata && (!p->hasOldData || memRead16(p->addr) == (u16)ByteSwap(static_cast<u16>(p->oldData))))
 						memWrite16(p->addr, (u16)ledata);
 					break;
 
 				case WORD_BE_T:
 					ledata = ByteSwap(static_cast<u32>(p->data));
-					if (memRead32(p->addr) != (u32)ledata)
+					if (memRead32(p->addr) != (u32)ledata && (!p->hasOldData || memRead32(p->addr) == (u32)ByteSwap(static_cast<u32>(p->oldData))))
 						memWrite32(p->addr, (u32)ledata);
 					break;
 
 				case DOUBLE_BE_T:
 					ledata = ByteSwap(p->data);
-					if (memRead64(p->addr) != (u64)ledata)
+					if (memRead64(p->addr) != (u64)ledata && (!p->hasOldData || memRead64(p->addr) == (u64)ByteSwap(static_cast<u64>(p->oldData))))
 						memWrite64(p->addr, (u64)ledata);
 					break;
 
@@ -1661,15 +1696,15 @@ void Patch::ApplyPatch(const PatchCommand* p)
 			switch (p->type)
 			{
 				case BYTE_T:
-					if (iopMemRead8(p->addr) != (u8)p->data)
+					if (iopMemRead8(p->addr) != (u8)p->data && (!p->hasOldData || iopMemRead8(p->addr) == (u8)p->oldData))
 						iopMemWrite8(p->addr, (u8)p->data);
 					break;
 				case SHORT_T:
-					if (iopMemRead16(p->addr) != (u16)p->data)
+					if (iopMemRead16(p->addr) != (u16)p->data && (!p->hasOldData || iopMemRead16(p->addr) == (u16)p->oldData))
 						iopMemWrite16(p->addr, (u16)p->data);
 					break;
 				case WORD_T:
-					if (iopMemRead32(p->addr) != (u32)p->data)
+					if (iopMemRead32(p->addr) != (u32)p->data && (!p->hasOldData || iopMemRead32(p->addr) == (u32)p->oldData))
 						iopMemWrite32(p->addr, (u32)p->data);
 					break;
 				case BYTES_T:

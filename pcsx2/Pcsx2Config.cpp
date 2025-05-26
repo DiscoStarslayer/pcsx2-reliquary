@@ -1254,6 +1254,7 @@ const char* Pcsx2Config::DEV9Options::DnsModeNames[] = {
 Pcsx2Config::DEV9Options::DEV9Options()
 {
 	HddFile = "DEV9hdd.raw";
+	HddIdFile = "DEV9hdd.hddid";
 }
 
 void Pcsx2Config::DEV9Options::LoadSave(SettingsWrapper& wrap)
@@ -1344,6 +1345,7 @@ void Pcsx2Config::DEV9Options::LoadSave(SettingsWrapper& wrap)
 		SettingsWrapSection("DEV9/Hdd");
 		SettingsWrapEntry(HddEnable);
 		SettingsWrapEntry(HddFile);
+		SettingsWrapEntry(HddIdFile);
 	}
 }
 

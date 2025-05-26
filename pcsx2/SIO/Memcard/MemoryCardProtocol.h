@@ -47,8 +47,9 @@ public:
 	void EraseBlock();
 	void UnknownBoot();
 	void AuthXor();
-	void AuthF3();
-	void AuthF7();
+	void AuthCrypt();
+	void AuthReset();
+	void AuthKeySelect();
 };
 
 extern MemoryCardProtocol g_MemoryCardProtocol;
