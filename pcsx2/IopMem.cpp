@@ -23,6 +23,8 @@ void iopMemAlloc()
 	if (!psxMemWLUT)
 		pxFailRel("Failed to allocate IOP memory lookup table");
 
+	memset(psxMemWLUT, 0, 0x2000 * sizeof(uptr) * 2);
+	
 	psxMemRLUT = psxMemWLUT + 0x2000; //(uptr*)_aligned_malloc(0x10000 * sizeof(uptr),16);
 
 	iopMem = reinterpret_cast<IopVM_MemoryAllocMess*>(SysMemory::GetIOPMem());
