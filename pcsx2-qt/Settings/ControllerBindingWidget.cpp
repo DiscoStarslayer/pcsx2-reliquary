@@ -29,6 +29,7 @@
 #include "ui_USBBindingWidget_Gametrak.h"
 #include "ui_USBBindingWidget_GTForce.h"
 #include "ui_USBBindingWidget_GunCon2.h"
+// #include "ui_USBBindingWidget_Python2.h"
 #include "ui_USBBindingWidget_RealPlay.h"
 #include "ui_USBBindingWidget_RyojouhenCon.h"
 #include "ui_USBBindingWidget_ShinkansenCon.h"
@@ -126,10 +127,6 @@ void ControllerBindingWidget::onTypeChanged()
 	else if (cinfo->type == Pad::ControllerType::Popn)
 	{
 		m_bindings_widget = ControllerBindingWidget_Popn::createInstance(this);
-	}
-	else if (cinfo->type == Pad::ControllerType::Python2)
-	{
-		m_bindings_widget = ControllerBindingWidget_Python2::createInstance(this);
 	}
 	else
 	{
@@ -985,27 +982,6 @@ ControllerBindingWidget_Base* ControllerBindingWidget_Popn::createInstance(Contr
 	return new ControllerBindingWidget_Popn(parent);
 }
 
-ControllerBindingWidget_Python2::ControllerBindingWidget_Python2(ControllerBindingWidget* parent)
-	: ControllerBindingWidget_Base(parent)
-{
-	m_ui.setupUi(this);
-	initBindingWidgets();
-}
-
-ControllerBindingWidget_Python2::~ControllerBindingWidget_Python2()
-{
-}
-
-QIcon ControllerBindingWidget_Python2::getIcon() const
-{
-	return QIcon::fromTheme("Popn-line");
-}
-
-ControllerBindingWidget_Base* ControllerBindingWidget_Python2::createInstance(ControllerBindingWidget* parent)
-{
-	return new ControllerBindingWidget_Python2(parent);
-}
-
 //////////////////////////////////////////////////////////////////////////
 
 USBDeviceWidget::USBDeviceWidget(QWidget* parent, ControllerSettingsWindow* dialog, u32 port)
@@ -1055,7 +1031,8 @@ QIcon USBDeviceWidget::getIcon() const
 		{"DJTurntable", "dj-hero-line"}, // DJ Hero TurnTable
 		{"Gametrak", "gametrak-line"}, // Gametrak Device
 		{"RealPlay", "realplay-sphere-line"}, // RealPlay Device
-		{"TrainController", "train-line"} // Train Controller
+		{"TrainController", "train-line"}, // Train Controller
+		{"python2io", "keyboardmania-line"} // Python 2 IO Board
 	};
 
 	for (size_t i = 0; i < std::size(icons); i++)
@@ -1458,6 +1435,11 @@ USBBindingWidget* USBBindingWidget::createInstance(
 		Ui::USBBindingWidget_TranceVibrator().setupUi(widget);
 		has_template = true;
 	}
+	// else if (type == "python2io")
+	// {
+	// 	Ui::USBBindingWidget_Python2().setupUi(widget);
+	// 	has_template = true;
+	// }
 
 	if (has_template)
 		widget->bindWidgets(bindings);

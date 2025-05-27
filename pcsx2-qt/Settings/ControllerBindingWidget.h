@@ -15,7 +15,6 @@
 #include "ui_ControllerBindingWidget_Jogcon.h"
 #include "ui_ControllerBindingWidget_Negcon.h"
 #include "ui_ControllerBindingWidget_Popn.h"
-#include "ui_ControllerBindingWidget_Python2.h"
 #include "ui_ControllerMacroWidget.h"
 #include "ui_ControllerMacroEditWidget.h"
 #include "ui_USBDeviceWidget.h"
@@ -249,22 +248,6 @@ public:
 
 private:
 	Ui::ControllerBindingWidget_Popn m_ui;
-};
-
-class ControllerBindingWidget_Python2 final : public ControllerBindingWidget_Base
-{
-	Q_OBJECT
-
-public:
-	ControllerBindingWidget_Python2(ControllerBindingWidget* parent);
-	~ControllerBindingWidget_Python2();
-
-	QIcon getIcon() const override;
-
-	static ControllerBindingWidget_Base* createInstance(ControllerBindingWidget* parent);
-
-private:
-	Ui::ControllerBindingWidget_Python2 m_ui;
 };
 
 //////////////////////////////////////////////////////////////////////////

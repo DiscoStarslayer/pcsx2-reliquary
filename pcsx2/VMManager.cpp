@@ -1084,6 +1084,7 @@ void VMManager::UpdateDiscDetails(bool booting)
 					title = std::move(game_title);
 				}
 
+				s_cdvd_offset = game->cdvdOffset;
 				memcardFilters = game->memcardFiltersAsString();
 			}
 			else

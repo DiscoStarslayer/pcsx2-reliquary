@@ -553,16 +553,19 @@ PBPX-95201:
   name-sort: "ゆーてぃりてぃでぃすく Version 1.00"
   name-en: "Utility Disc Version 1.00"
   region: "NTSC-J"
+  cdvdOffset: 0x07A08E02
 PBPX-95202:
   name: "ユーティリティディスク Version 1.01"
   name-sort: "ゆーてぃりてぃでぃすく Version 1.01"
   name-en: "Utility Disc Version 1.01"
   region: "NTSC-J"
+  cdvdOffset: 0x07A08E02
 PBPX-95203:
   name: "ユーティリティディスク Version 1.01"
   name-sort: "ゆーてぃりてぃでぃすく Version 1.01"
   name-en: "Utility Disc Version 1.01"
   region: "NTSC-J"
+  cdvdOffset: 0x07A08E02
 PBPX-95204:
   name: "PlayStation 2 - Demo Disc 2000"
   region: "PAL-M5"
@@ -574,60 +577,75 @@ PBPX-95206:
   name-sort: "DVDぷれーやー Version 2.01"
   name-en: "DVD Player Version 2.01"
   region: "NTSC-J"
+  cdvdOffset: 0x07350502
 PBPX-95207:
   name: "DVDプレーヤー Version 2.10"
   name-sort: "DVDぷれーやー Version 2.10"
   name-en: "DVD Player Version 2.10"
   region: "NTSC-J"
+  cdvdOffset: 0x07E5F501
 PBPX-95208:
   name: "DVD Player Version 2.10"
   region: "PAL-M8"
+  cdvdOffset: 0x07EBF401
 PBPX-95209:
   name: "DVD Player Version 2.10"
   region: "PAL-A"
+  cdvdOffset: 0x07F7F201
 PBPX-95210:
   name: "DVD Player Version 2.10"
   region: "NTSC-U"
+  cdvdOffset: 0x07F1F301
 PBPX-95211:
   name: "HDD ユーティリティディスク Version 1.00"
   name-sort: "はーどでぃすく ゆーてぃりてぃでぃすく Version 1.00"
   name-en: "HDD Utility Disc Version 1.00"
   region: "NTSC-J"
+  cdvdOffset: 0x0791AC01
 PBPX-95216:
   name: "HDD Utility Disc Version 1.00 [Beta]"
   region: "NTSC-U"
+  cdvdOffset: 0x078CBA01
 PBPX-95218:
   name: "DVD Player Version 2.12"
   region: "NTSC-U"
+  cdvdOffset: 0x059B9101
 PBPX-95219:
   name: "DVD Player Version 2.14"
   region: "PAL-E"
+  cdvdOffset: 0x07EECF01
 PBPX-95220:
   name: "DVD Player Version 2.14"
   region: "PAL-M7"
+  cdvdOffset: 0x07EECF01
 PBPX-95221:
   name: "DVDプレーヤー Version 2.12"
   name-sort: "DVDぷれーやー Version 2.12"
   name-en: "DVD Player Version 2.12"
   region: "NTSC-J"
+  cdvdOffset: 0x06458F01
 PBPX-95222:
   name: "DVDプレーヤー Version 2.14"
   name-sort: "DVDぷれーやー Version 2.14"
   name-en: "DVD Player Version 2.14"
   region: "NTSC-J"
+  cdvdOffset: 0x0798C701
 PBPX-95223:
   name: "DVD Player Version 2.14"
   region: "NTSC-U"
+  cdvdOffset: 0x071CCB01
 PBPX-95224:
   name: "DVDプレーヤー Version 2.16"
   name-sort: "DVDぷれーやー Version 2.16"
   name-en: "DVD Player Version 2.16"
   region: "NTSC-J"
+  cdvdOffset: 0x07EECF01
 PBPX-95228:
   name: "DVDプレーヤー Version 3.00"
   name-sort: "DVDぷれーやー Version 3.00"
   name-en: "DVD Player Version 3.00"
   region: "NTSC-J"
+  cdvdOffset: 0x07EECF01
 PBPX-95237:
   name: "HDD Utility Disc"
   region: "NTSC-U"
@@ -8088,6 +8106,7 @@ SCPN-60101:
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.10 [Prerelease] [Disc 1]"
   name-en: "PlayStation BB Navigator - Version 0.10 [Prerelease] [Disc 1]"
   region: "NTSC-J"
+  cdvdOffset: 0x07224603
 SCPN-60103:
   name: "PlayStation BB Navigator - Version 0.10 [Prerelease] [Disc 2]"
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.10 [Prerelease] [Disc 2]"
@@ -8113,21 +8132,25 @@ SCPN-60130:
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.20"
   name-en: "PlayStation BB Navigator - Version 0.20"
   region: "NTSC-J"
+  cdvdOffset: 0x07224603
 SCPN-60140:
   name: "PlayStation BB Navigator - Version 0.30"
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.30"
   name-en: "PlayStation BB Navigator - Version 0.30"
   region: "NTSC-J"
+  cdvdOffset: 0x07224603
 SCPN-60150:
   name: "PlayStation BB Navigator - Version 0.31"
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.31"
   name-en: "PlayStation BB Navigator - Version 0.31"
   region: "NTSC-J"
+  cdvdOffset: 0x05224603
 SCPN-60160:
   name: "PlayStation BB Navigator - Version 0.32"
   name-sort: "ぷれいすてーしょん BB なびげーたー - Version 0.32"
   name-en: "PlayStation BB Navigator - Version 0.32"
   region: "NTSC-J"
+  cdvdOffset: 0x03224603
 SCPS-11001:
   name: "I.Q REMIX+"
   name-sort: "あいきゅー りみっくすぷらす"
@@ -11749,6 +11772,7 @@ SCUS-97394:
 SCUS-97395:
   name: "HDD Utility Disc Version 1.10"
   region: "NTSC-U"
+  cdvdOffset: 0x07B2F903
 SCUS-97396:
   name: "World Tour Soccer 2005 [Demo]"
   region: "NTSC-U"

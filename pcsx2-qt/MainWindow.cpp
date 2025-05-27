@@ -2840,9 +2840,9 @@ void MainWindow::startGameListEntry(const GameList::Entry* entry, std::optional<
 		params->save_state = std::move(state_filename);
 	}
 
-	if (params->is_python2 && !verifyPython2Configuration(entry))
+	if (entry->type == GameList::EntryType::Python2)
 	{
-		return;
+		if (!verifyPython2Configuration(entry)) return;
 	}
 
 	g_emu_thread->startVM(std::move(params));

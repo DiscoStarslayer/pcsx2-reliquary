@@ -38,7 +38,7 @@ cdvdStruct cdvd;
 
 s64 PSXCLK = 36864000;
 
-std::string ilinkIdPath;
+std::string ilinkIdPath = "C:\\Users\\royfe\\Desktop\\python2\\ddrsn2\\ps2_nvram";
 
 static constexpr u8 monthmap[13] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 

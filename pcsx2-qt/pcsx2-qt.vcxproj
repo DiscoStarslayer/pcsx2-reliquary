@@ -394,7 +394,6 @@
     <QtUi Include="Settings\ControllerBindingWidget_Jogcon.ui" />
     <QtUi Include="Settings\ControllerBindingWidget_Negcon.ui" />
     <QtUi Include="Settings\ControllerBindingWidget_Popn.ui" />
-    <QtUi Include="Settings\ControllerBindingWidget_Python2.ui" />
     <QtUi Include="Settings\ControllerGlobalSettingsWidget.ui" />
     <QtUi Include="Settings\ControllerLEDSettingsDialog.ui" />
     <QtUi Include="Settings\ControllerMacroEditWidget.ui" />
@@ -430,6 +429,7 @@
     <QtUi Include="Settings\USBBindingWidget_Gametrak.ui" />
     <QtUi Include="Settings\USBBindingWidget_GTForce.ui" />
     <QtUi Include="Settings\USBBindingWidget_GunCon2.ui" />
+    <QtUi Include="Settings\USBBindingWidget_Python2.ui" />
     <QtUi Include="Settings\USBBindingWidget_RealPlay.ui" />
     <QtUi Include="Settings\USBBindingWidget_RyojouhenCon.ui" />
     <QtUi Include="Settings\USBBindingWidget_ShinkansenCon.ui" />
