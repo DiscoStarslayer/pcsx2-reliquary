@@ -30,7 +30,7 @@
 #include <ctype.h>
 #include <stdio.h>
 
-#include "libusb\libusbi.h"
+#include "libusbi.h"
 #include "windows_winusb.h"
 
 #define HANDLE_VALID(h) (((h) != NULL) && ((h) != INVALID_HANDLE_VALUE))

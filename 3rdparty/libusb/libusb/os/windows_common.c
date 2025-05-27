@@ -22,11 +22,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <msvc\config.h>
+#include <config.h>
 
 #include <stdio.h>
 
-#include "libusb\libusbi.h"
+#include "libusbi.h"
 #include "windows_common.h"
 
 #define EPOCH_TIME	UINT64_C(116444736000000000)	// 1970.01.01 00:00:000 in MS Filetime

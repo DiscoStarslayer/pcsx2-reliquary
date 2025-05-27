@@ -8,7 +8,8 @@
     <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
     <PropertyGroup Label="Configuration">
         <ConfigurationType>StaticLibrary</ConfigurationType>
-        <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+        <PlatformToolset Condition="!$(Configuration.Contains(Clang))">$(DefaultPlatformToolset)</PlatformToolset>
+        <PlatformToolset Condition="$(Configuration.Contains(Clang))">ClangCL</PlatformToolset>
         <CharacterSet>Unicode</CharacterSet>
         <WholeProgramOptimization Condition="$(Configuration.Contains(Release))">true</WholeProgramOptimization>
         <UseDebugLibraries Condition="$(Configuration.Contains(Debug))">true</UseDebugLibraries>
@@ -57,10 +58,7 @@
         <ClCompile>
             <PreprocessorDefinitions>%(PreprocessorDefinitions)</PreprocessorDefinitions>
             <WarningLevel>TurnOffAllWarnings</WarningLevel>
-            <AdditionalIncludeDirectories>$(SolutionDir)3rdparty\libusb\libusb\libusb;$(SolutionDir)3rdparty\libusb\libusb\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-            <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalOptions)</AdditionalOptions>
-            <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Devel|x64'">%(AdditionalOptions)</AdditionalOptions>
-            <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalOptions)</AdditionalOptions>
+            <AdditionalIncludeDirectories>$(SolutionDir)3rdparty\libusb\libusb;$(SolutionDir)3rdparty\libusb\msvc;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
         </ClCompile>
     </ItemDefinitionGroup>
     <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
