@@ -8,7 +8,8 @@
     <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
     <PropertyGroup Label="Configuration">
         <ConfigurationType>StaticLibrary</ConfigurationType>
-        <PlatformToolset>$(DefaultPlatformToolset)</PlatformToolset>
+        <PlatformToolset Condition="!$(Configuration.Contains(Clang))">$(DefaultPlatformToolset)</PlatformToolset>
+        <PlatformToolset Condition="$(Configuration.Contains(Clang))">ClangCL</PlatformToolset>
         <CharacterSet>Unicode</CharacterSet>
         <WholeProgramOptimization Condition="$(Configuration.Contains(Release))">true</WholeProgramOptimization>
         <UseDebugLibraries Condition="$(Configuration.Contains(Debug))">true</UseDebugLibraries>
@@ -20,6 +21,7 @@
         <Import Project="..\DefaultProjectRootDir.props" />
         <Import Project="..\3rdparty.props" />
         <Import Condition="$(Configuration.Contains(Debug))" Project="..\..\common\vsprops\CodeGen_Debug.props" />
+        <Import Condition="$(Configuration.Contains(Devel))" Project="..\..\common\vsprops\CodeGen_Devel.props" />
         <Import Condition="$(Configuration.Contains(Release))" Project="..\..\common\vsprops\CodeGen_Release.props" />
         <Import Condition="!$(Configuration.Contains(Release))" Project="..\..\common\vsprops\IncrementalLinking.props" />
     </ImportGroup>
@@ -30,8 +32,6 @@
     <ItemDefinitionGroup>
         <ClCompile>
             <WarningLevel>TurnOffAllWarnings</WarningLevel>
-            <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</MinimalRebuild>
-            <MinimalRebuild Condition="'$(Configuration)|$(Platform)'=='Devel|x64'">false</MinimalRebuild>
         </ClCompile>
     </ItemDefinitionGroup>
     <ItemGroup>
