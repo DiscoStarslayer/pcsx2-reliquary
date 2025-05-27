@@ -22,7 +22,7 @@ using namespace std::string_view_literals;
 
 // Dummy objects, need to get rid of them...
 ConsoleLogWriter<LOGLEVEL_INFO> Console;
-ConsoleLogWriter<LOGLEVEL_DEV> DevCon;
+NullLogWriter DevCon;
 
 #ifdef _DEBUG
 ConsoleLogWriter<LOGLEVEL_DEBUG> DbgConWriter;

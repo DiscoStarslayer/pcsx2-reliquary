@@ -36,6 +36,13 @@ struct VMBootParameters
 
 	std::optional<bool> fast_boot;
 	std::optional<bool> fullscreen;
+
+	// For Python 2
+	std::optional<bool> is_python2;
+	std::optional<u32> python2_crc;
+	std::optional<std::string> python2_serial;
+	std::optional<std::string> python2_patch_file;
+	
 	bool disable_achievements_hardcore_mode = false;
 };
 
@@ -46,6 +53,9 @@ namespace VMManager
 
 	/// The stack size to use for threads running recompilers
 	static constexpr std::size_t EMU_THREAD_STACK_SIZE = 2 * 1024 * 1024; // µVU likes recursion
+
+	/// Returns the CDVD offset of the disc currently running.
+	u32 GetCdvdOffset();
 
 	/// Makes sure that AVX2 is available if we were compiled with it.
 	bool PerformEarlyHardwareChecks(const char** error);

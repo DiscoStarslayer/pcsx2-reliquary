@@ -174,10 +174,16 @@ static std::pair<u32, u32> s_elf_text_range;
 static bool s_elf_executed = false;
 static std::string s_elf_override;
 static std::string s_input_profile_name;
+static u32 s_cdvd_offset = 0;
 static u32 s_frame_advance_count = 0;
 static bool s_fast_boot_requested = false;
 static bool s_gs_open_on_initialize = false;
 static bool s_thread_affinities_set = false;
+
+static bool s_is_python2 = false;
+static u32 s_python2_crc = 0;
+static std::string s_python2_serial;
+static std::string s_python2_patch_file;
 
 static LimiterModeType s_limiter_mode = LimiterModeType::Nominal;
 static s64 s_limiter_ticks_per_frame = 0;
@@ -345,6 +351,12 @@ std::string VMManager::GetTitle(bool prefer_en)
 	}
 	return out;
 }
+
+u32 VMManager::GetCdvdOffset()
+{
+	std::unique_lock lock(s_info_mutex);
+	return s_cdvd_offset;
+};
 
 u32 VMManager::GetDiscCRC()
 {
@@ -1032,6 +1044,12 @@ void VMManager::UpdateDiscDetails(bool booting)
 		if (!s_elf_override.empty())
 			s_disc_crc = cdvdGetElfCRC(s_elf_override);
 
+		if (s_is_python2)
+		{
+			s_disc_crc = s_python2_crc;
+			s_disc_serial = s_python2_serial;
+		}
+
 		if (!booting && s_disc_serial == old_serial && s_disc_crc == old_crc)
 		{
 			Console.WriteLn("Skipping disc details update, no change.");
@@ -1580,6 +1598,22 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	}
 
 	PerformanceMetrics::Clear();
+
+	s_is_python2 = boot_params.is_python2.has_value() && boot_params.is_python2.value();
+	if (s_is_python2)
+	{
+		// Set parameters for Python 2
+		s_python2_crc = boot_params.python2_crc.has_value() ? boot_params.python2_crc.value() : 0;
+		s_python2_serial = boot_params.python2_serial.has_value() ? boot_params.python2_serial.value() : "";
+		s_python2_patch_file = boot_params.python2_patch_file.has_value() ? boot_params.python2_patch_file.value() : "";
+	}
+	else
+	{
+		s_python2_crc = 0;
+		s_python2_serial = "";
+		s_python2_patch_file = "";
+	}
+	
 	return true;
 }
 
@@ -2336,7 +2370,7 @@ bool VMManager::IsSaveStateFileName(const std::string_view path)
 
 bool VMManager::IsDiscFileName(const std::string_view path)
 {
-	static const char* extensions[] = {".iso", ".bin", ".img", ".mdf", ".gz", ".cso", ".zso", ".chd"};
+	static const char* extensions[] = {".iso", ".bin", ".img", ".mdf", ".gz", ".cso", ".zso", ".chd", ".py2"};
 
 	for (const char* test_extension : extensions)
 	{

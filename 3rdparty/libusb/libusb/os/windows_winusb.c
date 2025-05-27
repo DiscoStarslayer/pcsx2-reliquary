@@ -23,14 +23,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include <msvc\config.h>
 
 #include <windows.h>
 #include <setupapi.h>
 #include <ctype.h>
 #include <stdio.h>
 
-#include "libusbi.h"
+#include "libusb\libusbi.h"
 #include "windows_winusb.h"
 
 #define HANDLE_VALID(h) (((h) != NULL) && ((h) != INVALID_HANDLE_VALUE))

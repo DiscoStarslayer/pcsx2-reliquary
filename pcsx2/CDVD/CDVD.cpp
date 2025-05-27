@@ -38,7 +38,7 @@ cdvdStruct cdvd;
 
 s64 PSXCLK = 36864000;
 
-std::string IlinkIdPath;
+std::string ilinkIdPath;
 
 static constexpr u8 monthmap[13] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
@@ -209,7 +209,7 @@ static void cdvdCreateNewNVM()
 
 	u8 ILinkID_Data[8] = {0x00, 0xAC, 0xFF, 0xFF, 0xFF, 0xFF, 0xB9, 0x86};
 
-	auto fpIlink = FileSystem::OpenManagedCFile(IlinkIdPath.c_str(), "rb");
+	auto fpIlink = FileSystem::OpenManagedCFile(ilinkIdPath.c_str(), "rb");
 	if (fpIlink && FileSystem::FSize64(fpIlink.get()) >= 8)
 	{
 		if (FileSystem::FSize64(fpIlink.get()) == 0x400)

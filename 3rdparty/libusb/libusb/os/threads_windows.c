@@ -19,7 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include "libusbi.h"
+#include "libusb\libusbi.h"
 
 int usbi_cond_timedwait(usbi_cond_t *cond,
 	usbi_mutex_t *mutex, const struct timeval *tv)

@@ -179,7 +179,7 @@ struct NullLogWriter
 };
 
 extern ConsoleLogWriter<LOGLEVEL_INFO> Console;
-extern ConsoleLogWriter<LOGLEVEL_DEV> DevCon;
+extern NullLogWriter DevCon;
 
 #define ERROR_LOG(...) Log::Write(LOGLEVEL_ERROR, Color_StrongRed, __VA_ARGS__)
 #define WARNING_LOG(...) Log::Write(LOGLEVEL_WARNING, Color_StrongOrange, __VA_ARGS__)

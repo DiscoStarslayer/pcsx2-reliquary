@@ -24,7 +24,7 @@ MemoryCardProtocol g_MemoryCardProtocol;
 uint8_t keysource[] = {0xf5, 0x80, 0x95, 0x3c, 0x4c, 0x84, 0xa9, 0xc0};
 uint8_t dex_key[16] = {0x17, 0x39, 0xd3, 0xbc, 0xd0, 0x2c, 0x18, 0x07, 0x4b, 0x17, 0xf0, 0xea, 0xc4, 0x66, 0x30, 0xf9};
 uint8_t cex_key[16] = {0x06, 0x46, 0x7a, 0x6c, 0x5b, 0x9b, 0x82, 0x77, 0x39, 0x0f, 0x78, 0xb7, 0xf2, 0xc6, 0xa5, 0x20};
-uint8_t* key = dex_key;
+uint8_t* key = cex_key;
 uint8_t iv[8];
 uint8_t seed[8];
 uint8_t nonce[8];
@@ -532,9 +532,7 @@ void MemoryCardProtocol::AuthXor()
 
 	switch (modeByte)
 	{
-		// When encountered, the command length in RECV3 is guaranteed to be 14,
-		// and the PS2 is expecting us to XOR the data it is about to send.
-		case 0x01:
+		case 0x01: // get iv
 		{
 			generateIvSeedNonce();
 			g_Sio2FifoOut.push_back(0x00);
@@ -650,7 +648,7 @@ void MemoryCardProtocol::AuthXor()
 			g_Sio2FifoOut.push_back(mcd->term);
 			break;
 		}
-		case 0x13:
+		case 0x13: // CardResponse3
 		{
 			g_Sio2FifoOut.push_back(0x00);
 			g_Sio2FifoOut.push_back(0x2b);
@@ -658,7 +656,7 @@ void MemoryCardProtocol::AuthXor()
 
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = g_Sio2FifoIn.front();
+				const u8 toXOR = MechaResponse3[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -752,7 +750,7 @@ void MemoryCardProtocol::AuthReset()
 	else
 	{
 		mcd->term = Terminator::READY;
-		key = dex_key;
+		key = cex_key;
 		The2bTerminator(5);
 	}
 }

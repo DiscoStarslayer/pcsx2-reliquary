@@ -21,12 +21,12 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#include <config.h>
+#include <msvc\config.h>
 
 #include <windows.h>
 #include <stdio.h>
 
-#include "libusbi.h"
+#include "libusb\libusbi.h"
 #include "windows_usbdk.h"
 
 #if !defined(STATUS_SUCCESS)

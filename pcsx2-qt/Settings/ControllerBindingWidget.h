@@ -15,6 +15,7 @@
 #include "ui_ControllerBindingWidget_Jogcon.h"
 #include "ui_ControllerBindingWidget_Negcon.h"
 #include "ui_ControllerBindingWidget_Popn.h"
+#include "ui_ControllerBindingWidget_Python2.h"
 #include "ui_ControllerMacroWidget.h"
 #include "ui_ControllerMacroEditWidget.h"
 #include "ui_USBDeviceWidget.h"
