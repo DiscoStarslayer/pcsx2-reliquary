@@ -133,7 +133,7 @@ move "libusb" "libusb-%LIBUSB%\" || goto error
 cd "libusb-%LIBUSB%" || goto error
 copy "%SCRIPTDIR%\libusb\CMakeLists.txt" "CmakeLists.txt"
 copy "%SCRIPTDIR%\libusb\config.h.in" "config.h.in"
-cmake %ARM64TOOLCHAIN% -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -B build -G Ninja || goto error
+cmake %ARM64TOOLCHAIN% -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -B build -G Ninja || goto error
 cmake --build build --parallel || goto error
 ninja -C build install || goto error
 cd .. || goto error

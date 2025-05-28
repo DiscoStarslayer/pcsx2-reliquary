@@ -22,6 +22,9 @@ find_package(Freetype 2.11.1 REQUIRED)
 find_package(plutovg REQUIRED) # v0.0.13 is needed for building plutosvg, but we can support v1.0.0
 find_package(plutosvg 0.0.6 REQUIRED)
 
+# For P2IO fork
+find_package(LibUSB 1.0.26 REQUIRED)
+
 if(USE_VULKAN)
 	find_package(Shaderc REQUIRED)
 endif()
@@ -146,6 +149,3 @@ if(MSVC)
 	# Don't warn about "deprecated" POSIX functions.
 	add_definitions("-D_CRT_NONSTDC_NO_WARNINGS" "-D_CRT_SECURE_NO_WARNINGS" "-DCRT_SECURE_NO_DEPRECATE")
 endif()
-
-# For P2IO fork
-include(FindLibUSB)

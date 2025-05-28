@@ -80,7 +80,7 @@ curl -L \
 	-o "KDDockWidgets-$KDDOCKWIDGETS.tar.gz" "https://github.com/KDAB/KDDockWidgets/archive/v$KDDOCKWIDGETS.tar.gz" \
 	-o "plutovg-$PLUTOVG.tar.gz" "https://github.com/sammycage/plutovg/archive/v$PLUTOVG.tar.gz" \
 	-o "plutosvg-$PLUTOSVG.tar.gz" "https://github.com/sammycage/plutosvg/archive/v$PLUTOSVG.tar.gz" \
-	-o "https://github.com/libusb/libusb/releases/download/v$LIBUSB/libusb-$LIBUSB.tar.bz2"
+	-o "libusb-$LIBUSB.tar.bz2" "https://github.com/libusb/libusb/releases/download/v$LIBUSB/libusb-$LIBUSB.tar.bz2"
 
 shasum -a 256 --check SHASUMS
 
@@ -269,7 +269,7 @@ cd ..
 echo "Installing libusb..."
 tar xf "libusb-$LIBUSB.tar.bz2"
 cd "libusb-$LIBUSB"
-./configure --prefix "$INSTALLDIR"
+./configure --prefix "$INSTALLDIR" --enable_shared
 make "-j$NPROCS"
 make install
 cd ..
