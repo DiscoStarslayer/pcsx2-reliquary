@@ -1,0 +1,21 @@
+{
+    "name": "libusb",
+    "buildsystem": "autotools",
+    "build-options": {
+      "strip": false,
+      "no-debuginfo": true
+    },
+    "sources": [
+      {
+        "type": "git",
+        "url": "https://github.com/libusb/libusb",
+        "commit": "4239bc3a50014b8e6a5a2a59df1fff3b7469543b"
+      }
+    ],
+    "cleanup": [
+      "/include",
+      "/lib/*.a",
+      "/lib/*.la"
+    ]
+  }
+  

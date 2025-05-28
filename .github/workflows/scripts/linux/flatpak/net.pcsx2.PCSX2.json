@@ -32,6 +32,7 @@
     "modules/23-kddockwidgets.json",
     "modules/24-plutovg.json",
     "modules/25-plutosvg.json",
+    "modules/30-libusb.json",
     {
       "name": "pcsx2",
       "buildsystem": "cmake-ninja",
