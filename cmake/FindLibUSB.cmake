@@ -7,6 +7,28 @@
 #  LibUSB_INCLUDE_DIR: the directory that contains the include file
 #  LibUSB_LIBRARIES:  the libraries
 
+IF(PKG_CONFIG_FOUND)
+  IF(DEPENDS_DIR) #Otherwise use System pkg-config path
+    SET(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${DEPENDS_DIR}/libusb/lib/pkgconfig")
+  ENDIF()
+  SET(MODULE "libusb-1.0")
+  IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    SET(MODULE "libusb-1.0>=1.0.20")
+  ENDIF()
+  IF(LibUSB_FIND_REQUIRED)
+    SET(LibUSB_REQUIRED "REQUIRED")
+  ENDIF()
+  PKG_CHECK_MODULES(LibUSB ${LibUSB_REQUIRED} ${MODULE})
+
+  FIND_LIBRARY(LibUSB_LIBRARY
+    NAMES ${LibUSB_LIBRARIES}
+    HINTS ${LibUSB_LIBRARY_DIRS}
+  )
+  SET(LibUSB_LIBRARIES ${LibUSB_LIBRARY})
+
+  RETURN()
+ENDIF()
+
 FIND_PATH(LibUSB_INCLUDE_DIRS
   NAMES libusb.h
   PATHS
