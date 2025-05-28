@@ -384,6 +384,7 @@ set(pcsx2USBSources
     USB/usb-python2/devices/acio.cpp
     USB/usb-python2/devices/ddr_extio.cpp
     USB/usb-python2/devices/icca.cpp
+	USB/usb-eyetoy/cam-jpeg.cpp
 	USB/usb-eyetoy/jo_mpeg.cpp
 	USB/usb-eyetoy/usb-eyetoy-webcam.cpp
 	USB/usb-hid/usb-hid.cpp
