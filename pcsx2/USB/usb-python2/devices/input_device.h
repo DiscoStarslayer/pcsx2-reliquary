@@ -1,4 +1,5 @@
 ﻿#include <cstdint>
+#include <cstddef>
 #include <vector>
 
 namespace usb_python2
