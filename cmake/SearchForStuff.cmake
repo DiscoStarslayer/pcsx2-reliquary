@@ -19,8 +19,8 @@ find_package(LZ4 REQUIRED)
 find_package(WebP REQUIRED) # v1.3.2, spews an error on Linux because no pkg-config.
 find_package(SDL3 3.2.6 REQUIRED)
 find_package(Freetype 2.11.1 REQUIRED)
-find_package(plutovg REQUIRED) # v0.0.13 is needed for building plutosvg, but we can support v1.0.0
-find_package(plutosvg 0.0.6 REQUIRED)
+find_package(plutovg 1.1.0 REQUIRED)
+find_package(plutosvg 0.0.7 REQUIRED)
 
 # For P2IO fork
 find_package(LibUSB 1.0.26 REQUIRED)
@@ -125,7 +125,7 @@ add_subdirectory(3rdparty/demangler EXCLUDE_FROM_ALL)
 add_subdirectory(3rdparty/ccc EXCLUDE_FROM_ALL)
 
 # The docking system for the debugger.
-find_package(KDDockWidgets-qt6 REQUIRED)
+find_package(KDDockWidgets-qt6 2.0.0 REQUIRED)
 # Add an extra include path to work around a broken include directive.
 # TODO: Remove this the next time we update KDDockWidgets.
 get_target_property(KDDOCKWIDGETS_INCLUDE_DIRECTORY KDAB::kddockwidgets INTERFACE_INCLUDE_DIRECTORIES)

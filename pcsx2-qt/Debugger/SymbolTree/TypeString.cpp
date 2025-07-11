@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
-// SPDX-License-Identifier: LGPL-3.0+
+// SPDX-License-Identifier: GPL-3.0+
 
 #include "TypeString.h"
 
@@ -38,7 +38,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 		s32 element_count = atoi(&string[j]);
 		if (element_count < 0 || element_count > 1024 * 1024)
 		{
-			error_out = QCoreApplication::tr("Invalid array subscript.");
+			error_out = QCoreApplication::translate("TypeString", "Invalid array subscript.");
 			return nullptr;
 		}
 
@@ -51,7 +51,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 	std::string type_name_string(string.data(), string.data() + i);
 	if (type_name_string.empty())
 	{
-		error_out = QCoreApplication::tr("No type name provided.");
+		error_out = QCoreApplication::translate("TypeString", "No type name provided.");
 		return nullptr;
 	}
 
@@ -59,7 +59,7 @@ std::unique_ptr<ccc::ast::Node> stringToType(std::string_view string, const ccc:
 	const ccc::DataType* data_type = database.data_types.symbol_from_handle(handle);
 	if (!data_type || !data_type->type())
 	{
-		error_out = QCoreApplication::tr("Type '%1' not found.").arg(QString::fromStdString(type_name_string));
+		error_out = QCoreApplication::translate("TypeString", "Type '%1' not found.").arg(QString::fromStdString(type_name_string));
 		return nullptr;
 	}
 

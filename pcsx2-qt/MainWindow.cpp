@@ -1132,7 +1132,7 @@ bool MainWindow::shouldHideMainWindow() const
 	// NOTE: We can't use isRenderingToMain() here, because this happens post-fullscreen-switch.
 	return (Host::GetBoolSettingValue("UI", "HideMainWindowWhenRunning", false) && !g_emu_thread->shouldRenderToMain()) ||
 		   (g_emu_thread->shouldRenderToMain() && (isRenderingFullscreen() || m_is_temporarily_windowed)) ||
-		   QtHost::InNoGUIMode();
+		   Host::InNoGUIMode();
 }
 
 bool MainWindow::shouldMouseLock() const
@@ -1308,7 +1308,7 @@ bool MainWindow::requestShutdown(bool allow_confirm, bool allow_save_to_state, b
 	// reshow the main window during display updates, because otherwise fullscreen transitions and renderer switches
 	// would briefly show and then hide the main window. So instead, we do it on shutdown, here. Except if we're in
 	// batch mode, when we're going to exit anyway.
-	if (!isRenderingToMain() && isHidden() && !QtHost::InBatchMode() && !g_emu_thread->isRunningFullscreenUI())
+	if (!isRenderingToMain() && isHidden() && !Host::InBatchMode() && !g_emu_thread->isRunningFullscreenUI())
 		updateWindowState(true);
 
 	// Clear the VM valid state early. That way we can't do anything in the UI if we take a while to shut down.
@@ -2062,7 +2062,7 @@ void MainWindow::onVMStopped()
 	updateInputRecordingActions(false);
 
 	// If we're closing or in batch mode, quit the whole application now.
-	if (m_is_closing || QtHost::InBatchMode())
+	if (m_is_closing || Host::InBatchMode())
 	{
 		quit();
 		return;
@@ -2171,56 +2171,55 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 
 void MainWindow::dropEvent(QDropEvent* event)
 {
+	if (startFile(getFilenameFromMimeData(event->mimeData())))
+		event->acceptProposedAction();
+}
+
+bool MainWindow::startFile(const QString& filename)
+{
 	const auto mcLock = pauseAndLockVM();
 
 	// Check if memcard is busy, deny request if so
 	if (shouldAbortForMemcardBusy(mcLock))
 	{
-		return;
+		return false;
 	}
 
-	const QString filename(getFilenameFromMimeData(event->mimeData()));
-	const std::string filename_str(filename.toStdString());
+	std::string filename_str = filename.toStdString();
+
 	if (VMManager::IsSaveStateFileName(filename_str))
 	{
-		event->acceptProposedAction();
-
 		// can't load a save state without a current VM
 		if (s_vm_valid)
 			g_emu_thread->loadState(filename);
 		else
 			QMessageBox::critical(this, tr("Load State Failed"), tr("Cannot load a save state without a running VM."));
 
-		return;
+		return true;
 	}
 
 	if (!VMManager::IsLoadableFileName(filename_str))
-		return;
+		return false;
 
 	// if we're already running, do a disc change, otherwise start
 	if (!s_vm_valid)
 	{
-		event->acceptProposedAction();
 		doStartFile(std::nullopt, filename);
-		return;
+		return true;
 	}
 
 	if (VMManager::IsDiscFileName(filename_str) || VMManager::IsBlockDumpFileName(filename_str))
 	{
-		event->acceptProposedAction();
 		doDiscChange(CDVD_SourceType::Iso, filename);
 	}
 	else if (VMManager::IsElfFileName(filename_str))
 	{
 		const auto lock = pauseAndLockVM();
 
-		event->acceptProposedAction();
-
-		if (QMessageBox::question(this, tr("Confirm Reset"),
-				tr("The new ELF cannot be loaded without resetting the virtual machine. Do you want to reset the virtual machine now?")) !=
-			QMessageBox::Yes)
+		if (QMessageBox::Yes != QMessageBox::question(this, tr("Confirm Reset"),
+				tr("The new ELF cannot be loaded without resetting the virtual machine. Do you want to reset the virtual machine now?")))
 		{
-			return;
+			return true;
 		}
 
 		g_emu_thread->setELFOverride(filename);
@@ -2228,17 +2227,15 @@ void MainWindow::dropEvent(QDropEvent* event)
 	}
 	else if (VMManager::IsGSDumpFileName(filename_str))
 	{
-		event->acceptProposedAction();
-
 		if (!GSDumpReplayer::IsReplayingDump())
 		{
 			QMessageBox::critical(this, tr("Error"), tr("Cannot change from game to GS dump without shutting down first."));
-			return;
 		}
 
 		g_emu_thread->changeGSDump(filename);
 		switchToEmulationView();
 	}
+	return true;
 }
 
 void MainWindow::moveEvent(QMoveEvent* event)

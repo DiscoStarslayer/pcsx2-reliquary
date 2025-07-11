@@ -703,11 +703,17 @@ bool GSDevice12::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	if (!AcquireWindow(true) || (m_window_info.type != WindowInfo::Type::Surfaceless && !CreateSwapChain()))
 		return false;
 
+	if (!CreateNullTexture())
+	{
+		Host::ReportErrorAsync("GS", "Failed to create dummy texture");
+		return false;
+	}
+
 	{
 		std::optional<std::string> shader = ReadShaderSource("shaders/dx11/tfx.fx");
 		if (!shader.has_value())
 		{
-			Host::ReportErrorAsync("GS", "Failed to read shaders/dx11/tfx.fxf.");
+			Host::ReportErrorAsync("GS", "Failed to read shaders/dx11/tfx.fx.");
 			return false;
 		}
 
@@ -716,12 +722,6 @@ bool GSDevice12::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 
 	if (!m_shader_cache.Open(m_feature_level, GSConfig.UseDebugDevice))
 		Console.Warning("D3D12: Shader cache failed to open.");
-
-	if (!CreateNullTexture())
-	{
-		Host::ReportErrorAsync("GS", "Failed to create dummy texture");
-		return false;
-	}
 
 	if (!CreateRootSignatures())
 	{
@@ -1486,15 +1486,15 @@ void GSDevice12::ConvertToIndexedTexture(
 	{
 		float scale;
 		float pad1[3];
-		u32 SBW, DBW, pad2;
+		u32 SBW, DBW, SPSM;
 	};
 
-	const Uniforms cb = {sScale, {}, SBW, DBW};
+	const Uniforms cb = {sScale, {}, SBW, DBW, SPSM};
 	SetUtilityRootSignature();
 	SetUtilityPushConstants(&cb, sizeof(cb));
 
 	const GSVector4 dRect(0, 0, dTex->GetWidth(), dTex->GetHeight());
-	const ShaderConvert shader = ShaderConvert::RGBA_TO_8I;
+	const ShaderConvert shader = ((SPSM & 0xE) == 0) ? ShaderConvert::RGBA_TO_8I : ShaderConvert::RGB5A1_TO_8I;
 	DoStretchRect(static_cast<GSTexture12*>(sTex), GSVector4::zero(), static_cast<GSTexture12*>(dTex), dRect,
 		m_convert[static_cast<int>(shader)].get(), false, true);
 }
@@ -3903,7 +3903,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 		config.rt = backup_rt;
 		if (!date_image)
 		{
-			Console.WriteLn("D3D12: Failed to allocate DATE image, aborting draw.");
+			Console.Warning("D3D12: Failed to allocate DATE image, aborting draw.");
 			return;
 		}
 	}
@@ -3917,7 +3917,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 		{
 			EndRenderPass();
 
-			GL_PUSH("Copy RT to temp texture {%d,%d %dx%d}", config.drawarea.left, config.drawarea.top,
+			GL_PUSH("D3D12: Copy RT to temp texture {%d,%d %dx%d}", config.drawarea.left, config.drawarea.top,
 				config.drawarea.width(), config.drawarea.height());
 
 			draw_rt_clone->SetState(GSTexture::State::Invalidated);
@@ -3927,6 +3927,8 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 			if (config.tex && config.tex == config.rt)
 				PSSetShaderResource(0, draw_rt_clone, true);
 		}
+		else
+			Console.Warning("D3D12: Failed to allocate temp texture for RT copy.");
 	}
 
 	if (config.tex && config.tex == config.ds)
@@ -3937,13 +3939,15 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 		{
 			EndRenderPass();
 
-			GL_PUSH("Copy RT to temp texture {%d,%d %dx%d}", config.drawarea.left, config.drawarea.top,
+			GL_PUSH("D3D12: Copy DS to temp texture {%d,%d %dx%d}", config.drawarea.left, config.drawarea.top,
 				config.drawarea.width(), config.drawarea.height());
 
 			draw_ds_clone->SetState(GSTexture::State::Invalidated);
 			CopyRect(config.ds, draw_ds_clone, config.drawarea, config.drawarea.left, config.drawarea.top);
 			PSSetShaderResource(0, draw_ds_clone, true);
 		}
+		else
+			Console.Warning("D3D12: Failed to allocate temp texture for DS copy.");
 	}
 
 	// Switch to colclip target for colclip hw rendering
@@ -3958,7 +3962,7 @@ void GSDevice12::RenderHW(GSHWDrawConfig& config)
 			colclip_rt = static_cast<GSTexture12*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false));
 			if (!colclip_rt)
 			{
-				Console.WriteLn("D3D12: Failed to allocate ColorClip render target, aborting draw.");
+				Console.Warning("D3D12: Failed to allocate ColorClip render target, aborting draw.");
 
 				if (date_image)
 					Recycle(date_image);

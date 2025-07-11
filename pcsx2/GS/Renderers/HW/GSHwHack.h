@@ -16,12 +16,9 @@ public:
 	static bool GSC_BlackAndBurnoutSky(GSRendererHW& r, int& skip);
 	static bool GSC_MidnightClub3(GSRendererHW& r, int& skip);
 	static bool GSC_TalesOfLegendia(GSRendererHW& r, int& skip);
-	static bool GSC_Kunoichi(GSRendererHW& r, int& skip);
 	static bool GSC_ZettaiZetsumeiToshi2(GSRendererHW& r, int& skip);
-	static bool GSC_SakuraWarsSoLongMyLove(GSRendererHW& r, int& skip);
 	static bool GSC_UltramanFightingEvolution(GSRendererHW& r, int& skip);
 	static bool GSC_TalesofSymphonia(GSRendererHW& r, int& skip);
-	static bool GSC_Simple2000Vol114(GSRendererHW& r, int& skip);
 	static bool GSC_UrbanReign(GSRendererHW& r, int& skip);
 	static bool GSC_SteambotChronicles(GSRendererHW& r, int& skip);
 	static bool GSC_BlueTongueGames(GSRendererHW& r, int& skip);
@@ -29,7 +26,7 @@ public:
 	static bool GSC_Battlefield2(GSRendererHW& r, int& skip);
 	static bool GSC_PolyphonyDigitalGames(GSRendererHW& r, int& skip);
 	static bool GSC_MetalGearSolid3(GSRendererHW& r, int& skip);
-	static bool GSC_HitmanBloodMoney(GSRendererHW& r, int& skip);
+	static bool GSC_Turok(GSRendererHW& r, int& skip);
 
 	static bool OI_PointListPalette(GSRendererHW& r, GSTexture* rt, GSTexture* ds, GSTextureCache::Source* t);
 	static bool OI_DBZBTGames(GSRendererHW& r, GSTexture* rt, GSTexture* ds, GSTextureCache::Source* t);

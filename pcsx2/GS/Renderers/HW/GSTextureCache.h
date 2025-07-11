@@ -45,6 +45,9 @@ public:
 		bool HasY() const { return static_cast<u32>(bits >> 32) != 0; }
 		bool HasEither() const { return (bits != 0); }
 
+		void ClearX() { bits &= ~0xFFFFFFFFULL; }
+		void ClearY() { bits &= 0xFFFFFFFFULL; }
+
 		void SetX(s32 min, s32 max) { bits |= (static_cast<u64>(static_cast<u16>(min)) | (static_cast<u64>(static_cast<u16>(max) << 16))); }
 		void SetY(s32 min, s32 max) { bits |= ((static_cast<u64>(static_cast<u16>(min)) << 32) | (static_cast<u64>(static_cast<u16>(max)) << 48)); }
 
@@ -210,6 +213,7 @@ public:
 	{
 		u32 ZBP;
 		int offset;
+		int rt_offset;
 		GSVector4i rect_since;
 	};
 
@@ -564,7 +568,7 @@ public:
 	void SetTemporaryZ(GSTexture* temp_z);
 	GSTexture* GetTemporaryZ();
 	TempZAddress GetTemporaryZInfo();
-	void SetTemporaryZInfo(u32 address, u32 offset);
+	void SetTemporaryZInfo(u32 address, u32 offset, u32 rt_offset);
 	void SetTemporaryZInfo(TempZAddress address_info);
 	/// Invalidates a temporary Z, a partial copy only created from the current DS for the current draw when Z is not offset but RT is.
 	void InvalidateTemporaryZ();

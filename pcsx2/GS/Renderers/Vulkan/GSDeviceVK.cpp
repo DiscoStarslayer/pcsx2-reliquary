@@ -84,7 +84,6 @@ static std::mutex s_instance_mutex;
 // Device extensions that are required for PCSX2.
 static constexpr const char* s_required_device_extensions[] = {
 	VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME,
-	VK_KHR_SHADER_DRAW_PARAMETERS_EXTENSION_NAME,
 };
 
 GSDeviceVK::GSDeviceVK()
@@ -401,14 +400,6 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 			return false;
 	}
 
-	// MoltenVK does not support VK_EXT_line_rasterization. We want it for other platforms,
-	// but on Mac, the implicit line rasterization apparently matches Bresenham anyway.
-#ifdef __APPLE__
-	static constexpr bool require_line_rasterization = false;
-#else
-	static constexpr bool require_line_rasterization = true;
-#endif
-
 	m_optional_extensions.vk_ext_provoking_vertex = SupportsExtension(VK_EXT_PROVOKING_VERTEX_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_memory_budget = SupportsExtension(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_calibrated_timestamps =
@@ -417,8 +408,7 @@ bool GSDeviceVK::SelectDeviceExtensions(ExtensionList* extension_list, bool enab
 		SupportsExtension(VK_EXT_RASTERIZATION_ORDER_ATTACHMENT_ACCESS_EXTENSION_NAME, false);
 	m_optional_extensions.vk_ext_attachment_feedback_loop_layout =
 		SupportsExtension(VK_EXT_ATTACHMENT_FEEDBACK_LOOP_LAYOUT_EXTENSION_NAME, false);
-	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME,
-		require_line_rasterization);
+	m_optional_extensions.vk_ext_line_rasterization = SupportsExtension(VK_EXT_LINE_RASTERIZATION_EXTENSION_NAME, false);
 	m_optional_extensions.vk_khr_driver_properties = SupportsExtension(VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME, false);
 
 	// glslang generates debug info instructions before phi nodes at the beginning of blocks when non-semantic debug info
@@ -764,15 +754,10 @@ bool GSDeviceVK::ProcessDeviceExtensions()
 		return false;
 	}
 
-	if (!line_rasterization_feature.bresenhamLines)
+	if (m_optional_extensions.vk_ext_line_rasterization && !line_rasterization_feature.bresenhamLines)
 	{
-		// See note in SelectDeviceExtensions().
-		Console.Error("VK: bresenhamLines is not supported.");
-#ifndef __APPLE__
-		return false;
-#else
+		Console.Warning("VK: bresenhamLines is not supported.");
 		m_optional_extensions.vk_ext_line_rasterization = false;
-#endif
 	}
 
 	// VK_EXT_calibrated_timestamps checking
@@ -2059,6 +2044,12 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		return false;
 	}
 
+	if (!CreateNullTexture())
+	{
+		Host::ReportErrorAsync("GS", "Failed to create dummy texture");
+		return false;
+	}
+
 	{
 		std::optional<std::string> shader = ReadShaderSource("shaders/vulkan/tfx.glsl");
 		if (!shader.has_value())
@@ -2068,12 +2059,6 @@ bool GSDeviceVK::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		}
 
 		m_tfx_source = std::move(*shader);
-	}
-
-	if (!CreateNullTexture())
-	{
-		Host::ReportErrorAsync("GS", "Failed to create dummy texture");
-		return false;
 	}
 
 	if (!CreatePipelineLayouts())
@@ -3158,15 +3143,16 @@ void GSDeviceVK::ConvertToIndexedTexture(
 	{
 		u32 SBW;
 		u32 DBW;
-		u32 pad1[2];
+		u32 PSM;
+		u32 pad1[1];
 		float ScaleFactor;
 		float pad2[3];
 	};
 
-	const Uniforms uniforms = {SBW, DBW, {}, sScale, {}};
+	const Uniforms uniforms = {SBW, DBW, SPSM, {}, sScale, {}};
 	SetUtilityPushConstants(&uniforms, sizeof(uniforms));
 
-	const ShaderConvert shader = ShaderConvert::RGBA_TO_8I;
+	const ShaderConvert shader = ((SPSM & 0xE) == 0) ? ShaderConvert::RGBA_TO_8I : ShaderConvert::RGB5A1_TO_8I;
 	const GSVector4 dRect(0, 0, dTex->GetWidth(), dTex->GetHeight());
 	DoStretchRect(static_cast<GSTextureVK*>(sTex), GSVector4::zero(), static_cast<GSTextureVK*>(dTex), dRect,
 		m_convert[static_cast<int>(shader)], false, true);
@@ -3369,13 +3355,13 @@ void GSDeviceVK::DoFXAA(GSTexture* sTex, GSTexture* dTex)
 	static_cast<GSTextureVK*>(dTex)->TransitionToLayout(GSTextureVK::Layout::ShaderReadOnly);
 }
 
-void GSDeviceVK::IASetVertexBuffer(const void* vertex, size_t stride, size_t count)
+void GSDeviceVK::IASetVertexBuffer(const void* vertex, size_t stride, size_t count, size_t align_multiplier)
 {
 	const u32 size = static_cast<u32>(stride) * static_cast<u32>(count);
-	if (!m_vertex_stream_buffer.ReserveMemory(size, static_cast<u32>(stride)))
+	if (!m_vertex_stream_buffer.ReserveMemory(size, static_cast<u32>(stride) * align_multiplier))
 	{
 		ExecuteCommandBufferAndRestartRenderPass(false, "Uploading bytes to vertex buffer");
-		if (!m_vertex_stream_buffer.ReserveMemory(size, static_cast<u32>(stride)))
+		if (!m_vertex_stream_buffer.ReserveMemory(size, static_cast<u32>(stride) * align_multiplier))
 			pxFailRel("Failed to reserve space for vertices");
 	}
 
@@ -3625,7 +3611,6 @@ static void AddShaderHeader(std::stringstream& ss)
 
 	ss << "#version 460 core\n";
 	ss << "#extension GL_EXT_samplerless_texture_functions : require\n";
-	ss << "#extension GL_ARB_shader_draw_parameters : require\n";
 
 	if (!features.texture_barrier)
 		ss << "#define DISABLE_TEXTURE_BARRIER 1\n";
@@ -5291,8 +5276,12 @@ void GSDeviceVK::SetPipeline(VkPipeline pipeline)
 
 void GSDeviceVK::SetInitialState(VkCommandBuffer cmdbuf)
 {
-	const VkDeviceSize buffer_offset = 0;
-	vkCmdBindVertexBuffers(cmdbuf, 0, 1, m_vertex_stream_buffer.GetBufferPtr(), &buffer_offset);
+	VkBuffer buffer = *m_vertex_stream_buffer.GetBufferPtr();
+	if (buffer != VK_NULL_HANDLE)
+	{
+		constexpr VkDeviceSize buffer_offset = 0;
+		vkCmdBindVertexBuffers(cmdbuf, 0, 1, &buffer, &buffer_offset);
+	}
 }
 
 __ri void GSDeviceVK::ApplyBaseState(u32 flags, VkCommandBuffer cmdbuf)
@@ -5625,7 +5614,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 		date_image = SetupPrimitiveTrackingDATE(config);
 		if (!date_image)
 		{
-			Console.WriteLn("Failed to allocate DATE image, aborting draw.");
+			Console.Warning("VK: Failed to allocate DATE image, aborting draw.");
 			return;
 		}
 
@@ -5726,12 +5715,14 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 		{
 			EndRenderPass();
 
-			GL_PUSH("Copy RT to temp texture for fbmask {%d,%d %dx%d}", config.drawarea.left, config.drawarea.top,
+			GL_PUSH("VK: Copy RT to temp texture for fbmask {%d,%d %dx%d}", config.drawarea.left, config.drawarea.top,
 				config.drawarea.width(), config.drawarea.height());
 
 			CopyRect(draw_rt, draw_rt_clone, config.drawarea, config.drawarea.left, config.drawarea.top);
 			PSSetShaderResource(2, draw_rt_clone, true);
 		}
+		else
+			Console.Warning("VK: Failed to allocate temp texture for RT copy.");
 	}
 
 	// Switch to colclip target for colclip hw rendering
@@ -5744,7 +5735,7 @@ void GSDeviceVK::RenderHW(GSHWDrawConfig& config)
 			colclip_rt = static_cast<GSTextureVK*>(CreateRenderTarget(rtsize.x, rtsize.y, GSTexture::Format::ColorClip, false));
 			if (!colclip_rt)
 			{
-				Console.WriteLn("Failed to allocate ColorClip render target, aborting draw.");
+				Console.Warning("VK: Failed to allocate ColorClip render target, aborting draw.");
 
 				if (date_image)
 					Recycle(date_image);
@@ -6031,7 +6022,8 @@ void GSDeviceVK::UpdateHWPipelineSelector(GSHWDrawConfig& config, PipelineSelect
 
 void GSDeviceVK::UploadHWDrawVerticesAndIndices(const GSHWDrawConfig& config)
 {
-	IASetVertexBuffer(config.verts, sizeof(GSVertex), config.nverts);
+	IASetVertexBuffer(config.verts, sizeof(GSVertex), config.nverts, GetVertexAlignment(config.vs.expand));
+	m_vertex.start *= GetExpansionFactor(config.vs.expand);
 
 	if (config.vs.UseExpandIndexBuffer())
 	{

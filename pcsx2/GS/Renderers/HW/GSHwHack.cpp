@@ -184,40 +184,6 @@ bool GSHwHack::GSC_NamcoGames(GSRendererHW& r, int& skip)
 {
 	if (skip == 0)
 	{
-		if (r.IsPossibleChannelShuffle() && !(RTBP0 & 31))
-		{
-			GSVertex* v = &r.m_vertex.buff[0];
-
-			// Make sure we're detecting the right effect.
-			if (((v[1].XYZ.X - v[0].XYZ.X) >> 4) != 8 || ((v[1].XYZ.Y - v[0].XYZ.Y) >> 4) != 14)
-				return false;
-
-			GSTextureCache::Target* rt = g_texture_cache->LookupTarget(GIFRegTEX0::Create(RTBP0, RFBW, RFPSM),
-				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::RenderTarget);
-			if (!rt)
-				return false;
-
-			GL_INS("GSC_NamcoGames(): HLE channel shuffle");
-
-			// have to set up the palette ourselves too, since GSC executes before it does
-			r.m_mem.m_clut.Read32(RTEX0, r.m_draw_env->TEXA);
-			std::shared_ptr<GSTextureCache::Palette> palette =
-				g_texture_cache->LookupPaletteObject(r.m_mem.m_clut, GSLocalMemory::m_psm[RTEX0.PSM].pal, true);
-			if (!palette)
-				return false;
-
-			GSHWDrawConfig& conf = r.BeginHLEHardwareDraw(
-				rt->GetTexture(), nullptr, rt->GetScale(), rt->GetTexture(), rt->GetScale(), rt->GetUnscaledRect());
-			conf.pal = palette->GetPaletteGSTexture();
-			conf.ps.channel = ChannelFetch_RGB;
-			conf.colormask.wa = false;
-			r.EndHLEHardwareDraw(false);
-
-			// 12 pages: 2 calls by channel, 3 channels, 1 blit
-			skip = 12 * (3 + 3 + 1);
-			return true;
-		}
-
 		if (!s_nativeres && r.PRIM->PRIM == GS_SPRITE && RTME && RTEX0.TFX == 1 && RFPSM == RTPSM && RTPSM == PSMCT32 && RFBMSK == 0xFF000000 && r.m_index.tail > 2)
 		{
 			GSVertex* v = &r.m_vertex.buff[0];
@@ -431,31 +397,6 @@ bool GSHwHack::GSC_TalesOfLegendia(GSRendererHW& r, int& skip)
 	return true;
 }
 
-bool GSHwHack::GSC_Kunoichi(GSRendererHW& r, int& skip)
-{
-	if (skip == 0)
-	{
-		if (!RTME && (RFBP == 0x0 || RFBP == 0x00700 || RFBP == 0x00800) && RFPSM == PSMCT32 && RFBMSK == 0x00FFFFFF)
-		{
-			// Removes depth effects(shadows) not rendered correctly on all renders.
-			skip = 3;
-		}
-		if (RTME && (RFBP == 0x0700 || RFBP == 0) && RTBP0 == 0x0e00 && RTPSM == 0 && RFBMSK == 0)
-		{
-			skip = 1; // Removes black screen (not needed anymore maybe)?
-		}
-	}
-	else
-	{
-		if (RTME && (RFBP == 0x0e00) && RFPSM == PSMCT32 && RFBMSK == 0xFF000000)
-		{
-			skip = 0;
-		}
-	}
-
-	return true;
-}
-
 bool GSHwHack::GSC_ZettaiZetsumeiToshi2(GSRendererHW& r, int& skip)
 {
 	if (skip == 0)
@@ -505,27 +446,6 @@ bool GSHwHack::GSC_ZettaiZetsumeiToshi2(GSRendererHW& r, int& skip)
 	return true;
 }
 
-bool GSHwHack::GSC_SakuraWarsSoLongMyLove(GSRendererHW& r, int& skip)
-{
-	if (skip == 0)
-	{
-		if (RTME == 0 && RFBP != RTBP0 && RTBP0 && RFBMSK == 0x00FFFFFF)
-		{
-			skip = 3; // Remove darkness
-		}
-		else if (RTME == 0 && RFBP == RTBP0 && (RTBP0 == 0x1200 || RTBP0 == 0x1180 || RTBP0 == 0) && RFBMSK == 0x00FFFFFF)
-		{
-			skip = 3; // Remove darkness
-		}
-		else if (RTME && (RFBP == 0 || RFBP == 0x1180) && RFPSM == PSMCT32 && RTBP0 == 0x3F3F && RTPSM == PSMT8)
-		{
-			skip = 1; // Floodlight
-		}
-	}
-
-	return true;
-}
-
 bool GSHwHack::GSC_UltramanFightingEvolution(GSRendererHW& r, int& skip)
 {
 	if (skip == 0)
@@ -551,26 +471,6 @@ bool GSHwHack::GSC_TalesofSymphonia(GSRendererHW& r, int& skip)
 		if (RTME && (RTBP0 == 0x1180 || RTBP0 == 0x1a40 || RTBP0 == 0x2300) && RFBMSK >= 0xFF000000)
 		{
 			skip = 1; // Afterimage
-		}
-	}
-
-	return true;
-}
-
-bool GSHwHack::GSC_Simple2000Vol114(GSRendererHW& r, int& skip)
-{
-	if (skip == 0)
-	{
-		if (!s_nativeres && RTME == 0 && (RFBP == 0x1500) && (RTBP0 == 0x2c97 || RTBP0 == 0x2ace || RTBP0 == 0x03d0 || RTBP0 == 0x2448) && (RFBMSK == 0x0000))
-		{
-			// Don't enable hack on native res if crc is below aggressive.
-			// Upscaling issues, removes glow/blur effect which fixes ghosting.
-			skip = 1;
-		}
-		if (RTME && (RFBP == 0x0e00) && (RTBP0 == 0x1000) && (RFBMSK == 0x0000))
-		{
-			// Depth shadows.
-			skip = 1;
 		}
 	}
 
@@ -737,7 +637,7 @@ bool GSHwHack::GSC_PolyphonyDigitalGames(GSRendererHW& r, int& skip)
 		constexpr u32 base = 0;
 
 		GL_PUSH("GSC_PolyphonyDigitalGames(): HLE Gran Turismo A channel shuffle");
-		GL_INS("Src: %x %s TBW %u, Dst: %x, %x, %x", src->m_TEX0.TBP0, psm_str(src->m_TEX0.PSM), src->m_TEX0.TBW,
+		GL_INS("Src: %x %s TBW %u, Dst: %x, %x, %x", src->m_TEX0.TBP0, GSUtil::GetPSMName(src->m_TEX0.PSM), src->m_TEX0.TBW,
 			base, base + page_offset, base + page_offset * 2);
 		GL_INS("Rect: %d,%d => %d,%d", src->m_drawn_since_read.x, src->m_drawn_since_read.y,
 			src->m_drawn_since_read.z, src->m_drawn_since_read.w);
@@ -922,21 +822,25 @@ bool GSHwHack::GSC_MetalGearSolid3(GSRendererHW& r, int& skip)
 	return true;
 }
 
-bool GSHwHack::GSC_HitmanBloodMoney(GSRendererHW& r, int& skip)
+bool GSHwHack::GSC_Turok(GSRendererHW& r, int& skip)
 {
-	// The game does a stupid thing where it backs up the last 2 pages of the framebuffer with shuffles, uploads a CT32 texture to it
-	// then copies the RGB back (keeping the new alpha only). It's pretty gross, I have no idea why they didn't just upload a new alpha.
-	// This is a real pain to emulate with the current state of things, so let's just clear the dirty area from the upload and pretend it wasn't there.
-	
-	// Catch the first draw of the copy back.
-	if (RFBP > 0 && RTPSM == PSMT8H && RFPSM == PSMCT32)
+	// Turok does some very silly clears where it will set the alpha channel with a 512x512 draw, then decides the image is actually 640x448 later, this causes havok for the texture cache and target end blocks.
+	// Since we can't look in to the future to check this, the options are either rearrange all the pages in a target when the width changes
+	// (very slow, could break a ton of stuff which stores different things in the alpha channel), or this. I choose this.
+
+	if (r.m_index.tail == 6 && RPRIM->PRIM == 4 && !RTME && RFBMSK == 0x00FFFFFF && floor(r.m_vt.m_max.p.x) == 512 && r.m_env.CTXT[r.m_backed_up_ctx].FRAME.FBW == 10 && RFRAME.FBW == 8 && RFPSM == PSMCT32 && RTEST.ATE && RTEST.ATST == ATST_GEQUAL)
 	{
-		GSTextureCache::Target* target = g_texture_cache->FindOverlappingTarget(RFBP, RFBP + 1);
-		if (target)
-			target->m_dirty.clear();
+		int num_pages = r.m_cached_ctx.FRAME.FBW * ((floor(r.m_vt.m_max.p.y) + 31) / 32);
+		r.m_cached_ctx.FRAME.FBW = 10;
+		// Round them up to fill the row, it later reads the bottom right corner clamped, but because we can't rearrange it ends up reading the black square.
+		num_pages = ((num_pages + 9) / 10) * 10;
+
+		r.ReplaceVerticesWithSprite(
+			r.GetDrawRectForPages(r.m_cached_ctx.FRAME.FBW, r.m_cached_ctx.FRAME.PSM, num_pages),
+			GSVector2i(1, 1));
 	}
 
-	return false;
+	return true;
 }
 
 bool GSHwHack::OI_PointListPalette(GSRendererHW& r, GSTexture* rt, GSTexture* ds, GSTextureCache::Source* t)
@@ -1413,13 +1317,10 @@ bool GSHwHack::MV_Ico(GSRendererHW& r)
 #define CRC_F(name) { #name, &GSHwHack::name }
 
 const GSHwHack::Entry<GSRendererHW::GSC_Ptr> GSHwHack::s_get_skip_count_functions[] = {
-	CRC_F(GSC_Kunoichi),
 	CRC_F(GSC_Manhunt2),
 	CRC_F(GSC_MidnightClub3),
 	CRC_F(GSC_SacredBlaze),
 	CRC_F(GSC_GuitarHero),
-	CRC_F(GSC_SakuraWarsSoLongMyLove),
-	CRC_F(GSC_Simple2000Vol114),
 	CRC_F(GSC_SFEX3),
 	CRC_F(GSC_DTGames),
 	CRC_F(GSC_TalesOfLegendia),
@@ -1431,8 +1332,8 @@ const GSHwHack::Entry<GSRendererHW::GSC_Ptr> GSHwHack::s_get_skip_count_function
 	CRC_F(GSC_NFSUndercover),
 	CRC_F(GSC_PolyphonyDigitalGames),
 	CRC_F(GSC_MetalGearSolid3),
-	CRC_F(GSC_HitmanBloodMoney),
 	CRC_F(GSC_Battlefield2),
+	CRC_F(GSC_Turok),
 
 	// Channel Effect
 	CRC_F(GSC_NamcoGames),

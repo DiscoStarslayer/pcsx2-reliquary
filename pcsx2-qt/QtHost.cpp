@@ -602,7 +602,7 @@ void Host::CheckForSettingsChanges(const Pcsx2Config& old_config)
 
 bool EmuThread::shouldRenderToMain() const
 {
-	return !Host::GetBoolSettingValue("UI", "RenderToSeparateWindow", false) && !QtHost::InNoGUIMode();
+	return !Host::GetBoolSettingValue("UI", "RenderToSeparateWindow", false) && !Host::InNoGUIMode();
 }
 
 void EmuThread::toggleSoftwareRendering()
@@ -1268,7 +1268,7 @@ void Host::RequestVMShutdown(bool allow_confirm, bool allow_save_state, bool def
 
 		// This will probably call shutdownVM() again, but by the time it runs, we'll have already shut down
 		// and it'll be a noop.
-		if (QtHost::InBatchMode())
+		if (Host::InBatchMode())
 			QMetaObject::invokeMethod(g_main_window, "requestExit", Qt::QueuedConnection, Q_ARG(bool, false));
 	}
 }
@@ -1437,12 +1437,12 @@ void Host::CommitBaseSettingChanges()
 	}
 }
 
-bool QtHost::InBatchMode()
+bool Host::InBatchMode()
 {
 	return s_batch_mode;
 }
 
-bool QtHost::InNoGUIMode()
+bool Host::InNoGUIMode()
 {
 	return s_nogui_mode;
 }
@@ -2327,14 +2327,34 @@ bool QtHost::RunSetupWizard()
 	return true;
 }
 
+class PCSX2MainApplication : public QApplication {
+public:
+	using QApplication::QApplication;
+
+	bool event(QEvent* event) override {
+		if (event->type() == QEvent::FileOpen)
+		{
+			QFileOpenEvent* open = static_cast<QFileOpenEvent*>(event);
+			const QUrl url = open->url();
+			if (url.isLocalFile())
+				return g_main_window->startFile(url.toLocalFile());
+			else
+				return false; // No URL schemas currently supported
+		}
+		return QApplication::event(event);
+	}
+};
+
 int main(int argc, char* argv[])
 {
 	CrashHandler::Install();
 
+	std::locale::global(std::locale(""));
+
 	QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
 	QtHost::RegisterTypes();
 
-	QApplication app(argc, argv);
+	PCSX2MainApplication app(argc, argv);
 
 #ifndef _WIN32
 	if (!PerformEarlyHardwareChecks())

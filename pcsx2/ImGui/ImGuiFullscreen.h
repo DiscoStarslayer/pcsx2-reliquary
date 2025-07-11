@@ -5,7 +5,7 @@
 
 #include "common/Pcsx2Defs.h"
 
-#include "IconsFontAwesome5.h"
+#include "IconsFontAwesome6.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 
@@ -235,7 +235,9 @@ namespace ImGuiFullscreen
 
 	bool BeginHorizontalMenu(const char* name, const ImVec2& position, const ImVec2& size, u32 num_items);
 	void EndHorizontalMenu();
+	bool HorizontalMenuItem(GSTexture* icon, const ImVec2& icon_uv0, const ImVec2& icon_uv1, const char* title, const char* description);
 	bool HorizontalMenuItem(GSTexture* icon, const char* title, const char* description);
+	bool HorizontalMenuSvgItem(const char* svg_path, const char* title, const char* description, SvgScaling mode = SvgScaling::Stretch);
 
 	using FileSelectorCallback = std::function<void(const std::string& path)>;
 	using FileSelectorFilters = std::vector<std::string>;
@@ -261,9 +263,9 @@ namespace ImGuiFullscreen
 	using MessageDialogCallback = std::function<void(s32)>;
 	bool IsMessageBoxDialogOpen();
 	void OpenConfirmMessageDialog(std::string title, std::string message, ConfirmMessageDialogCallback callback,
-		std::string yes_button_text = ICON_FA_CHECK " Yes", std::string no_button_text = ICON_FA_TIMES " No");
+		std::string yes_button_text = ICON_FA_CHECK " Yes", std::string no_button_text = ICON_FA_XMARK " No");
 	void OpenInfoMessageDialog(std::string title, std::string message, InfoMessageDialogCallback callback = {},
-		std::string button_text = ICON_FA_WINDOW_CLOSE " Close");
+		std::string button_text = ICON_FA_SQUARE_XMARK " Close");
 	void OpenMessageDialog(std::string title, std::string message, MessageDialogCallback callback, std::string first_button_text,
 		std::string second_button_text, std::string third_button_text);
 	void CloseMessageDialog();
@@ -271,6 +273,7 @@ namespace ImGuiFullscreen
 	float GetNotificationVerticalPosition();
 	float GetNotificationVerticalDirection();
 	void SetNotificationVerticalPosition(float position, float direction);
+	void SetNotificationPosition(float horizontal_position, float vertical_position, float direction);
 
 	void OpenBackgroundProgressDialog(const char* str_id, std::string message, s32 min, s32 max, s32 value);
 	void UpdateBackgroundProgressDialog(const char* str_id, std::string message, s32 min, s32 max, s32 value);

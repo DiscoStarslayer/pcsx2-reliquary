@@ -145,9 +145,11 @@ private:
 		ID3D11VertexShader* vs;
 		ID3D11Buffer* vs_cb;
 		std::array<ID3D11ShaderResourceView*, MAX_TEXTURES> ps_sr_views;
+		std::array<ID3D11ShaderResourceView*, MAX_TEXTURES> ps_cached_sr_views;
 		ID3D11PixelShader* ps;
 		ID3D11Buffer* ps_cb;
 		std::array<ID3D11SamplerState*, MAX_SAMPLERS> ps_ss;
+		std::array<ID3D11SamplerState*, MAX_SAMPLERS> ps_cached_ss;
 		GSVector2i viewport;
 		GSVector4i scissor;
 		u32 vb_stride;
@@ -157,6 +159,8 @@ private:
 		u8 bf;
 		ID3D11RenderTargetView* rt_view;
 		ID3D11DepthStencilView* dsv;
+		GSTexture* cached_rt_view;
+		GSTexture* cached_dsv;
 	} m_state;
 
 	std::array<std::array<wil::com_ptr_nothrow<ID3D11Query>, 3>, NUM_TIMESTAMP_QUERIES> m_timestamp_queries = {};
@@ -324,7 +328,8 @@ public:
 
 	void PSSetShaderResource(int i, GSTexture* sr);
 	void PSSetShader(ID3D11PixelShader* ps, ID3D11Buffer* ps_cb);
-	void PSUpdateShaderState();
+	void PSUpdateShaderState(const bool sr_update, const bool ss_update);
+	void PSUnbindConflictingSRVs(GSTexture* tex1 = nullptr, GSTexture* tex2 = nullptr);
 	void PSSetSamplerState(ID3D11SamplerState* ss0);
 
 	void OMSetDepthStencilState(ID3D11DepthStencilState* dss, u8 sref);

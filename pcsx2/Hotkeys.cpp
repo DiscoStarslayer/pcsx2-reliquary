@@ -4,13 +4,14 @@
 #include "Achievements.h"
 #include "GS.h"
 #include "Host.h"
-#include "IconsFontAwesome5.h"
+#include "IconsFontAwesome6.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiOverlays.h"
 #include "Input/InputManager.h"
 #include "Recording/InputRecording.h"
 #include "SPU2/spu2.h"
 #include "VMManager.h"
+#include "SIO/Memcard/MemoryCardFile.h"
 
 #include "common/Assertions.h"
 #include "common/FileSystem.h"
@@ -52,11 +53,11 @@ static void HotkeyAdjustVolume(s32 fixed, s32 delta)
 
 	if (new_volume == 0)
 	{
-		Host::AddIconOSDMessage("VolumeChanged", ICON_FA_VOLUME_MUTE, TRANSLATE_STR("Hotkeys", "Volume: Muted"));
+		Host::AddIconOSDMessage("VolumeChanged", ICON_FA_VOLUME_XMARK, TRANSLATE_STR("Hotkeys", "Volume: Muted"));
 	}
 	else
 	{
-		Host::AddIconOSDMessage("VolumeChanged", (current_vol < new_volume) ? ICON_FA_VOLUME_UP : ICON_FA_VOLUME_DOWN,
+		Host::AddIconOSDMessage("VolumeChanged", (current_vol < new_volume) ? ICON_FA_VOLUME_HIGH : ICON_FA_VOLUME_LOW,
 			fmt::format(TRANSLATE_FS("Hotkeys", "Volume: {}%"), new_volume));
 	}
 }
@@ -67,7 +68,7 @@ static void HotkeyLoadStateSlot(s32 slot)
 	Host::RunOnCPUThread([slot]() {
 		if (!VMManager::HasSaveStateInSlot(VMManager::GetDiscSerial().c_str(), VMManager::GetDiscCRC(), slot))
 		{
-			Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_EXCLAMATION_TRIANGLE,
+			Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
 				fmt::format(TRANSLATE_FS("Hotkeys", "No save state found in slot {}."), slot), Host::OSD_INFO_DURATION);
 			return;
 		}
@@ -222,6 +223,11 @@ DEFINE_HOTKEY("InputRecToggleMode", TRANSLATE_NOOP("Hotkeys", "System"),
 	TRANSLATE_NOOP("Hotkeys", "Toggle Input Recording Mode"), [](s32 pressed) {
 		if (!pressed && VMManager::HasValidVM())
 			g_InputRecording.getControls().toggleRecordMode();
+	})
+DEFINE_HOTKEY("SwapMemCards", TRANSLATE_NOOP("Hotkeys", "System"),
+	TRANSLATE_NOOP("Hotkeys", "Swap Memory Cards"), [](s32 pressed) {
+		if (!pressed && VMManager::HasValidVM())
+			FileMcd_Swap();
 	})
 
 DEFINE_HOTKEY("PreviousSaveStateSlot", TRANSLATE_NOOP("Hotkeys", "Save States"),

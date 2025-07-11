@@ -53,7 +53,7 @@
 #include "common/Threading.h"
 #include "common/Timer.h"
 
-#include "IconsFontAwesome5.h"
+#include "IconsFontAwesome6.h"
 #include "IconsPromptFont.h"
 #include "cpuinfo.h"
 #include "discord_rpc.h"
@@ -1273,7 +1273,7 @@ void VMManager::PrecacheCDVDFile()
 		}
 		else
 		{
-			Host::AddIconOSDMessage("PrecacheCDVDFile", ICON_FA_EXCLAMATION_TRIANGLE,
+			Host::AddIconOSDMessage("PrecacheCDVDFile", ICON_FA_TRIANGLE_EXCLAMATION,
 				fmt::format(TRANSLATE_FS("VMManager", "CDVD precaching failed: {}"), error.GetDescription()),
 				Host::OSD_ERROR_DURATION);
 		}
@@ -1876,7 +1876,7 @@ bool VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 	std::unique_ptr<ArchiveEntryList> elist = SaveState_DownloadState(&error);
 	if (!elist)
 	{
-		Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state: {}."), error.GetDescription()),
 			Host::OSD_ERROR_DURATION);
 		return false;
@@ -1890,7 +1890,7 @@ bool VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 		Console.WriteLn(fmt::format("Creating save state backup {}...", backup_filename));
 		if (!FileSystem::RenamePath(filename, backup_filename.c_str()))
 		{
-			Host::AddIconOSDMessage(osd_key, ICON_FA_EXCLAMATION_TRIANGLE,
+			Host::AddIconOSDMessage(osd_key, ICON_FA_TRIANGLE_EXCLAMATION,
 				fmt::format(
 					TRANSLATE_FS("VMManager", "Failed to back up old save state {}."), Path::GetFileName(filename)),
 				Host::OSD_ERROR_DURATION);
@@ -1924,14 +1924,14 @@ void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
 	{
 		if (slot_for_message >= 0 && VMManager::HasValidVM())
 		{
-			Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_SAVE,
+			Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_FLOPPY_DISK,
 				fmt::format(TRANSLATE_FS("VMManager", "State saved to slot {}."), slot_for_message),
 				Host::OSD_QUICK_DURATION);
 		}
 	}
 	else
 	{
-		Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state to slot {}."), slot_for_message,
 				Host::OSD_ERROR_DURATION));
 	}
@@ -2010,7 +2010,7 @@ bool VMManager::LoadState(const char* filename)
 
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "Failed to load state (Memory card is busy)")),
 			Host::OSD_QUICK_DURATION);
 		return false;
@@ -2029,7 +2029,7 @@ bool VMManager::LoadStateFromSlot(s32 slot, bool backup)
 	const std::string filename = GetCurrentSaveStateFileName(slot, backup);
 	if (filename.empty() || !FileSystem::FileExists(filename.c_str()))
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "There is no saved {} in slot {}."), backup ? TRANSLATE("VMManager", "backup state") : "state", slot),
 			Host::OSD_QUICK_DURATION);
 		return false;
@@ -2047,7 +2047,7 @@ bool VMManager::LoadStateFromSlot(s32 slot, bool backup)
 
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "Failed to load {} from slot {} (Memory card is busy)"), backup ? TRANSLATE("VMManager", "backup state") : TRANSLATE("VMManager", "state"), slot),
 			Host::OSD_QUICK_DURATION);
 		return false;
@@ -2062,7 +2062,7 @@ bool VMManager::SaveState(const char* filename, bool zip_on_thread, bool backup_
 {
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state (Memory card is busy)")),
 			Host::OSD_QUICK_DURATION);
 		return false;
@@ -2079,14 +2079,14 @@ bool VMManager::SaveStateToSlot(s32 slot, bool zip_on_thread)
 
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_EXCLAMATION_TRIANGLE,
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
 			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state to slot {} (Memory card is busy)"), slot),
 			Host::OSD_QUICK_DURATION);
 		return false;
 	}
 
 	// if it takes more than a minute.. well.. wtf.
-	Host::AddIconOSDMessage(fmt::format("SaveStateSlot{}", slot), ICON_FA_SAVE,
+	Host::AddIconOSDMessage(fmt::format("SaveStateSlot{}", slot), ICON_FA_FLOPPY_DISK,
 		fmt::format(TRANSLATE_FS("VMManager", "Saving state to slot {}..."), slot), 60.0f);
 	return DoSaveState(filename.c_str(), slot, zip_on_thread, EmuConfig.BackupSavestate);
 }
@@ -3163,7 +3163,7 @@ void VMManager::WarnAboutUnsafeSettings()
 		append(ICON_FA_COMPACT_DISC, TRANSLATE_SV("VMManager", "Fast CDVD is enabled, this may break games."));
 	if (EmuConfig.Speedhacks.EECycleRate != 0 || EmuConfig.Speedhacks.EECycleSkip != 0)
 	{
-		append(ICON_FA_TACHOMETER_ALT,
+		append(ICON_FA_GAUGE_SIMPLE_HIGH,
 			TRANSLATE_SV("VMManager", "Cycle rate/skip is not at default, this may crash or make games run too slow."));
 	}
 
@@ -3183,7 +3183,7 @@ void VMManager::WarnAboutUnsafeSettings()
 		}
 		if (EmuConfig.GS.AccurateBlendingUnit <= AccBlendLevel::Minimum)
 		{
-			append(ICON_FA_PAINT_BRUSH,
+			append(ICON_FA_PAINTBRUSH,
 				TRANSLATE_SV("VMManager", "Blending Accuracy is below Basic, this may break effects in some games."));
 		}
 		if (EmuConfig.GS.HWDownloadMode != GSHardwareDownloadMode::Enabled)
@@ -3193,22 +3193,22 @@ void VMManager::WarnAboutUnsafeSettings()
 		}
 		if (EmuConfig.GS.GPUPaletteConversion)
 		{
-			append(ICON_FA_EXCLAMATION_CIRCLE,
+			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "GPU Palette Conversion is enabled, this may reduce performance."));
 		}
 		if (EmuConfig.GS.TexturePreloading != TexturePreloadingLevel::Full)
 		{
-			append(ICON_FA_EXCLAMATION_CIRCLE,
+			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "Texture Preloading is not Full, this may reduce performance."));
 		}
 		if (EmuConfig.GS.UserHacks_EstimateTextureRegion)
 		{
-			append(ICON_FA_EXCLAMATION_CIRCLE,
+			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "Estimate texture region is enabled, this may reduce performance."));
 		}
 		if (EmuConfig.GS.DumpReplaceableTextures)
 		{
-			append(ICON_FA_EXCLAMATION_CIRCLE,
+			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "Texture dumping is enabled, this will continually dump textures to disk."));
 		}
 		if (!EmuConfig.GS.HWMipmap)
@@ -3227,7 +3227,7 @@ void VMManager::WarnAboutUnsafeSettings()
 			// show messagesbox
 			render_change_warn = true;
 
-			append(ICON_FA_EXCLAMATION_CIRCLE,
+			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "Renderer is not set to Automatic. This may cause performance problems and graphical issues."));
 		}
 	}
@@ -3302,49 +3302,49 @@ void VMManager::WarnAboutUnsafeSettings()
 	messages.clear();
 	if (!EmuConfig.Cpu.Recompiler.EnableEE)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "EE Recompiler is not enabled, this will significantly reduce performance."));
 	}
 	if (!EmuConfig.Cpu.Recompiler.EnableVU0)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "VU0 Recompiler is not enabled, this will significantly reduce performance."));
 	}
 	if (!EmuConfig.Cpu.Recompiler.EnableVU1)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "VU1 Recompiler is not enabled, this will significantly reduce performance."));
 	}
 	if (!EmuConfig.Cpu.Recompiler.EnableIOP)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "IOP Recompiler is not enabled, this will significantly reduce performance."));
 	}
 	if (EmuConfig.Cpu.Recompiler.EnableEECache)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "EE Cache is enabled, this will significantly reduce performance."));
 	}
 	if (!EmuConfig.Speedhacks.WaitLoop)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "EE Wait Loop Detection is not enabled, this may reduce performance."));
 	}
 	if (!EmuConfig.Speedhacks.IntcStat)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "INTC Spin Detection is not enabled, this may reduce performance."));
 	}
 	if (!EmuConfig.Cpu.Recompiler.EnableFastmem)
-		append(ICON_FA_EXCLAMATION_CIRCLE, TRANSLATE_SV("VMManager", "Fastmem is not enabled, this will reduce performance."));
+		append(ICON_FA_CIRCLE_EXCLAMATION, TRANSLATE_SV("VMManager", "Fastmem is not enabled, this will reduce performance."));
 	if (!EmuConfig.Speedhacks.vu1Instant)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "Instant VU1 is disabled, this may reduce performance."));
 	}
 	if (!EmuConfig.Speedhacks.vuFlagHack)
 	{
-		append(ICON_FA_EXCLAMATION_CIRCLE,
+		append(ICON_FA_CIRCLE_EXCLAMATION,
 			TRANSLATE_SV("VMManager", "mVU Flag Hack is not enabled, this may reduce performance."));
 	}
 

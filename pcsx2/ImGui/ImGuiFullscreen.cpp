@@ -22,7 +22,7 @@
 #include "common/Threading.h"
 #include "common/Timer.h"
 
-#include "IconsFontAwesome5.h"
+#include "IconsFontAwesome6.h"
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
 
@@ -181,6 +181,9 @@ namespace ImGuiFullscreen
 	};
 
 	static std::vector<Notification> s_notifications;
+	static float s_notification_vertical_position = 0.15f;
+	static float s_notification_vertical_direction = 1.0f;
+	static float s_notification_horizontal_position = 0.0f; // 0.0 = left, 0.5 = center, 1.0 = right
 
 	static std::string s_toast_title;
 	static std::string s_toast_message;
@@ -697,7 +700,17 @@ void ImGuiFullscreen::EndLayout()
 	const float notification_margin = LayoutScale(10.0f);
 	const float spacing = LayoutScale(10.0f);
 	const float notification_vertical_pos = GetNotificationVerticalPosition();
-	ImVec2 position(notification_margin, notification_vertical_pos * ImGui::GetIO().DisplaySize.y +
+	
+	// Get the horizonal position based on alignment
+	float horizontal_pos;
+	if (s_notification_horizontal_position <= 0.0f)
+		horizontal_pos = notification_margin; // Left
+	else if (s_notification_horizontal_position >= 1.0f) 
+		horizontal_pos = ImGui::GetIO().DisplaySize.x - notification_margin; // Right
+	else
+		horizontal_pos = ImGui::GetIO().DisplaySize.x * s_notification_horizontal_position; // Center
+	
+	ImVec2 position(horizontal_pos, notification_vertical_pos * ImGui::GetIO().DisplaySize.y +
 											 ((notification_vertical_pos >= 0.5f) ? -notification_margin : notification_margin));
 	DrawBackgroundProgressDialogs(position, spacing);
 	DrawNotifications(position, spacing);
@@ -1992,7 +2005,7 @@ void ImGuiFullscreen::EndHorizontalMenu()
 	EndFullscreenWindow();
 }
 
-bool ImGuiFullscreen::HorizontalMenuItem(GSTexture* icon, const char* title, const char* description)
+bool ImGuiFullscreen::HorizontalMenuItem(GSTexture* icon, const ImVec2& icon_uv0, const ImVec2& icon_uv1, const char* title, const char* description)
 {
 	ImGuiWindow* window = ImGui::GetCurrentWindow();
 	if (window->SkipItems)
@@ -2031,7 +2044,7 @@ bool ImGuiFullscreen::HorizontalMenuItem(GSTexture* icon, const char* title, con
 	const ImVec2 icon_pos = bb.Min + ImVec2((avail_width - icon_size) * 0.5f, 0.0f);
 
 	ImDrawList* dl = ImGui::GetWindowDrawList();
-	dl->AddImage(reinterpret_cast<ImTextureID>(icon->GetNativeHandle()), icon_pos, icon_pos + ImVec2(icon_size, icon_size));
+	dl->AddImage(reinterpret_cast<ImTextureID>(icon->GetNativeHandle()), icon_pos, icon_pos + ImVec2(icon_size, icon_size), icon_uv0, icon_uv1);
 
 	ImFont* title_font = g_large_font;
 	const ImVec2 title_size = title_font->CalcTextSizeA(title_font->FontSize, avail_width, 0.0f, title);
@@ -2054,6 +2067,22 @@ bool ImGuiFullscreen::HorizontalMenuItem(GSTexture* icon, const char* title, con
 
 	s_menu_button_index++;
 	return pressed;
+}
+
+bool ImGuiFullscreen::HorizontalMenuItem(GSTexture* icon, const char* title, const char* description)
+{
+	return HorizontalMenuItem(icon, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), title, description);
+}
+
+bool ImGuiFullscreen::HorizontalMenuSvgItem(const char* svg_path, const char* title, const char* description, SvgScaling mode)
+{
+	const ImVec2 icon_size = LayoutScale(150.0f, 150.0f);
+	GSTexture* padded_texture = GetCachedSvgTexture(svg_path, icon_size, mode);
+
+	const ImVec2 padded_size(padded_texture->GetWidth(), padded_texture->GetHeight());
+	const ImVec2 uv1 = icon_size / padded_size;
+
+	return HorizontalMenuItem(padded_texture, ImVec2(0.0f, 0.0f), uv1, title, description);
 }
 
 void ImGuiFullscreen::PopulateFileSelectorItems()
@@ -2352,7 +2381,7 @@ void ImGuiFullscreen::DrawChoiceDialog()
 				auto& option = s_choice_dialog_options[i];
 
 				const SmallString title =
-					SmallString::from_format("{0} {1}", option.second ? ICON_FA_CHECK_SQUARE : ICON_FA_SQUARE, option.first);
+					SmallString::from_format("{0} {1}", option.second ? ICON_FA_SQUARE_CHECK : ICON_FA_SQUARE, option.first);
 				if (MenuButton(title.c_str(), nullptr, true, LAYOUT_MENU_BUTTON_HEIGHT_NO_SUMMARY))
 				{
 					choice = i;
@@ -2485,7 +2514,7 @@ void ImGuiFullscreen::DrawInputDialog()
 			cb(std::move(text));
 		}
 
-		if (ActiveButton(ICON_FA_TIMES " Cancel", false))
+		if (ActiveButton(ICON_FA_XMARK " Cancel", false))
 		{
 			CloseInputDialog();
 
@@ -2656,9 +2685,6 @@ void ImGuiFullscreen::DrawMessageDialog()
 	}
 }
 
-static float s_notification_vertical_position = 0.15f;
-static float s_notification_vertical_direction = 1.0f;
-
 float ImGuiFullscreen::GetNotificationVerticalPosition()
 {
 	return s_notification_vertical_position;
@@ -2672,6 +2698,13 @@ float ImGuiFullscreen::GetNotificationVerticalDirection()
 void ImGuiFullscreen::SetNotificationVerticalPosition(float position, float direction)
 {
 	s_notification_vertical_position = position;
+	s_notification_vertical_direction = direction;
+}
+
+void ImGuiFullscreen::SetNotificationPosition(float horizontal_position, float vertical_position, float direction)
+{
+	s_notification_horizontal_position = horizontal_position;
+	s_notification_vertical_position = vertical_position;
 	s_notification_vertical_direction = direction;
 }
 
@@ -2936,7 +2969,14 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 			}
 		}
 
-		const ImVec2 box_min(position.x, actual_y);
+		// Adjust horizontal position based on alignment
+		float final_x = position.x;
+		if (s_notification_horizontal_position >= 1.0f)
+			final_x = position.x - box_width;
+		else if (s_notification_horizontal_position > 0.0f && s_notification_horizontal_position < 1.0f)
+			final_x = position.x - (box_width * 0.5f);
+		
+		const ImVec2 box_min(final_x, actual_y);
 		const ImVec2 box_max(box_min.x + box_width, box_min.y + box_height);
 		const u32 background_color = (toast_background_color & ~IM_COL32_A_MASK) | (opacity << IM_COL32_A_SHIFT);
 		const u32 border_color = (toast_border_color & ~IM_COL32_A_MASK) | (opacity << IM_COL32_A_SHIFT);

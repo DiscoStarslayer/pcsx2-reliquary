@@ -671,6 +671,18 @@ const char* Pcsx2Config::GSOptions::CaptureContainers[] = {
 	nullptr};
 const char* Pcsx2Config::GSOptions::DEFAULT_CAPTURE_CONTAINER = "mp4";
 
+const char* Pcsx2Config::AchievementsOptions::OverlayPositionNames[(size_t)AchievementOverlayPosition::MaxCount + 1] = {
+	"TopLeft",
+	"TopCenter", 
+	"TopRight",
+	"CenterLeft",
+	"Center",
+	"CenterRight",
+	"BottomLeft",
+	"BottomCenter",
+	"BottomRight",
+	nullptr};
+
 const char* Pcsx2Config::GSOptions::GetRendererName(GSRendererType type)
 {
 	switch (type)
@@ -1924,6 +1936,8 @@ void Pcsx2Config::AchievementsOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(Overlays);
 	SettingsWrapEntry(NotificationsDuration);
 	SettingsWrapEntry(LeaderboardsDuration);
+	SettingsWrapIntEnumEx(OverlayPosition, "OverlayPosition");
+	SettingsWrapIntEnumEx(NotificationPosition, "NotificationPosition");
 	SettingsWrapEntry(InfoSoundName);
 	SettingsWrapEntry(UnlockSoundName);
 	SettingsWrapEntry(LBSubmitSoundName);
@@ -1938,7 +1952,8 @@ void Pcsx2Config::AchievementsOptions::LoadSave(SettingsWrapper& wrap)
 
 bool Pcsx2Config::AchievementsOptions::operator==(const AchievementsOptions& right) const
 {
-	return OpEqu(bitset) && OpEqu(NotificationsDuration) && OpEqu(LeaderboardsDuration);
+	return OpEqu(bitset) && OpEqu(NotificationsDuration) && OpEqu(LeaderboardsDuration) && 
+		   OpEqu(OverlayPosition) && OpEqu(NotificationPosition);
 }
 
 bool Pcsx2Config::AchievementsOptions::operator!=(const AchievementsOptions& right) const
@@ -1959,6 +1974,7 @@ Pcsx2Config::Pcsx2Config()
 	UseSavestateSelector = true;
 	BackupSavestate = true;
 	WarnAboutUnsafeSettings = true;
+	EnableDiscordPresence = false;
 	ManuallySetRealTimeClock = false;
 
 	// To be moved to FileMemoryCard pluign (someday)
@@ -2145,17 +2161,16 @@ void Pcsx2Config::ClearInvalidPerGameConfiguration(SettingsInterface* si)
 void EmuFolders::SetAppRoot()
 {
 	std::string program_path = FileSystem::GetProgramPath();
+	Console.WriteLnFmt("Program Path: {}", program_path);
+	AppRoot = Path::Canonicalize(Path::GetDirectory(program_path));
 #ifdef __APPLE__
 	const auto bundle_path = CocoaTools::GetNonTranslocatedBundlePath();
 	if (bundle_path.has_value())
 	{
 		// On macOS, override with the bundle path if launched from a bundle.
-		program_path = bundle_path.value();
+		AppRoot = StringUtil::EndsWithNoCase(*bundle_path, ".app") ? Path::GetDirectory(*bundle_path) : *bundle_path;
 	}
 #endif
-	Console.WriteLnFmt("Program Path: {}", program_path);
-
-	AppRoot = Path::Canonicalize(Path::GetDirectory(program_path));
 
 	// logging of directories in case something goes wrong super early
 	Console.WriteLnFmt("AppRoot Directory: {}", AppRoot);
@@ -2172,8 +2187,10 @@ bool EmuFolders::SetResourcesDirectory()
 #endif
 #else
 	// On macOS, this is in the bundle resources directory.
-	const std::string program_path = FileSystem::GetProgramPath();
-	Resources = Path::Canonicalize(Path::Combine(Path::GetDirectory(program_path), "../Resources"));
+	if (auto resources = CocoaTools::GetResourcePath())
+		Resources = *resources;
+	else
+		Resources = Path::Combine(AppRoot, "resources");
 #endif
 
 	Console.WriteLnFmt("Resources Directory: {}", Resources);

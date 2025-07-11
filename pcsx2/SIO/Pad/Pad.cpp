@@ -14,7 +14,7 @@
 
 #include "Input/SDLInputSource.h"
 
-#include "IconsFontAwesome5.h"
+#include "IconsFontAwesome6.h"
 
 #include "VMManager.h"
 #include "common/Assertions.h"
@@ -223,6 +223,7 @@ void Pad::SetDefaultHotkeyConfig(SettingsInterface& si)
 	// PCSX2 Controller Settings - Hotkeys - Graphics
 	si.SetStringValue("Hotkeys", "CycleAspectRatio", "Keyboard/F6");
 	si.SetStringValue("Hotkeys", "CycleInterlaceMode", "Keyboard/F5");
+	// si.SetStringValue("Hotkeys", "CycleTVShader", "Keyboard/"); TBD
 	si.SetStringValue("Hotkeys", "ToggleMipmapMode", "Keyboard/Insert");
 	//	si.SetStringValue("Hotkeys", "DecreaseUpscaleMultiplier", "Keyboard"); TBD
 	//	si.SetStringValue("Hotkeys", "IncreaseUpscaleMultiplier", "Keyboard"); TBD

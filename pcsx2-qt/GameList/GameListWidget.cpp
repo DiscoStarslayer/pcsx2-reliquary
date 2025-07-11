@@ -128,21 +128,24 @@ namespace
 			const int pix_width = static_cast<int>(pix.width() / pix.devicePixelRatio());
 			const int pix_height = static_cast<int>(pix.height() / pix.devicePixelRatio());
 
+			// Clip the pixmaps so they don't extend outside the column
+			painter->save();
+			painter->setClipRect(option.rect);
+
 			// Draw the icon, using code derived from QItemDelegate::drawDecoration()
 			const bool enabled = option.state & QStyle::State_Enabled;
 			const QPoint p = QPoint((r.width() - pix_width) / 2, (r.height() - pix_height) / 2);
 			if (option.state & QStyle::State_Selected)
 			{
-				// See QItemDelegate::selectedPixmap()		
-				QString key = QString::fromStdString(fmt::format("{:016X}-{:d}", pix.cacheKey(), enabled));
+				// See QItemDelegate::selectedPixmap()
+				QColor color = option.palette.color(enabled ? QPalette::Normal : QPalette::Disabled, QPalette::Highlight);
+				color.setAlphaF(0.3f);
+
+				QString key = QString::fromStdString(fmt::format("{:016X}-{:d}-{:08X}", pix.cacheKey(), enabled, color.rgba()));
 				QPixmap pm;
 				if (!QPixmapCache::find(key, &pm))
 				{
 					QImage img = pix.toImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
-
-					QColor color = option.palette.color(enabled ? QPalette::Normal : QPalette::Disabled,
-						QPalette::Highlight);
-					color.setAlphaF(0.3f);
 
 					QPainter tinted_painter(&img);
 					tinted_painter.setCompositionMode(QPainter::CompositionMode_SourceAtop);
@@ -159,6 +162,9 @@ namespace
 			{
 				painter->drawPixmap(r.topLeft() + p, pix);
 			}
+
+			// Restore the old clip path.
+			painter->restore();
 		}
 	};
 } // namespace
@@ -174,22 +180,27 @@ void GameListWidget::initialize()
 {
 	const float cover_scale = Host::GetBaseFloatSettingValue("UI", "GameListCoverArtScale", 0.45f);
 	const bool show_cover_titles = Host::GetBaseBoolSettingValue("UI", "GameListShowCoverTitles", true);
-	m_model = new GameListModel(cover_scale, show_cover_titles, this);
+	m_model = new GameListModel(cover_scale, show_cover_titles, devicePixelRatioF(), this);
 	m_model->updateCacheSize(width(), height());
 
 	m_sort_model = new GameListSortModel(m_model);
 	m_sort_model->setSourceModel(m_model);
 
 	m_ui.setupUi(this);
+
 	for (u32 type = 0; type < static_cast<u32>(GameList::EntryType::Count); type++)
 	{
-		m_ui.filterType->addItem(GameListModel::getIconForType(static_cast<GameList::EntryType>(type)),
-			qApp->translate("GameList", GameList::EntryTypeToDisplayString(static_cast<GameList::EntryType>(type))));
+		if (type != static_cast<u32>(GameList::EntryType::Invalid))
+		{
+			m_ui.filterType->addItem(GameListModel::getIconForType(static_cast<GameList::EntryType>(type)),
+				GameList::EntryTypeToString(static_cast<GameList::EntryType>(type), true));
+		}
 	}
+
 	for (u32 region = 0; region < static_cast<u32>(GameList::Region::Count); region++)
 	{
 		m_ui.filterRegion->addItem(GameListModel::getIconForRegion(static_cast<GameList::Region>(region)),
-			qApp->translate("GameList", GameList::RegionToString(static_cast<GameList::Region>(region))));
+			GameList::RegionToString(static_cast<GameList::Region>(region), true));
 	}
 
 	connect(m_ui.viewGameList, &QPushButton::clicked, this, &GameListWidget::showGameList);
@@ -545,6 +556,18 @@ void GameListWidget::resizeEvent(QResizeEvent* event)
 	QWidget::resizeEvent(event);
 	resizeTableViewColumnsToFit();
 	m_model->updateCacheSize(width(), height());
+}
+
+bool GameListWidget::event(QEvent* event)
+{
+	if (event->type() == QEvent::DevicePixelRatioChange)
+	{
+		m_model->setDevicePixelRatio(devicePixelRatioF());
+		QWidget::event(event);
+		return true;
+	}
+
+	return QWidget::event(event);
 }
 
 void GameListWidget::resizeTableViewColumnsToFit()
