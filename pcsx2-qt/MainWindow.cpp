@@ -2843,6 +2843,7 @@ void MainWindow::startGameListEntry(const GameList::Entry* entry, std::optional<
 	if (entry->type == GameList::EntryType::Python2)
 	{
 		if (!verifyPython2Configuration(entry)) return;
+		params->is_python2 = true;
 	}
 
 	g_emu_thread->startVM(std::move(params));
@@ -3313,36 +3314,31 @@ bool MainWindow::verifyPython2Configuration(const GameList::Entry* entry)
 
 	// Check for all files required for Python 2 to work
 	// MG
-	std::string civPath = Path::Combine(EmuFolders::Bios, "civ.bin");
-	std::string cksPath = Path::Combine(EmuFolders::Bios, "cks.bin");
-	std::string eksPath = Path::Combine(EmuFolders::Bios, "eks.bin");
-	std::string kekPath = Path::Combine(EmuFolders::Bios, "kek.bin");
-
-	if (!FileSystem::FileExists(civPath.c_str()))
+	if (EmuConfig.Security.MgChallengeIvFile.empty())
 	{
-		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required file: '%1'").arg(QString::fromStdString(civPath)));
-		Console.Error("Could not find required file: '%s'", civPath.c_str());
+		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required Challenge IV file"));
+		Console.Error("Could not find Challenge IV file");
 		valid = false;
 	}
 
-	if (!FileSystem::FileExists(cksPath.c_str()))
+	if (EmuConfig.Security.MgCardKeyStoreFile.empty())
 	{
-		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required file: '%1'").arg(QString::fromStdString(cksPath)));
-		Console.Error("Could not find required file: '%s'", cksPath.c_str());
+		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required Card Key Store file"));
+		Console.Error("Could not find Card Key Store file");
 		valid = false;
 	}
 
-	if (!FileSystem::FileExists(eksPath.c_str()))
+	if (EmuConfig.Security.MgKeyStoreKeyFile.empty())
 	{
-		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required file: '%1'").arg(QString::fromStdString(eksPath)));
-		Console.Error("Could not find required file: '%s'", eksPath.c_str());
+		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required Key Store Key file"));
+		Console.Error("Could not find Key Store Key file");
 		valid = false;
 	}
 
-	if (!FileSystem::FileExists(kekPath.c_str()))
+	if (EmuConfig.Security.MgEncryptedKeyStoreFile.empty())
 	{
-		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required file: '%1'").arg(QString::fromStdString(kekPath)));
-		Console.Error("Could not find required file: '%s'", kekPath.c_str());
+		QMessageBox::critical(nullptr, tr("Error"), tr("Could not find required Encrypted Key Store file"));
+		Console.Error("Could not find Encrypted Key Store file");
 		valid = false;
 	}
 
@@ -3360,12 +3356,14 @@ bool MainWindow::verifyPython2Configuration(const GameList::Entry* entry)
 	if (hddIdPath.empty() || !FileSystem::FileExists(hddIdPath.c_str()))
 	{
 		Console.Error("Could not find HDD ID file: '%s'", hddIdPath.c_str());
+		valid = false;
 	}
 
-	const std::string ilinkIdPath = si->GetStringValue("Python2/System", "IlinkIdFile", "");
-	if (ilinkIdPath.empty() || !FileSystem::FileExists(ilinkIdPath.c_str()))
+	std::string iLinkIdPath = si->GetStringValue("Python2/System", "ILinkIdFile", "");
+	if (iLinkIdPath.empty() || !FileSystem::FileExists(iLinkIdPath.c_str()))
 	{
-		Console.Error("Could not find ILINK ID file: '%s'", ilinkIdPath.c_str());
+		Console.Error("Could not find ILINK ID file: '%s'", iLinkIdPath.c_str());
+		valid = false;
 	}
 
 	// Dongles

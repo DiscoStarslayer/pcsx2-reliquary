@@ -377,7 +377,6 @@ bool GameList::GetIsoListEntry(const std::string& path, GameList::Entry* entry)
 // clang-format off
 bool GameList::GetPython2ListEntry(const std::string& path, GameList::Entry* entry)
 {
-	// TODO: Parse a .py2 entry file to read target image filename, HDD ID, ILINK ID, and other configurations
 	std::unique_ptr<INISettingsInterface> new_interface = std::make_unique<INISettingsInterface>(std::move(path));
 	if (!new_interface->Load())
 	{
@@ -392,10 +391,17 @@ bool GameList::GetPython2ListEntry(const std::string& path, GameList::Entry* ent
 		hdd_id_path = std::string(Path::Canonicalize(Path::Combine(Path::GetDirectory(path), hdd_id_path)));
 	}
 
-	std::string ilink_id_path;
-	new_interface->GetStringValue("Game", "IlinkIdPath", &ilink_id_path);
-	if (!ilink_id_path.empty() && !Path::IsAbsolute(ilink_id_path)) {
-		ilink_id_path = std::string(Path::Canonicalize(Path::Combine(Path::GetDirectory(path), ilink_id_path)));
+	std::string iLinkIdPath;
+	new_interface->GetStringValue("Game", "IlinkIdPath", &iLinkIdPath);
+	if (!iLinkIdPath.empty() && !Path::IsAbsolute(iLinkIdPath))
+	{
+		iLinkIdPath = std::string(Path::Canonicalize(Path::Combine(Path::GetDirectory(path), iLinkIdPath)));
+	}
+
+	std::string nvRamPath;
+	new_interface->GetStringValue("Game", "NvRamPath", &nvRamPath);
+	if (!nvRamPath.empty() && !Path::IsAbsolute(nvRamPath)) {
+		nvRamPath = std::string(Path::Canonicalize(Path::Combine(Path::GetDirectory(path), nvRamPath)));
 	}
 
 	std::string hdd_image_path;
@@ -425,7 +431,9 @@ bool GameList::GetPython2ListEntry(const std::string& path, GameList::Entry* ent
 	sif->SetBoolValue("DEV9/Hdd", "HddEnable", true);
 	sif->SetStringValue("DEV9/Hdd", "HddFile", hdd_image_path.c_str());
 	sif->SetStringValue("DEV9/Hdd", "HddIdFile", hdd_id_path.c_str());
-	sif->SetStringValue("Python2/System", "IlinkIdFile", ilink_id_path.c_str());
+	sif->SetStringValue("Security", "NvRamFile", nvRamPath.c_str());
+	sif->SetStringValue("Security", "ILinkIdFile", iLinkIdPath.c_str());
+	sif->SetIntValue("Security", "KeyStoreMode", static_cast<int>(SecurityKeyStoreMode::Retail));
 	sif->SetBoolValue("DEV9/Eth", "EthEnable", true);
 	sif->SetBoolValue("EmuCore/Gamefixes", "OPHFlagHack", true);
 	sif->SetBoolValue("EmuCore/GS", "pcrtc_offsets", false);

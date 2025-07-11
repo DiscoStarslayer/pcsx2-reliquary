@@ -56,8 +56,8 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.ntscFrameRate, "EmuCore/GS", "FramerateNTSC", 59.94f);
 	SettingWidgetBinder::BindWidgetToFloatSetting(sif, m_ui.palFrameRate, "EmuCore/GS", "FrameratePAL", 50.00f);
 
-	dialog->registerWidgetHelp(m_ui.savestateSelector, tr("Use Save State Selector"), tr("Checked"), 
-			tr("Show a save state selector UI when switching slots instead of showing a notification bubble."));
+	dialog->registerWidgetHelp(m_ui.savestateSelector, tr("Use Save State Selector"), tr("Checked"),
+		tr("Show a save state selector UI when switching slots instead of showing a notification bubble."));
 
 	SettingWidgetBinder::BindWidgetToIntSetting(
 		sif, m_ui.savestateCompressionMethod, "EmuCore", "SavestateCompressionType", static_cast<int>(SavestateCompressionMethod::Zstandard));
@@ -75,12 +75,26 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* dialog, QWidget* 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.pineEnable, "EmuCore", "EnablePINE", false);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.pineSlot, "EmuCore", "PINESlot", 28011);
 
+	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.mgEncryptedKeyStoreFile, "Security", "MgEncryptedKeyStoreFile", "");
+	connect(m_ui.mgEncryptedKeyStoreBrowse, &QPushButton::clicked, this, &AdvancedSettingsWidget::onBrowseClickedEncryptedKeyStore);
+
+	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.mgKeyStoreKeyFile, "Security", "MgKeyStoreKeyFile", "");
+	connect(m_ui.mgKeyStoreKeyBrowse, &QPushButton::clicked, this, &AdvancedSettingsWidget::onBrowseClickedKeyStoreKeyFile);
+
+	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.mgCardKeyStoreFile, "Security", "MgCardKeyStoreFile", "");
+	connect(m_ui.mgCardKeyStoreBrowse, &QPushButton::clicked, this, &AdvancedSettingsWidget::onBrowseClickedCardKeyStoreFile);
+
+	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.mgChallengeIvFile, "Security", "MgChallengeIvFile", "");
+	connect(m_ui.mgChallengeIvFileBrowse, &QPushButton::clicked, this, &AdvancedSettingsWidget::onBrowseClickedChallengeIvFile);
+
+	SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.mgKeyStoreMode, "Security", "MgKeyStoreMode", &Pcsx2Config::ParseSecurityKeyStoreMode, &Pcsx2Config::GetSecurityKeyStoreModeName, SecurityKeyStoreMode::Retail);
+
 	dialog->registerWidgetHelp(m_ui.eeRoundingMode, tr("Rounding Mode"), tr("Chop/Zero (Default)"), tr("Changes how PCSX2 handles rounding while emulating the Emotion Engine's Floating Point Unit (EE FPU). "
-	"Because the various FPUs in the PS2 are non-compliant with international standards, some games may need different modes to do math correctly. The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
+																									   "Because the various FPUs in the PS2 are non-compliant with international standards, some games may need different modes to do math correctly. The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
 	dialog->registerWidgetHelp(m_ui.eeDivRoundingMode, tr("Division Rounding Mode"), tr("Nearest (Default)"), tr("Determines how the results of floating-point division are rounded. Some games need specific settings; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
 
 	dialog->registerWidgetHelp(m_ui.eeClampMode, tr("Clamping Mode"), tr("Normal (Default)"), tr("Changes how PCSX2 handles keeping floats in a standard x86 range. "
-	"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
+																								 "The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
 
 	dialog->registerWidgetHelp(m_ui.eeRecompiler, tr("Enable Recompiler"), tr("Checked"),
 		tr("Performs just-in-time binary translation of 64-bit MIPS-IV machine code to x86."));
@@ -108,18 +122,18 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* dialog, QWidget* 
 		tr("Exposes an additional 96MB of memory to the virtual machine."));
 
 	dialog->registerWidgetHelp(m_ui.vu0RoundingMode, tr("VU0 Rounding Mode"), tr("Chop/Zero (Default)"), tr("Changes how PCSX2 handles rounding while emulating the Emotion Engine's Vector Unit 0 (EE VU0). "
-	"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem will cause stability issues and/or crashes.</b>"));
+																											"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem will cause stability issues and/or crashes.</b>"));
 
 	dialog->registerWidgetHelp(m_ui.vu1RoundingMode, tr("VU1 Rounding Mode"), tr("Chop/Zero (Default)"), tr("Changes how PCSX2 handles rounding while emulating the Emotion Engine's Vector Unit 1 (EE VU1). "
-	"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem will cause stability issues and/or crashes.</b>"));
+																											"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem will cause stability issues and/or crashes.</b>"));
 
 	dialog->registerWidgetHelp(m_ui.vu0ClampMode, tr("VU0 Clamping Mode"), tr("Normal (Default)"), tr("Changes how PCSX2 handles keeping floats in a standard x86 range in the Emotion Engine's Vector Unit 0 (EE VU0). "
-	"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
+																									  "The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
 	dialog->registerWidgetHelp(m_ui.vu1ClampMode, tr("VU1 Clamping Mode"), tr("Normal (Default)"), tr("Changes how PCSX2 handles keeping floats in a standard x86 range in the Emotion Engine's Vector Unit 1 (EE VU1). "
-	"The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
+																									  "The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem can cause instability.</b>"));
 
 	dialog->registerWidgetHelp(m_ui.instantVU1, tr("Enable Instant VU1"), tr("Checked"), tr("Runs VU1 instantly. Provides a modest speed improvement in most games. "
-		   "Safe for most games, but a few games may exhibit graphical errors."));
+																							"Safe for most games, but a few games may exhibit graphical errors."));
 
 	//: VU0 = Vector Unit 0. One of the PS2's processors.
 	dialog->registerWidgetHelp(m_ui.vu0Recompiler, tr("Enable VU0 Recompiler (Micro Mode)"), tr("Checked"), tr("Enables VU0 Recompiler."));
@@ -225,4 +239,38 @@ void AdvancedSettingsWidget::onSavestateCompressionTypeChanged()
 	const bool uncompressed = (m_dialog->getEffectiveIntValue("EmuCore", "SavestateCompressionType", static_cast<int>(SavestateCompressionMethod::Zstandard)) ==
 							   static_cast<int>(SavestateCompressionMethod::Uncompressed));
 	m_ui.savestateCompressionLevel->setDisabled(uncompressed);
+}
+
+void AdvancedSettingsWidget::onBrowseClickedEncryptedKeyStore()
+{
+	onBrowseClicked(m_ui.mgEncryptedKeyStoreFile);
+}
+
+void AdvancedSettingsWidget::onBrowseClickedChallengeIvFile()
+{
+	onBrowseClicked(m_ui.mgChallengeIvFile);
+}
+
+void AdvancedSettingsWidget::onBrowseClickedCardKeyStoreFile()
+{
+	onBrowseClicked(m_ui.mgCardKeyStoreFile);
+}
+
+void AdvancedSettingsWidget::onBrowseClickedKeyStoreKeyFile()
+{
+	onBrowseClicked(m_ui.mgKeyStoreKeyFile);
+}
+
+void AdvancedSettingsWidget::onBrowseClicked(QLineEdit* pathElement)
+{
+	QString path =
+	QDir::toNativeSeparators(QFileDialog::getOpenFileName(QtUtils::GetRootWidget(this), tr("Browse File"),
+		!pathElement->text().isEmpty() ? pathElement->text() : "", tr("BIN (*.bin)"), nullptr,
+		QFileDialog::DontConfirmOverwrite));
+
+	if (path.isEmpty())
+		return;
+
+	pathElement->setText(path);
+	pathElement->editingFinished();
 }

@@ -452,6 +452,14 @@ enum class GSNativeScaling : u8
 	MaxCount
 };
 
+enum class SecurityKeyStoreMode : u8
+{
+	Dev = 0,
+	Retail = 1,
+	Prototype = 2,
+	Arcade = 3,
+};
+
 // --------------------------------------------------------------------------------------
 //  TraceLogsEE
 // --------------------------------------------------------------------------------------
@@ -1256,6 +1264,28 @@ struct Pcsx2Config
 		bool operator!=(const SavestateOptions& right) const;
 	};
 
+	struct SecurityOptions
+	{
+		static const char* KeyStoreModeNames[];
+
+		std::string MgChallengeIvFile;
+		std::string MgCardKeyStoreFile;
+		std::string MgEncryptedKeyStoreFile;
+		std::string MgKeyStoreKeyFile;
+
+		std::string NvRamFile;
+		std::string ILinkIdFile;
+
+		SecurityKeyStoreMode MgKeyStoreMode;
+
+		SecurityOptions();
+
+		void LoadSave(SettingsWrapper& wrap);
+
+		bool operator==(const SecurityOptions& right) const;
+		bool operator!=(const SecurityOptions& right) const;
+	};
+
 	// ------------------------------------------------------------------------
 
 	BITFIELD32()
@@ -1295,6 +1325,7 @@ struct Pcsx2Config
 	DebugAnalysisOptions DebuggerAnalysis;
 	EmulationSpeedOptions EmulationSpeed;
 	SavestateOptions Savestate;
+	SecurityOptions Security;
 	SPU2Options SPU2;
 	DEV9Options DEV9;
 	USBOptions USB;
@@ -1329,6 +1360,8 @@ struct Pcsx2Config
 	float CurrentCustomAspectRatio = 0.f;
 	bool IsPortableMode = false;
 
+	static std::optional<SecurityKeyStoreMode> ParseSecurityKeyStoreMode(const char* name);
+	static const char* GetSecurityKeyStoreModeName(SecurityKeyStoreMode mode);
 	Pcsx2Config();
 	void LoadSave(SettingsWrapper& wrap);
 	void LoadSaveCore(SettingsWrapper& wrap);
@@ -1474,10 +1507,6 @@ namespace EmuFolders
 // Change to 1 for console logs of SIF, GPU (PS1 mode) and MDEC (PS1 mode).
 // These do spam a lot though!
 #define PSX_EXTRALOGS 0
-
-// Make it easier to switch HDD and ILINK ID files without copying data
-extern std::string IlinkIdPath;
-extern std::string PatchFileOverridePath;
 
 #undef BITFIELD32
 #undef BITFIELD_END

@@ -1638,6 +1638,65 @@ bool Pcsx2Config::SavestateOptions::operator==(const SavestateOptions& right) co
 	return OpEqu(CompressionType) && OpEqu(CompressionRatio);
 };
 
+const char* Pcsx2Config::SecurityOptions::KeyStoreModeNames[] = {
+	"Dev",
+	"Retail",
+	"Prototype",
+	"Arcade"
+};
+
+Pcsx2Config::SecurityOptions::SecurityOptions()
+{
+	MgChallengeIvFile = "";
+	MgCardKeyStoreFile = "";
+	MgEncryptedKeyStoreFile = "";
+	MgKeyStoreKeyFile = "";
+	NvRamFile = "";
+	ILinkIdFile = "";
+	MgKeyStoreMode = SecurityKeyStoreMode::Retail;
+}
+
+std::optional<SecurityKeyStoreMode> Pcsx2Config::ParseSecurityKeyStoreMode(const char* name)
+{
+	for (u8 i = 0; i < static_cast<u8>(SecurityKeyStoreMode::Arcade); i++)
+	{
+		if (std::strcmp(name, SecurityOptions::KeyStoreModeNames[i]) == 0)
+			return static_cast<SecurityKeyStoreMode>(i);
+	}
+
+	return std::nullopt;
+}
+
+const char* Pcsx2Config::GetSecurityKeyStoreModeName(SecurityKeyStoreMode mode)
+{
+	return (static_cast<u8>(mode) <= static_cast<u8>(SecurityKeyStoreMode::Arcade)) ? SecurityOptions::KeyStoreModeNames[static_cast<u8>(mode)] : "";
+}
+
+void Pcsx2Config::SecurityOptions::LoadSave(SettingsWrapper& wrap)
+{
+	SettingsWrapSection("Security");
+
+	SettingsWrapEntry(MgChallengeIvFile);
+	SettingsWrapEntry(MgCardKeyStoreFile);
+	SettingsWrapEntry(MgEncryptedKeyStoreFile);
+	SettingsWrapEntry(MgKeyStoreKeyFile);
+
+	SettingsWrapEntry(NvRamFile);
+	SettingsWrapEntry(ILinkIdFile);
+
+	SettingsWrapParsedEnum(MgKeyStoreMode, "MgKeyStoreMode", &ParseSecurityKeyStoreMode, &GetSecurityKeyStoreModeName);
+}
+
+bool Pcsx2Config::SecurityOptions::operator!=(const SecurityOptions& right) const
+{
+	return !this->operator==(right);
+}
+
+bool Pcsx2Config::SecurityOptions::operator==(const SecurityOptions& right) const
+{
+	return OpEqu(MgChallengeIvFile) && OpEqu(MgCardKeyStoreFile) && OpEqu(MgEncryptedKeyStoreFile) && OpEqu(NvRamFile) && OpEqu(ILinkIdFile) && OpEqu(MgKeyStoreMode);
+}
+
 Pcsx2Config::FilenameOptions::FilenameOptions()
 {
 }
@@ -1961,6 +2020,7 @@ void Pcsx2Config::LoadSaveCore(SettingsWrapper& wrap)
 	Gamefixes.LoadSave(wrap);
 	Profiler.LoadSave(wrap);
 	Savestate.LoadSave(wrap);
+	Security.LoadSave(wrap);
 
 	DebuggerAnalysis.LoadSave(wrap);
 	Trace.LoadSave(wrap);

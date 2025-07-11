@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>809</width>
-    <height>602</height>
+    <width>771</width>
+    <height>797</height>
    </rect>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -32,9 +32,9 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>-449</y>
-        <width>790</width>
-        <height>1051</height>
+        <y>-542</y>
+        <width>750</width>
+        <height>1347</height>
        </rect>
       </property>
       <layout class="QVBoxLayout" name="verticalLayout">
@@ -422,37 +422,6 @@
           <string>Savestate Settings</string>
          </property>
          <layout class="QGridLayout" name="savestateSettingsLayout">
-          <item row="3" column="1">
-           <widget class="QCheckBox" name="saveStateOnShutdown">
-            <property name="text">
-             <string>Save State On Shutdown</string>
-            </property>
-           </widget>
-          </item>
-          <item row="1" column="1">
-           <widget class="QComboBox" name="savestateCompressionLevel">
-            <item>
-             <property name="text">
-              <string>Low (Fast)</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Medium (Recommended)</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>High</string>
-             </property>
-            </item>
-            <item>
-             <property name="text">
-              <string>Very High (Slow, Not Recommended)</string>
-             </property>
-            </item>
-           </widget>
-          </item>
           <item row="0" column="1">
            <widget class="QComboBox" name="savestateCompressionMethod">
             <item>
@@ -477,18 +446,28 @@
             </item>
            </widget>
           </item>
-          <item row="1" column="0">
-           <widget class="QLabel" name="savestateCompressionMethodLabel">
-            <property name="text">
-             <string>Compression Level:</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="0">
-           <widget class="QCheckBox" name="backupSaveStates">
-            <property name="text">
-             <string>Create Save State Backups</string>
-            </property>
+          <item row="2" column="1">
+           <widget class="QComboBox" name="savestateCompressionLevel">
+            <item>
+             <property name="text">
+              <string>Low (Fast)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Medium (Recommended)</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>High</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Very High (Slow, Not Recommended)</string>
+             </property>
+            </item>
            </widget>
           </item>
           <item row="0" column="0">
@@ -498,10 +477,31 @@
             </property>
            </widget>
           </item>
+          <item row="4" column="1">
+           <widget class="QCheckBox" name="saveStateOnShutdown">
+            <property name="text">
+             <string>Save State On Shutdown</string>
+            </property>
+           </widget>
+          </item>
           <item row="4" column="0">
+           <widget class="QCheckBox" name="backupSaveStates">
+            <property name="text">
+             <string>Create Save State Backups</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
            <widget class="QCheckBox" name="savestateSelector">
             <property name="text">
              <string>Use Save State Selector</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="savestateCompressionMethodLabel">
+            <property name="text">
+             <string>Compression Level:</string>
             </property>
            </widget>
           </item>
@@ -596,6 +596,148 @@
            <widget class="QCheckBox" name="pineEnable">
             <property name="text">
              <string>Enable</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="securitySettings">
+         <property name="title">
+          <string>Security Settings</string>
+         </property>
+         <layout class="QGridLayout" name="gridLayout_4">
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="mgEncryptedKeyStoreFile">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="mgKeyStoreModeLabel">
+            <property name="text">
+             <string>MagicGate Key Store Mode:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="mgEncryptedKeyStoreFileLabel">
+            <property name="text">
+             <string>MagicGate Encrypted Key Store File:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QComboBox" name="mgKeyStoreMode">
+            <item>
+             <property name="text">
+              <string>Dev</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Retail</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Prototype</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>Arcade</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="mgKeyStoreKeyFileLabel">
+            <property name="text">
+             <string>MagicGate Key Store Key File:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="mgCardKeyStoreFileLabel">
+            <property name="text">
+             <string>MagicGate Card Key Store File:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="mgCardKeyStoreFile">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="mgChallengeIvFile">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <widget class="QLabel" name="mgChallengeIvFileLabel">
+            <property name="text">
+             <string>MagicGate Challenge IV File:</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="mgKeyStoreKeyFile">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="2">
+           <widget class="QPushButton" name="mgChallengeIvFileBrowse">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="text">
+             <string>Browse</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="2">
+           <widget class="QPushButton" name="mgCardKeyStoreBrowse">
+            <property name="text">
+             <string>Browse</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="2">
+           <widget class="QPushButton" name="mgKeyStoreKeyBrowse">
+            <property name="text">
+             <string>Browse</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="2">
+           <widget class="QPushButton" name="mgEncryptedKeyStoreBrowse">
+            <property name="text">
+             <string>Browse</string>
             </property>
            </widget>
           </item>

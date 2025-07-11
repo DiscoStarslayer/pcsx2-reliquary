@@ -38,8 +38,6 @@ cdvdStruct cdvd;
 
 s64 PSXCLK = 36864000;
 
-std::string ilinkIdPath = "C:\\Users\\royfe\\Desktop\\python2\\ddrsn2\\ps2_nvram";
-
 static constexpr u8 monthmap[13] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
 static constexpr u8 cdvdParamLength[16] = { 0, 0, 0, 0, 0, 4, 11, 11, 11, 1, 255, 255, 7, 2, 11, 1 };
@@ -209,21 +207,25 @@ static void cdvdCreateNewNVM()
 
 	u8 ILinkID_Data[8] = {0x00, 0xAC, 0xFF, 0xFF, 0xFF, 0xFF, 0xB9, 0x86};
 
-	auto fpIlink = FileSystem::OpenManagedCFile(ilinkIdPath.c_str(), "rb");
-	if (fpIlink && FileSystem::FSize64(fpIlink.get()) >= 8)
+	if (!EmuConfig.Security.ILinkIdFile.empty())
 	{
-		if (FileSystem::FSize64(fpIlink.get()) == 0x400)
+		auto fp = FileSystem::OpenManagedCFile(EmuConfig.Security.ILinkIdFile.c_str(), "rb");
+		if (fp && FileSystem::FSize64(fp.get()) >= 8)
 		{
-			// NVM dump given for ILINK ID
-			// MAME ROMs will only have the NVM dump available so this is required for compatibility.
-			std::fseek(fpIlink.get(), 0x1e0, SEEK_SET);
-			std::fread(ILinkID_Data, 1, 8, fpIlink.get());
-			Console.WriteLn("ILINK ID MAME type");
-		}
-		else if (FileSystem::FSize64(fpIlink.get()) == 8)
-		{
-			std::fread(ILinkID_Data, 1, 8, fpIlink.get());
-			Console.WriteLn("ILINK ID OLD type");
+			if (FileSystem::FSize64(fp.get()) == 0x400)
+			{
+				// NVM dump given for ILINK ID
+				// MAME ROMs will only have the NVM dump available so this is required for compatibility.
+				std::fseek(fp.get(), 0x1e0, SEEK_SET);
+				std::fread(ILinkID_Data, 1, 8, fp.get());
+				Console.WriteLn("ILink ID is nvram dump, please use NvRamFile in .py2 instead");
+			}
+			else if (FileSystem::FSize64(fp.get()) == 8)
+			{
+				// Only ILink ID provided
+				std::fread(ILinkID_Data, 1, 8, fp.get());
+				Console.WriteLn("ILink ID found");
+			}
 		}
 	}
 	
@@ -247,6 +249,10 @@ static void cdvdCreateNewNVM()
 
 static std::string cdvdGetNVRAMPath()
 {
+	if (!EmuConfig.Security.NvRamFile.empty())
+	{
+		return EmuConfig.Security.NvRamFile;
+	}
 	return Path::ReplaceExtension(BiosPath, "nvm");
 }
 
@@ -1121,11 +1127,19 @@ static void xor_bit(const void* a, const void* b, void* Result, size_t Length)
 	}
 }
 
-void readAndDecryptKeyStore(int idx_set)
+static void printChunk(uint8_t* chunks, size_t length)
+{
+	for (int i = 0; i < length; ++i)
+	{
+		printf("%02X", chunks[i]);
+	}
+}
+
+void readAndDecryptKeyStore(SecurityKeyStoreMode keyStoreMode)
 {
 	uint8_t* ks = (uint8_t*)&g_keyStore;
 
-	readKeyStore(idx_set);
+	readKeyStore(static_cast<int>(keyStoreMode));
 	for (int i = 0; i < 38; ++i)
 		doubleDesDecrypt(g_KeyStoreKey, &ks[i * 8]);
 
@@ -1149,6 +1163,37 @@ void readAndDecryptKeyStore(int idx_set)
 
 	memcpy(cdvd.icvps2Key, icvps2LowSeed, 8);
 	memcpy(&cdvd.icvps2Key[8], icvps2HiSeed, 8);
+
+	// Print Calculated Keystore
+	printf("===== KEYSTORE =====\n\n");
+	printf("MG_CARDKEY_0="); printChunk(g_keyStore.CardKeyLow[0], 8); printChunk(g_keyStore.CardKeyHi[0], 8); printf("\n");
+	printf("MG_CARDIV_0="); printChunk(g_keyStore.CardIV[0], 8); printf("\n");
+	printf("MG_CARDKEY2_0="); printChunk(g_keyStore.CardKey2Low[0], 8); printChunk(g_keyStore.CardKey2Hi[0], 8); printf("\n");
+	printf("MG_CARDIV2_0="); printChunk(g_keyStore.CardIV2[0], 8); printf("\n");
+
+	printf("MG_CARDKEY_1="); printChunk(g_keyStore.CardKeyLow[1], 8); printChunk(g_keyStore.CardKeyHi[1], 8); printf("\n");
+	printf("MG_CARDIV_1="); printChunk(g_keyStore.CardIV[1], 8); printf("\n");
+	printf("MG_CARDKEY2_1="); printChunk(g_keyStore.CardKey2Low[1], 8); printChunk(g_keyStore.CardKey2Hi[1], 8); printf("\n");
+	printf("MG_CARDIV2_1="); printChunk(g_keyStore.CardIV2[1], 8); printf("\n");
+
+	printf("MG_CARDKEY_2="); printChunk(g_keyStore.CardKeyLow[2], 8); printChunk(g_keyStore.CardKeyHi[2], 8); printf("\n");
+	printf("MG_CARDIV_2="); printChunk(g_keyStore.CardIV[2], 8); printf("\n");
+	printf("MG_CARDKEY2_2="); printChunk(g_keyStore.CardKey2Low[2], 8); printChunk(g_keyStore.CardKey2Hi[2], 8); printf("\n");
+	printf("MG_CARDIV2_2="); printChunk(g_keyStore.CardIV2[2], 8); printf("\n");
+
+
+	printf("MG_KBIT_MASTER_KEY="); printChunk(g_keyStore.KbitMasterKey, 16); printf("\n");
+	printf("MG_KC_MASTER_KEY="); printChunk(g_keyStore.KcMasterKey, 16); printf("\n");
+	printf("MG_KBIT_IV="); printChunk(g_keyStore.KbitIv, 8); printf("\n");
+	printf("MG_KC_IV="); printChunk(g_keyStore.KcIv, 8); printf("\n");
+	printf("MG_SIG_MASTER_KEY="); printChunk(g_keyStore.SignatureMasterKey, 8); printf("\n");
+	printf("MG_SIG_HASH_KEY="); printChunk(g_keyStore.SignatureHashKey, 8); printf("\n");
+	printf("MG_ROOTSIG_HASH_KEY="); printChunk(g_keyStore.RootSigHashKey, 16); printf("\n");
+	printf("MG_ROOTSIG_MASTER_KEY="); printChunk(g_keyStore.RootSigMasterKey, 8); printf("\n");
+	printf("MG_CONTENT_IV="); printChunk(g_keyStore.ContentIV, 8); printf("\n");
+	printf("MG_CONTENT_TABLE_IV="); printChunk(g_keyStore.ContentTableIV, 8); printf("\n");
+	printf("MG_CHALLENGE_IV="); printChunk(g_keyStore.ChallengeIV, 8); printf("\n");
+	printf("\n====== END KEYSTORE =====\n\n");
 }
 
 void cdvdReset()
@@ -1232,40 +1277,40 @@ void cdvdReset()
 
 	cdvdCtrlTrayClose();
 
+	if (!EmuConfig.Security.MgEncryptedKeyStoreFile.empty())
 	{
-		char filename[1024];
-		snprintf(filename, sizeof(filename), "%s/%s", EmuFolders::Bios.c_str(), "eks.bin");
-		FILE* f = fopen(filename, "rb");
-		if (f)
+		Error error;
+		std::string path = Path::Canonicalize(EmuConfig.Security.MgEncryptedKeyStoreFile);
+		auto fp = FileSystem::OpenManagedCFileTryIgnoreCase(path.c_str(), "rb", &error);
+		if (!fp || std::fread(g_EncryptedKeyStore, 1, sizeof(g_EncryptedKeyStore), fp.get()) != 1)
 		{
-			fread(g_EncryptedKeyStore, 1, sizeof(g_EncryptedKeyStore), f);
-			fclose(f);
+			ERROR_LOG("Failed to read Encrypted Key Store file at {}: {}", path, error.GetDescription());
 		}
 	}
 
+	if (!EmuConfig.Security.MgCardKeyStoreFile.empty())
 	{
-		char filename[1024];
-		snprintf(filename, sizeof(filename), "%s/%s", EmuFolders::Bios.c_str(), "cks.bin");
-		FILE* f = fopen(filename, "rb");
-		if (f)
+		Error error;
+		std::string path = Path::Canonicalize(EmuConfig.Security.MgCardKeyStoreFile);
+		auto fp = FileSystem::OpenManagedCFileTryIgnoreCase(path.c_str(), "rb", &error);
+		if (!fp || std::fread(g_cardKeyStore, 1, sizeof(g_cardKeyStore), fp.get()) != 1)
 		{
-			fread(g_cardKeyStore, 1, sizeof(g_cardKeyStore), f);
-			fclose(f);
+			ERROR_LOG("Failed to read Card Key Store file at {}: {}", path, error.GetDescription());
 		}
 	}
 
+	if (!EmuConfig.Security.MgKeyStoreKeyFile.empty())
 	{
-		char filename[1024];
-		snprintf(filename, sizeof(filename), "%s/%s", EmuFolders::Bios.c_str(), "kek.bin");
-		FILE* f = fopen(filename, "rb");
-		if (f)
+		Error error;
+		std::string path = Path::Canonicalize(EmuConfig.Security.MgKeyStoreKeyFile);
+		auto fp = FileSystem::OpenManagedCFileTryIgnoreCase(path.c_str(), "rb", &error);
+		if (!fp || std::fread(g_KeyStoreKey, 1, sizeof(g_KeyStoreKey), fp.get()) != 1)
 		{
-			fread(g_KeyStoreKey, 1, sizeof(g_KeyStoreKey), f);
-			fclose(f);
+			ERROR_LOG("Failed to read Key Store Key file at {}: {}", path, error.GetDescription());
 		}
 	}
 
-	readAndDecryptKeyStore(1); // 0: dev, 1: retail, 2: proto?, 3: arcade
+	readAndDecryptKeyStore(EmuConfig.Security.MgKeyStoreMode); // 0: dev, 1: retail, 2: proto?, 3: arcade
 	cdvd.mecha_state = MECHA_STATE_READY;
 	std::memcpy(temp_mechaver, &s_mecha_version, 4);
 

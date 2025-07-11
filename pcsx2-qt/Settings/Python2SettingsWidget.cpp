@@ -39,7 +39,7 @@ Python2SettingsWidget::Python2SettingsWidget(const GameList::Entry* entry, Setti
 	m_ui.hddIdPath->setEnabled(true);
 	connect(m_ui.hddIdBrowse, &QPushButton::clicked, this, &Python2SettingsWidget::onHddIdBrowseClicked);
 
-	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.ilinkIdPath, "Python2/System", "IlinkIdFile", "ILINK_ID.bin");
+	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.ilinkIdPath, "Python2/System", "ILinkIdFile", "ILINK_ID.bin");
 	m_ui.ilinkIdPath->setEnabled(true);
 	connect(m_ui.ilinkIdBrowse, &QPushButton::clicked, this, &Python2SettingsWidget::onIlinkIdBrowseClicked);
 

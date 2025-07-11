@@ -55,7 +55,7 @@ int ATA::Open(const std::string& hddPath)
 	}
 
 	// Open and read the content of the hddid file
-	std::string hddidPath = Path::ReplaceExtension(hddPath, "hddid");
+	std::string hddidPath = !EmuConfig.DEV9.HddIdFile.empty() ? EmuConfig.DEV9.HddIdFile : Path::ReplaceExtension(hddPath, "hddid");
 	std::optional<std::vector<u8>> fileContent = FileSystem::ReadBinaryFile(hddidPath.c_str());
 
 	if (fileContent.has_value() && fileContent.value().size() <= sizeof(sceSec))

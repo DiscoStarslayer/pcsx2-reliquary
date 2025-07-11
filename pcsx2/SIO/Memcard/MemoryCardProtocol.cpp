@@ -10,6 +10,9 @@
 
 #include "common/Assertions.h"
 #include "common/Console.h"
+#include "common/Error.h"
+#include "common/FileSystem.h"
+#include "common/Path.h"
 
 #include <cstring>
 
@@ -84,30 +87,32 @@ void generateIvSeedNonce()
 
 void generateResponse()
 {
-	uint8_t ChallengeIV[8] = {/* SHA256: e7b02f4f8d99a58b96dbca4db81c5d666ea7c46fbf6e1d5c045eaba0ee25416a */};
-	char filename[1024];
-	snprintf(filename, sizeof(filename), "%s/%s", EmuFolders::Bios.c_str(), "civ.bin");
-	FILE* f = fopen(filename, "rb");
-	if (f)
+	uint8_t challengeIV[8] = {/* SHA256: e7b02f4f8d99a58b96dbca4db81c5d666ea7c46fbf6e1d5c045eaba0ee25416a */};
+	if (!EmuConfig.Security.MgChallengeIvFile.empty())
 	{
-		fread(ChallengeIV, 1, sizeof(ChallengeIV), f);
-		fclose(f);
+		Error error;
+		std::string path = Path::Canonicalize(EmuConfig.Security.MgChallengeIvFile);
+		auto fp = FileSystem::OpenManagedCFileTryIgnoreCase(path.c_str(), "rb", &error);
+		if (!fp || std::fread(challengeIV, 1, sizeof(challengeIV), fp.get()) != 1)
+		{
+			ERROR_LOG("Failed to read Challenge IV file at {}: {}", path, error.GetDescription());
+		}
 	}
 
 	doubleDesDecrypt(key, MechaChallenge1);
 	uint8_t random[8];
-	xor_bit(MechaChallenge1, ChallengeIV, random, 8);
+	xor_bit(MechaChallenge1, challengeIV, random, 8);
 
-	// MechaChallenge2 and MechaChallenge3 let's the card verify the console
+	// MechaChallenge2 and MechaChallenge3 lets the card verify the console
 
-	xor_bit(nonce, ChallengeIV, MechaResponse1, 8);
+	xor_bit(nonce, challengeIV, MechaResponse1, 8);
 	doubleDesEncrypt(key, MechaResponse1);
 
 	xor_bit(random, MechaResponse1, MechaResponse2, 8);
 	doubleDesEncrypt(key, MechaResponse2);
 
-	uint8_t CardKey[] = {'M', 'e', 'c', 'h', 'a', 'P', 'w', 'n'};
-	xor_bit(CardKey, MechaResponse2, MechaResponse3, 8);
+	uint8_t cardKey[] = {'M', 'e', 'c', 'h', 'a', 'P', 'w', 'n'};
+	xor_bit(cardKey, MechaResponse2, MechaResponse3, 8);
 	doubleDesEncrypt(key, MechaResponse3);
 }
 

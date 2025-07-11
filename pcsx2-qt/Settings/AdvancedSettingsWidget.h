@@ -22,6 +22,11 @@ private:
 	int getClampingModeIndex(int vunum) const;
 	void setClampingMode(int vunum, int index);
 	void onSavestateCompressionTypeChanged();
+	void onBrowseClickedEncryptedKeyStore();
+	void onBrowseClickedChallengeIvFile();
+	void onBrowseClickedCardKeyStoreFile();
+	void onBrowseClickedKeyStoreKeyFile();
+	void onBrowseClicked(QLineEdit* pathElement);
 
 	SettingsWindow* m_dialog;
 	Ui::AdvancedSystemSettingsWidget m_ui;

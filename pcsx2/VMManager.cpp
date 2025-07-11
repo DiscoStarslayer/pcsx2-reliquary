@@ -1285,6 +1285,21 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	const Common::Timer init_timer;
 	pxAssertRel(s_state.load(std::memory_order_acquire) == VMState::Shutdown, "VM is shutdown");
 
+	s_is_python2 = boot_params.is_python2.has_value() && boot_params.is_python2.value();
+	if (s_is_python2)
+	{
+		// Set parameters for Python 2
+		s_python2_crc = boot_params.python2_crc.has_value() ? boot_params.python2_crc.value() : 0;
+		s_python2_serial = boot_params.python2_serial.has_value() ? boot_params.python2_serial.value() : "";
+		s_python2_patch_file = boot_params.python2_patch_file.has_value() ? boot_params.python2_patch_file.value() : "";
+	}
+	else
+	{
+		s_python2_crc = 0;
+		s_python2_serial = "";
+		s_python2_patch_file = "";
+	}
+
 	// cancel any game list scanning, we need to use CDVD!
 	// TODO: we can get rid of this once, we make CDVD not use globals...
 	// (or make it thread-local, but that seems silly.)
@@ -1377,9 +1392,6 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 					"Please consult the FAQs and Guides for further instructions."));
 			return false;
 		}
-
-		// Must happen after BIOS load, depends on BIOS version.
-		cdvdLoadNVRAM();
 	}
 
 	Error error;
@@ -1395,6 +1407,9 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 
 	// Figure out which game we're running! This also loads game settings.
 	UpdateDiscDetails(true);
+
+	// Must happen after BIOS load, depends on BIOS version, also after game setting load for protected titles
+	cdvdLoadNVRAM();
 
 	ScopedGuard close_memcards(&FileMcd_EmuClose);
 
@@ -1600,21 +1615,6 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 
 	PerformanceMetrics::Clear();
 
-	s_is_python2 = boot_params.is_python2.has_value() && boot_params.is_python2.value();
-	if (s_is_python2)
-	{
-		// Set parameters for Python 2
-		s_python2_crc = boot_params.python2_crc.has_value() ? boot_params.python2_crc.value() : 0;
-		s_python2_serial = boot_params.python2_serial.has_value() ? boot_params.python2_serial.value() : "";
-		s_python2_patch_file = boot_params.python2_patch_file.has_value() ? boot_params.python2_patch_file.value() : "";
-	}
-	else
-	{
-		s_python2_crc = 0;
-		s_python2_serial = "";
-		s_python2_patch_file = "";
-	}
-	
 	return true;
 }
 

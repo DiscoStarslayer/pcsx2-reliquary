@@ -404,8 +404,8 @@ namespace usb_python2
 		DevCon.WriteLn("dipswitches: %c %c %c %c\n", s->f.dipSwitch[0], s->f.dipSwitch[1], s->f.dipSwitch[2], s->f.dipSwitch[3]);
 		DevCon.WriteLn("force31khz: %d\n", s->f.force31khz);
 
-		// IlinkIdPath = si->GetStringValue("Python2/System", "IlinkIdFile", "");
-		// DevCon.WriteLn("IlinkIdPath: %s", IlinkIdPath.c_str());
+		std::string iLinkIdPath = si->GetStringValue("Python2/System", "ILinkIdFile", "");
+		DevCon.WriteLn("IlinkIdPath: %s", iLinkIdPath.c_str());
 
 		s->f.cardFilenames[0] = si->GetStringValue("Python2/Game", "Player1CardFile", "card1.txt");
 		DevCon.WriteLn("Player 1 card filename: %s", s->f.cardFilenames[0].c_str());
