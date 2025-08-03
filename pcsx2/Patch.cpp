@@ -715,6 +715,21 @@ u32 Patch::EnablePatches(const PatchList& patches, const EnablePatchList& enable
 	return count;
 }
 
+void Patch::LoadPython2Patches(const std::string& python2_patch_file)
+{
+	std::optional<std::string> contents = FileSystem::ReadFileToString(python2_patch_file.c_str());
+
+	if (contents.has_value())
+	{
+		const u32 patch_count = LoadPatchesFromString(&s_game_patches, contents.value());
+		if (patch_count > 0)
+			Console.WriteLn(Color_Green, fmt::format("Found {} game patches in {}.", patch_count, python2_patch_file));
+
+	}
+
+	UpdateActivePatches(true, true, true, false);
+}
+
 void Patch::ReloadPatches(const std::string& serial, u32 crc, bool reload_files, bool reload_enabled_list, bool verbose,
 	bool verbose_if_changed)
 {

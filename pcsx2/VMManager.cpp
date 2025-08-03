@@ -1122,7 +1122,13 @@ void VMManager::UpdateDiscDetails(bool booting)
 	ApplySettings();
 
 	// Patches are game-dependent, thus should get applied after game settings ia loaded.
-	Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? s_current_crc : 0, true, true, false, false);
+	if (s_is_python2 && !s_python2_patch_file.empty())
+	{
+		Patch::LoadPython2Patches(s_python2_patch_file);
+	} else
+	{
+		Patch::ReloadPatches(s_disc_serial, HasBootedELF() ? s_current_crc : 0, true, true, false, false);
+	}
 
 	ReportGameChangeToHost();
 	if (MTGS::IsOpen())

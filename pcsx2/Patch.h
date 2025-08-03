@@ -88,6 +88,8 @@ namespace Patch
 	/// Reloads cheats/patches. If verbose is set, the number of patches loaded will be shown in the OSD.
 	extern void ReloadPatches(const std::string& serial, u32 crc, bool reload_files, bool reload_enabled_list, bool verbose, bool verbose_if_changed);
 
+	extern void LoadPython2Patches(const std::string& python2_patch_file);
+
 	extern void UpdateActivePatches(bool reload_enabled_list, bool verbose, bool verbose_if_changed, bool apply_new_patches);
 	extern void ApplyPatchSettingOverrides();
 	extern bool ReloadPatchAffectingOptions();
