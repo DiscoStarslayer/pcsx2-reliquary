@@ -712,9 +712,14 @@ struct Pcsx2Config
 		static constexpr int DEFAULT_AUDIO_CAPTURE_BITRATE = 192;
 		static const char* DEFAULT_CAPTURE_CONTAINER;
 
+		static constexpr int DEFAULT_SHADEBOOST_BRIGHTNESS = 50;
+		static constexpr int DEFAULT_SHADEBOOST_CONTRAST = 50;
+		static constexpr int DEFAULT_SHADEBOOST_GAMMA = 50;
+		static constexpr int DEFAULT_SHADEBOOST_SATURATION = 50;
+
 		union
 		{
-			u64 bitset;
+			u64 bitset[2];
 
 			struct
 			{
@@ -743,6 +748,7 @@ struct Pcsx2Config
 					OsdShowGSStats : 1,
 					OsdShowIndicators : 1,
 					OsdShowSettings : 1,
+					OsdshowPatches : 1,
 					OsdShowInputs : 1,
 					OsdShowFrameTimes : 1,
 					OsdShowVersion : 1,
@@ -777,6 +783,7 @@ struct Pcsx2Config
 					SaveDepth : 1,
 					SaveAlpha : 1,
 					SaveInfo : 1,
+					SaveTransferImages : 1,
 					DumpReplaceableTextures : 1,
 					DumpReplaceableMipmaps : 1,
 					DumpTexturesWithFMVActive : 1,
@@ -789,7 +796,8 @@ struct Pcsx2Config
 					EnableVideoCaptureParameters : 1,
 					VideoCaptureAutoResolution : 1,
 					EnableAudioCapture : 1,
-					EnableAudioCaptureParameters : 1;
+					EnableAudioCaptureParameters : 1,
+					OrganizeScreenshotsByGame : 1;
 			};
 		};
 
@@ -844,9 +852,10 @@ struct Pcsx2Config
 		s8 OverrideTextureBarriers = -1;
 
 		u8 CAS_Sharpness = 50;
-		u8 ShadeBoost_Brightness = 50;
-		u8 ShadeBoost_Contrast = 50;
-		u8 ShadeBoost_Saturation = 50;
+		u8 ShadeBoost_Brightness = DEFAULT_SHADEBOOST_BRIGHTNESS;
+		u8 ShadeBoost_Contrast = DEFAULT_SHADEBOOST_CONTRAST;
+		u8 ShadeBoost_Saturation = DEFAULT_SHADEBOOST_SATURATION;
+		u8 ShadeBoost_Gamma = DEFAULT_SHADEBOOST_GAMMA;
 		u8 PNGCompressionLevel = 1;
 
 		u16 SWExtraThreads = 2;
@@ -941,7 +950,7 @@ struct Pcsx2Config
 			VisualDebugEnabled : 1;
 		BITFIELD_END
 
-		u32 OutputVolume = 100;
+		u32 StandardVolume = 100;
 		u32 FastForwardVolume = 100;
 		bool OutputMuted = false;
 
@@ -1258,7 +1267,8 @@ struct Pcsx2Config
 			InfoSound : 1,
 			UnlockSound : 1,
 			LBSubmitSound : 1,
-			Overlays : 1;
+			Overlays : 1,
+			LBOverlays : 1;
 		BITFIELD_END
 
 		u32 NotificationsDuration = DEFAULT_NOTIFICATION_DURATION;
@@ -1462,10 +1472,12 @@ namespace EmuFolders
 
 // ------------ CPU / Recompiler Options ---------------
 
-#ifdef _M_X86 // TODO(Stenzek): Remove me once EE/VU/IOP recs are added.
-#define THREAD_VU1 (EmuConfig.Cpu.Recompiler.EnableVU1 && EmuConfig.Speedhacks.vuThread)
+#ifdef _M_X86 // TODO: Remove me once EE/VU/IOP recs are added.
+#define REC_VU1 (EmuConfig.Cpu.Recompiler.EnableVU1)
+#define THREAD_VU1 (REC_VU1 && EmuConfig.Speedhacks.vuThread)
 #else
 #define THREAD_VU1 false
+#define REC_VU1 false
 #endif
 #define INSTANT_VU1 (EmuConfig.Speedhacks.vu1Instant)
 #define CHECK_EEREC (EmuConfig.Cpu.Recompiler.EnableEE)

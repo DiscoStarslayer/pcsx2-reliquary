@@ -85,7 +85,6 @@ target_sources(common PRIVATE
 
 if(_M_X86)
 	target_sources(common PRIVATE
-		emitter/avx.cpp
 		emitter/bmi.cpp
 		emitter/fpu.cpp
 		emitter/groups.cpp
@@ -174,9 +173,6 @@ else()
 		target_compile_definitions(common PRIVATE "HAS_LIBBACKTRACE=1")
 		target_link_libraries(common PRIVATE libbacktrace::libbacktrace)
 	endif()
-	if(${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
-		target_link_libraries(common PRIVATE cpuinfo)
-	endif()
 endif()
 
 set_source_files_properties(PrecompiledHeader.cpp PROPERTIES HEADER_FILE_ONLY TRUE)
@@ -206,6 +202,7 @@ target_link_libraries(common PRIVATE
 	JPEG::JPEG
 	PNG::PNG
 	WebP::libwebp
+	cpuinfo
 )
 
 target_link_libraries(common PUBLIC

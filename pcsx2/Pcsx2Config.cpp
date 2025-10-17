@@ -708,7 +708,8 @@ std::optional<bool> Pcsx2Config::GSOptions::TriStateToOptionalBoolean(int value)
 
 Pcsx2Config::GSOptions::GSOptions()
 {
-	bitset = 0;
+	bitset[0] = 0;
+	bitset[1] = 0;
 
 	PCRTCAntiBlur = true;
 	DisableInterlaceOffset = false;
@@ -733,6 +734,7 @@ Pcsx2Config::GSOptions::GSOptions()
 	OsdShowGSStats = false;
 	OsdShowIndicators = true;
 	OsdShowSettings = false;
+	OsdshowPatches = false;
 	OsdShowInputs = false;
 	OsdShowFrameTimes = false;
 	OsdShowVersion = false;
@@ -850,6 +852,7 @@ bool Pcsx2Config::GSOptions::OptionsAreEqual(const GSOptions& right) const
 		OpEqu(ShadeBoost_Brightness) &&
 		OpEqu(ShadeBoost_Contrast) &&
 		OpEqu(ShadeBoost_Saturation) &&
+		OpEqu(ShadeBoost_Gamma) &&
 		OpEqu(PNGCompressionLevel) &&
 		OpEqu(SaveDrawStart) &&
 		OpEqu(SaveDrawCount) &&
@@ -920,6 +923,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapIntEnumEx(ScreenshotSize, "ScreenshotSize");
 	SettingsWrapIntEnumEx(ScreenshotFormat, "ScreenshotFormat");
 	SettingsWrapEntry(ScreenshotQuality);
+	SettingsWrapBitBool(OrganizeScreenshotsByGame);
 	SettingsWrapEntry(StretchY);
 	SettingsWrapEntryEx(Crop[0], "CropLeft");
 	SettingsWrapEntryEx(Crop[1], "CropTop");
@@ -948,6 +952,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(OsdShowGSStats);
 	SettingsWrapBitBool(OsdShowIndicators);
 	SettingsWrapBitBool(OsdShowSettings);
+	SettingsWrapBitBool(OsdshowPatches);
 	SettingsWrapBitBool(OsdShowInputs);
 	SettingsWrapBitBool(OsdShowFrameTimes);
 	SettingsWrapBitBool(OsdShowVersion);
@@ -985,6 +990,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBoolEx(SaveDepth, "SaveDepth");
 	SettingsWrapBitBoolEx(SaveAlpha, "SaveAlpha");
 	SettingsWrapBitBoolEx(SaveInfo, "SaveInfo");
+	SettingsWrapBitBoolEx(SaveTransferImages, "SaveTransferImages");
 	SettingsWrapBitBool(DumpReplaceableTextures);
 	SettingsWrapBitBool(DumpReplaceableMipmaps);
 	SettingsWrapBitBool(DumpTexturesWithFMVActive);
@@ -1041,6 +1047,7 @@ void Pcsx2Config::GSOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitfield(ShadeBoost_Brightness);
 	SettingsWrapBitfield(ShadeBoost_Contrast);
 	SettingsWrapBitfield(ShadeBoost_Saturation);
+	SettingsWrapBitfield(ShadeBoost_Gamma);
 	SettingsWrapBitfield(ExclusiveFullscreenControl);
 	SettingsWrapBitfieldEx(PNGCompressionLevel, "png_compression_level");
 	SettingsWrapBitfieldEx(SaveDrawStart, "SaveDrawStart");
@@ -1221,7 +1228,7 @@ void Pcsx2Config::SPU2Options::LoadSave(SettingsWrapper& wrap)
 
 	{
 		SettingsWrapSection("SPU2/Output");
-		SettingsWrapEntry(OutputVolume);
+		SettingsWrapEntry(StandardVolume);
 		SettingsWrapEntry(FastForwardVolume);
 		SettingsWrapEntry(OutputMuted);
 		SettingsWrapParsedEnum(Backend, "Backend", &AudioStream::ParseBackendName, &AudioStream::GetBackendName);
@@ -1240,7 +1247,7 @@ bool Pcsx2Config::SPU2Options::operator!=(const SPU2Options& right) const
 bool Pcsx2Config::SPU2Options::operator==(const SPU2Options& right) const
 {
 	return OpEqu(bitset) &&
-		   OpEqu(OutputVolume) &&
+		   OpEqu(StandardVolume) &&
 		   OpEqu(FastForwardVolume) &&
 		   OpEqu(OutputMuted) &&
 		   OpEqu(Backend) &&
@@ -1907,6 +1914,7 @@ Pcsx2Config::AchievementsOptions::AchievementsOptions()
 	UnlockSound = true;
 	LBSubmitSound = true;
 	Overlays = true;
+	LBOverlays = true;
 }
 
 void Pcsx2Config::AchievementsOptions::LoadSave(SettingsWrapper& wrap)
@@ -1934,6 +1942,7 @@ void Pcsx2Config::AchievementsOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(UnlockSound);
 	SettingsWrapBitBool(LBSubmitSound);
 	SettingsWrapBitBool(Overlays);
+	SettingsWrapBitBool(LBOverlays);
 	SettingsWrapEntry(NotificationsDuration);
 	SettingsWrapEntry(LeaderboardsDuration);
 	SettingsWrapIntEnumEx(OverlayPosition, "OverlayPosition");

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "IconsFontAwesome6.h"
 #include "USB/qemu-usb/qusb.h"
 #include "USB/qemu-usb/desc.h"
 #include "USB/qemu-usb/USBinternal.h"
@@ -1139,9 +1140,16 @@ namespace usb_msd
 				break;
 		}
 
-		if (path.empty() || !(s->file = FileSystem::OpenCFile(path.c_str(), "r+b")))
+		if (path.empty())
 		{
-			Host::AddOSDMessage(fmt::format(TRANSLATE_FS("USB", "usb-msd: Could not open image file '{}'"), path),
+			Host::AddOSDMessage(fmt::format(TRANSLATE_FS("USB", "USB mass storage: No image path specified")),
+				Host::OSD_ERROR_DURATION);
+			goto fail;
+		}
+
+		if (!(s->file = FileSystem::OpenCFile(path.c_str(), "r+b")))
+		{
+			Host::AddOSDMessage(fmt::format(TRANSLATE_FS("USB", "USB mass storage: Could not open image file '{}'"), path),
 				Host::OSD_ERROR_DURATION);
 			goto fail;
 		}
@@ -1180,6 +1188,11 @@ namespace usb_msd
 	const char* MsdDevice::Name() const
 	{
 		return TRANSLATE_NOOP("USB", "Mass Storage Device");
+	}
+
+	const char* MsdDevice::IconName() const
+	{
+		return ICON_FA_HARD_DRIVE;
 	}
 
 	bool MsdDevice::Freeze(USBDevice* dev, StateWrapper& sw) const

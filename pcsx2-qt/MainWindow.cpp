@@ -35,6 +35,7 @@
 #include "pcsx2/Recording/InputRecording.h"
 #include "pcsx2/Recording/InputRecordingControls.h"
 #include "pcsx2/SIO/Sio.h"
+#include "pcsx2/GS/GSExtra.h"
 
 #include "common/Assertions.h"
 #include "common/CocoaTools.h"
@@ -154,7 +155,7 @@ void MainWindow::initialize()
 		});
 	});
 	// The cocoa backing isn't initialized yet, delay this until stuff is set up with a `RunOnUIThread` call
-	QtHost::RunOnUIThread([this]{
+	QtHost::RunOnUIThread([this] {
 		CocoaTools::MarkHelpMenu(m_ui.menuHelp->toNSMenu());
 	});
 #endif
@@ -218,6 +219,9 @@ void MainWindow::setupAdditionalUi()
 	const bool status_bar_visible = Host::GetBaseBoolSettingValue("UI", "ShowStatusBar", true);
 	m_ui.actionViewStatusBar->setChecked(status_bar_visible);
 	m_ui.statusBar->setVisible(status_bar_visible);
+
+	const bool show_game_grid = Host::GetBaseBoolSettingValue("UI", "GameListGridView", false);
+	updateGameGridActions(show_game_grid);
 
 	m_game_list_widget = new GameListWidget(getContentParent());
 	m_game_list_widget->initialize();
@@ -336,6 +340,8 @@ void MainWindow::connectSignals()
 	connect(m_ui.actionToolbarSettings, &QAction::triggered, this, &MainWindow::onSettingsTriggeredFromToolbar);
 	connect(m_ui.actionToolbarControllerSettings, &QAction::triggered,
 		[this]() { doControllerSettings(ControllerSettingsWindow::Category::GlobalSettings); });
+	connect(m_ui.actionToolbarHotkeySettings, &QAction::triggered,
+		[this]() { doControllerSettings(ControllerSettingsWindow::Category::HotkeySettings); });
 	connect(m_ui.actionToolbarScreenshot, &QAction::triggered, this, &MainWindow::onScreenshotActionTriggered);
 	connect(m_ui.actionExit, &QAction::triggered, this, &MainWindow::close);
 	connect(m_ui.actionScreenshot, &QAction::triggered, this, &MainWindow::onScreenshotActionTriggered);
@@ -390,6 +396,7 @@ void MainWindow::connectSignals()
 	connect(m_game_list_widget, &GameListWidget::layoutChange, this, [this]() {
 		QSignalBlocker sb(m_ui.actionGridViewShowTitles);
 		m_ui.actionGridViewShowTitles->setChecked(m_game_list_widget->getShowGridCoverTitles());
+		updateGameGridActions(m_game_list_widget->isShowingGameGrid());
 	});
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionViewStatusBarVerbose, "UI", "VerboseStatusBar", false);
@@ -504,26 +511,24 @@ void MainWindow::createRendererSwitchMenu()
 	};
 	const GSRendererType current_renderer = static_cast<GSRendererType>(
 		Host::GetBaseIntSettingValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Auto)));
+
+	QActionGroup* switch_renderer_group = new QActionGroup(m_ui.menuDebugSwitchRenderer);
+
 	for (const GSRendererType renderer : renderers)
 	{
-		QAction* action = m_ui.menuDebugSwitchRenderer->addAction(
-			QString::fromUtf8(Pcsx2Config::GSOptions::GetRendererName(renderer)));
+		QAction* action = new QAction(
+			QString::fromUtf8(Pcsx2Config::GSOptions::GetRendererName(renderer)), switch_renderer_group);
 		action->setCheckable(true);
 		action->setChecked(current_renderer == renderer);
 		connect(action,
-			&QAction::triggered, [this, action, renderer] {
+			&QAction::triggered, [renderer] {
 				Host::SetBaseIntSettingValue("EmuCore/GS", "Renderer", static_cast<int>(renderer));
 				Host::CommitBaseSettingChanges();
 				g_emu_thread->applySettings();
-
-				// clear all others
-				for (QObject* obj : m_ui.menuDebugSwitchRenderer->children())
-				{
-					if (QAction* act = qobject_cast<QAction*>(obj); act && act != action)
-						act->setChecked(false);
-				}
 			});
 	}
+
+	m_ui.menuDebugSwitchRenderer->addActions(switch_renderer_group->actions());
 }
 
 void MainWindow::recreate()
@@ -564,7 +569,7 @@ void MainWindow::recreate()
 	if (was_display_created)
 	{
 		g_emu_thread->setSurfaceless(false);
-		g_main_window->updateEmulationActions(false, s_vm_valid, Achievements::IsHardcoreModeActive());
+		g_main_window->updateEmulationActions(false, s_vm_valid, false);
 		g_main_window->onFullscreenUIStateChange(g_emu_thread->isRunningFullscreenUI());
 	}
 }
@@ -848,6 +853,10 @@ void MainWindow::onAchievementsHardcoreModeChanged(bool enabled)
 {
 	// disable debugger while hardcore mode is active
 	m_ui.actionDebugger->setDisabled(enabled);
+
+	// refresh emulation actions to show/hide load state buttons based on hardcore mode
+	updateEmulationActions(s_vm_valid, s_vm_valid, false);
+
 	if (enabled)
 	{
 		// If PauseOnEntry is enabled, we prompt the user to disable Hardcore Mode
@@ -943,7 +952,7 @@ void MainWindow::updateEmulationActions(bool starting, bool running, bool stoppi
 	m_ui.actionPause->setEnabled(running);
 	m_ui.actionScreenshot->setEnabled(running);
 	m_ui.menuChangeDisc->setEnabled(running);
-	m_ui.menuLoadState->setEnabled(running);
+	m_ui.menuLoadState->setEnabled(running && !Achievements::IsHardcoreModeActive());
 	m_ui.menuSaveState->setEnabled(running);
 	m_ui.actionSaveGSDump->setEnabled(running);
 
@@ -952,7 +961,7 @@ void MainWindow::updateEmulationActions(bool starting, bool running, bool stoppi
 	m_ui.actionToolbarPause->setEnabled(running);
 	m_ui.actionToolbarScreenshot->setEnabled(running);
 	m_ui.actionToolbarChangeDisc->setEnabled(running);
-	m_ui.actionToolbarLoadState->setEnabled(running);
+	m_ui.actionToolbarLoadState->setEnabled(running && !Achievements::IsHardcoreModeActive());
 	m_ui.actionToolbarSaveState->setEnabled(running);
 
 	m_ui.actionViewGameProperties->setEnabled(running);
@@ -1131,8 +1140,8 @@ bool MainWindow::shouldHideMainWindow() const
 {
 	// NOTE: We can't use isRenderingToMain() here, because this happens post-fullscreen-switch.
 	return (Host::GetBoolSettingValue("UI", "HideMainWindowWhenRunning", false) && !g_emu_thread->shouldRenderToMain()) ||
-		   (g_emu_thread->shouldRenderToMain() && (isRenderingFullscreen() || m_is_temporarily_windowed)) ||
-		   Host::InNoGUIMode();
+	       (g_emu_thread->shouldRenderToMain() && (isRenderingFullscreen() || m_is_temporarily_windowed)) ||
+	       Host::InNoGUIMode();
 }
 
 bool MainWindow::shouldMouseLock() const
@@ -1144,8 +1153,8 @@ bool MainWindow::shouldMouseLock() const
 		return false;
 
 	bool windowsHidden = (!g_debugger_window || g_debugger_window->isHidden()) &&
-						 (!m_controller_settings_window || m_controller_settings_window->isHidden()) &&
-						 (!m_settings_window || m_settings_window->isHidden());
+	                     (!m_controller_settings_window || m_controller_settings_window->isHidden()) &&
+	                     (!m_settings_window || m_settings_window->isHidden());
 
 	return windowsHidden && (isActiveWindow() || isRenderingFullscreen());
 }
@@ -1154,12 +1163,20 @@ bool MainWindow::shouldAbortForMemcardBusy(const VMLock& lock)
 {
 	if (MemcardBusy::IsBusy() && !GSDumpReplayer::IsReplayingDump())
 	{
-		const QMessageBox::StandardButton res = QMessageBox::critical(
-			lock.getDialogParent(),
-			tr("WARNING: Memory Card Busy"),
-			tr("WARNING: Your memory card is still writing data. Shutting down now <b>WILL IRREVERSIBLY DESTROY YOUR MEMORY CARD.</b> It is strongly recommended to resume your game and let it finish writing to your memory card.<br><br>Do you wish to shutdown anyways and <b>IRREVERSIBLY DESTROY YOUR MEMORY CARD?</b>"), QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+		QMessageBox msgbox(lock.getDialogParent());
+		msgbox.setIcon(QMessageBox::Warning);
+		msgbox.setWindowTitle(tr("WARNING: Memory Card Busy"));
+		msgbox.setWindowIcon(QtHost::GetAppIcon());
+		msgbox.setWindowModality(Qt::WindowModal);
+		msgbox.setTextFormat(Qt::RichText);
+		msgbox.setText(tr("Your memory card is still saving data."));
+		msgbox.setInformativeText(tr("WARNING: Shutting down now can <b>IRREVERSIBLY CORRUPT YOUR MEMORY CARD.</b><br><br>"
+									 "You are strongly advised to select 'No' and let the save finish.<br><br>"
+									 "Do you want to shutdown anyway and <b>IRREVERSIBLY CORRUPT YOUR MEMORY CARD</b>?"));
+		msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+		msgbox.setDefaultButton(QMessageBox::No);
 
-		if (res != QMessageBox::Yes)
+		if (msgbox.exec() != QMessageBox::Yes)
 		{
 			return true;
 		}
@@ -1456,6 +1473,8 @@ void MainWindow::onGameListEntryContextMenuRequested(const QPoint& point)
 			connect(menu.addAction(tr("Check Wiki Page")), &QAction::triggered, [this, entry]() { goToWikiPage(entry); });
 		}
 
+		action = menu.addAction(tr("Open Screenshots Folder"));
+		connect(action, &QAction::triggered, [this, entry]() { openScreenshotsFolderForGame(entry); });
 		menu.addSeparator();
 
 		if (!s_vm_valid)
@@ -1850,15 +1869,15 @@ void MainWindow::onInputRecNewActionTriggered()
 	if (result == QDialog::Accepted)
 	{
 		Host::RunOnCPUThread(
-			[&, filePath = dlg.getFilePath(), fromSavestate = dlg.getInputRecType() == InputRecording::Type::FROM_SAVESTATE,
+			[filePath = dlg.getFilePath(), fromSavestate = dlg.getInputRecType() == InputRecording::Type::FROM_SAVESTATE,
 				authorName = dlg.getAuthorName()]() {
 				if (g_InputRecording.create(filePath, fromSavestate, authorName))
 				{
-					QtHost::RunOnUIThread([&]() {
-						m_ui.actionInputRecNew->setEnabled(false);
-						m_ui.actionInputRecStop->setEnabled(true);
-						m_ui.actionReset->setEnabled(!g_InputRecording.isTypeSavestate());
-						m_ui.actionToolbarReset->setEnabled(!g_InputRecording.isTypeSavestate());
+					QtHost::RunOnUIThread([]() {
+						g_main_window->m_ui.actionInputRecNew->setEnabled(false);
+						g_main_window->m_ui.actionInputRecStop->setEnabled(true);
+						g_main_window->m_ui.actionReset->setEnabled(!g_InputRecording.isTypeSavestate());
+						g_main_window->m_ui.actionToolbarReset->setEnabled(!g_InputRecording.isTypeSavestate());
 					});
 				}
 				else
@@ -1910,14 +1929,14 @@ void MainWindow::onInputRecPlayActionTriggered()
 			Host::RunOnCPUThread([]() { g_InputRecording.stop(); });
 			m_ui.actionInputRecStop->setEnabled(false);
 		}
-		Host::RunOnCPUThread([&, filename = QDir::toNativeSeparators(fileNames.first()).toStdString()]() {
+		Host::RunOnCPUThread([filename = QDir::toNativeSeparators(fileNames.first()).toStdString()]() {
 			if (g_InputRecording.play(filename))
 			{
-				QtHost::RunOnUIThread([&]() {
-					m_ui.actionInputRecNew->setEnabled(false);
-					m_ui.actionInputRecStop->setEnabled(true);
-					m_ui.actionReset->setEnabled(!g_InputRecording.isTypeSavestate());
-					m_ui.actionToolbarReset->setEnabled(!g_InputRecording.isTypeSavestate());
+				QtHost::RunOnUIThread([]() {
+					g_main_window->m_ui.actionInputRecNew->setEnabled(false);
+					g_main_window->m_ui.actionInputRecStop->setEnabled(true);
+					g_main_window->m_ui.actionReset->setEnabled(!g_InputRecording.isTypeSavestate());
+					g_main_window->m_ui.actionToolbarReset->setEnabled(!g_InputRecording.isTypeSavestate());
 				});
 			}
 			else
@@ -1934,13 +1953,13 @@ void MainWindow::onInputRecStopActionTriggered()
 {
 	if (g_InputRecording.isActive())
 	{
-		Host::RunOnCPUThread([&]() {
+		Host::RunOnCPUThread([]() {
 			g_InputRecording.stop();
-			QtHost::RunOnUIThread([&]() {
-				m_ui.actionInputRecNew->setEnabled(true);
-				m_ui.actionInputRecStop->setEnabled(false);
-				m_ui.actionReset->setEnabled(true);
-				m_ui.actionToolbarReset->setEnabled(true);
+			QtHost::RunOnUIThread([]() {
+				g_main_window->m_ui.actionInputRecNew->setEnabled(true);
+				g_main_window->m_ui.actionInputRecStop->setEnabled(false);
+				g_main_window->m_ui.actionReset->setEnabled(true);
+				g_main_window->m_ui.actionToolbarReset->setEnabled(true);
 			});
 		});
 	}
@@ -2142,6 +2161,9 @@ void MainWindow::changeEvent(QEvent* event)
 		QtHost::SetIconThemeFromStyle();
 		reloadThemeSpecificImages();
 	}
+
+	if (event->type() == QEvent::ActivationChange)
+		m_game_list_widget->updateCustomBackgroundState();
 }
 
 static QString getFilenameFromMimeData(const QMimeData* md)
@@ -2217,7 +2239,7 @@ bool MainWindow::startFile(const QString& filename)
 		const auto lock = pauseAndLockVM();
 
 		if (QMessageBox::Yes != QMessageBox::question(this, tr("Confirm Reset"),
-				tr("The new ELF cannot be loaded without resetting the virtual machine. Do you want to reset the virtual machine now?")))
+									tr("The new ELF cannot be loaded without resetting the virtual machine. Do you want to reset the virtual machine now?")))
 		{
 			return true;
 		}
@@ -2688,6 +2710,7 @@ SettingsWindow* MainWindow::getSettingsWindow()
 		m_settings_window = new SettingsWindow();
 		connect(m_settings_window->getInterfaceSettingsWidget(), &InterfaceSettingsWidget::themeChanged, this, &MainWindow::onThemeChanged);
 		connect(m_settings_window->getInterfaceSettingsWidget(), &InterfaceSettingsWidget::languageChanged, this, &MainWindow::onLanguageChanged);
+		connect(m_settings_window->getInterfaceSettingsWidget(), &InterfaceSettingsWidget::backgroundChanged, m_game_list_widget, [this] { m_game_list_widget->setCustomBackground(true); });
 		connect(m_settings_window->getGameListSettingsWidget(), &GameListSettingsWidget::preferEnglishGameListChanged, this, [] {
 			g_main_window->m_game_list_widget->refreshGridCovers();
 		});
@@ -2913,6 +2936,39 @@ void MainWindow::goToWikiPage(const GameList::Entry* entry)
 	QtUtils::OpenURL(this, fmt::format("https://wiki.pcsx2.net/{}", entry->serial).c_str());
 }
 
+void MainWindow::openScreenshotsFolderForGame(const GameList::Entry* entry)
+{
+	if (!entry || entry->title.empty())
+		return;
+
+	// if disabled open the snapshots folder
+	if (!EmuConfig.GS.OrganizeScreenshotsByGame)
+	{
+		QtUtils::OpenURL(this, QUrl::fromLocalFile(QString::fromStdString(EmuFolders::Snapshots)));
+		return;
+	}
+
+	std::string game_name = entry->title;
+	Path::SanitizeFileName(&game_name);
+	if (game_name.length() > 219)
+	{
+		game_name.resize(219);
+	}
+	const std::string game_dir = Path::Combine(EmuFolders::Snapshots, game_name);
+
+	if (!FileSystem::DirectoryExists(game_dir.c_str()))
+	{
+		if (!FileSystem::CreateDirectoryPath(game_dir.c_str(), false))
+		{
+			QMessageBox::critical(this, tr("Error"), tr("Failed to create screenshots directory '%1'.").arg(QString::fromStdString(game_dir)));
+			return;
+		}
+	}
+
+	const QFileInfo fi(QString::fromStdString(game_dir));
+	QtUtils::OpenURL(this, QUrl::fromLocalFile(fi.absoluteFilePath()));
+}
+
 std::optional<bool> MainWindow::promptForResumeState(const QString& save_state_path)
 {
 	if (save_state_path.isEmpty())
@@ -3116,6 +3172,14 @@ void MainWindow::updateGameDependentActions()
 	m_ui.actionEditCheats->setEnabled(can_use_pnach);
 	m_ui.actionEditPatches->setEnabled(can_use_pnach);
 	m_ui.actionReloadPatches->setEnabled(s_vm_valid);
+}
+
+void MainWindow::updateGameGridActions(const bool show_game_grid)
+{
+	m_ui.actionGridViewShowTitles->setEnabled(show_game_grid);
+	m_ui.actionGridViewZoomIn->setEnabled(show_game_grid);
+	m_ui.actionGridViewZoomOut->setEnabled(show_game_grid);
+	m_ui.actionGridViewRefreshCovers->setEnabled(show_game_grid);
 }
 
 void MainWindow::doStartFile(std::optional<CDVD_SourceType> source, const QString& path)

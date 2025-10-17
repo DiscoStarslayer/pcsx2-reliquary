@@ -45,7 +45,7 @@ static const SettingInfo s_settings[] = {
 };
 
 const Pad::ControllerInfo PadJogcon::ControllerInfo = {Pad::ControllerType::Jogcon, "Jogcon",
-	TRANSLATE_NOOP("Pad", "Jogcon"), ICON_PF_GAMEPAD_ALT, s_bindings, s_settings, Pad::VibrationCapabilities::LargeSmallMotors};
+	TRANSLATE_NOOP("Pad", "Jogcon"), ICON_PF_JOGCON, s_bindings, s_settings, Pad::VibrationCapabilities::LargeSmallMotors};
 
 void PadJogcon::ConfigLog()
 {
@@ -448,6 +448,16 @@ u32 PadJogcon::GetButtons() const
 u8 PadJogcon::GetPressure(u32 index) const
 {
 	return 0;
+}
+
+bool PadJogcon::IsAnalogLightEnabled() const
+{
+	return this->analogLight;
+}
+
+bool PadJogcon::IsAnalogLocked() const
+{
+	return this->analogLocked;
 }
 
 bool PadJogcon::Freeze(StateWrapper& sw)

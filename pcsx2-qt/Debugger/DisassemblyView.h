@@ -43,6 +43,7 @@ public slots:
 	void contextCopyInstructionHex();
 	void contextCopyInstructionText();
 	void contextCopyFunctionName();
+	void contextPasteInstructionText();	
 	void contextAssembleInstruction();
 	void contextNoopInstruction();
 	void contextRestoreInstruction();
@@ -92,6 +93,7 @@ private:
 	};
 	QString FetchSelectionInfo(SelectionInfo selInfo);
 
+	void setInstructions(u32 start, u32 end, u32 value);
 	bool AddressCanRestore(u32 start, u32 end);
 	bool FunctionCanRestore(u32 address);
 };

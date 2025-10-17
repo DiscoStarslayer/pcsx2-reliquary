@@ -49,6 +49,7 @@
 #define PS_PROCESS_RG 0
 #define PS_SHUFFLE_ACROSS 0
 #define PS_READ16_SRC 0
+#define PS_WRITE_RG 0
 #define PS_DST_FMT 0
 #define PS_DEPTH_FMT 0
 #define PS_PAL_FMT 0
@@ -82,6 +83,7 @@
 #define SW_BLEND (PS_BLEND_A || PS_BLEND_B || PS_BLEND_D)
 #define SW_BLEND_NEEDS_RT (SW_BLEND && (PS_BLEND_A == 1 || PS_BLEND_B == 1 || PS_BLEND_C == 1 || PS_BLEND_D == 1))
 #define SW_AD_TO_HW (PS_BLEND_C == 1 && PS_A_MASKED)
+#define NEEDS_RT_FOR_AFAIL (PS_AFAIL == 3 && PS_NO_COLOR1)
 
 struct VS_INPUT
 {
@@ -172,10 +174,10 @@ cbuffer cb1
 	float RcpScaleFactor;
 };
 
-float4 sample_c(float2 uv, float uv_w)
+float4 sample_c(float2 uv, float uv_w, int2 xy)
 {
 #if PS_TEX_IS_FB == 1
-	return RtTexture.Load(int3(int2(uv * WH.zw), 0));
+	return RtTexture.Load(int3(int2(xy), 0));
 #elif PS_REGION_RECT == 1
 	return Texture.Load(int3(int2(uv), 0));
 #else
@@ -314,26 +316,26 @@ float4 clamp_wrap_uv(float4 uv)
 	return uv;
 }
 
-float4x4 sample_4c(float4 uv, float uv_w)
+float4x4 sample_4c(float4 uv, float uv_w, int2 xy)
 {
 	float4x4 c;
 
-	c[0] = sample_c(uv.xy, uv_w);
-	c[1] = sample_c(uv.zy, uv_w);
-	c[2] = sample_c(uv.xw, uv_w);
-	c[3] = sample_c(uv.zw, uv_w);
+	c[0] = sample_c(uv.xy, uv_w, xy);
+	c[1] = sample_c(uv.zy, uv_w, xy);
+	c[2] = sample_c(uv.xw, uv_w, xy);
+	c[3] = sample_c(uv.zw, uv_w, xy);
 
 	return c;
 }
 
-uint4 sample_4_index(float4 uv, float uv_w)
+uint4 sample_4_index(float4 uv, float uv_w, int2 xy)
 {
 	float4 c;
 
-	c.x = sample_c(uv.xy, uv_w).a;
-	c.y = sample_c(uv.zy, uv_w).a;
-	c.z = sample_c(uv.xw, uv_w).a;
-	c.w = sample_c(uv.zw, uv_w).a;
+	c.x = sample_c(uv.xy, uv_w, xy).a;
+	c.y = sample_c(uv.zy, uv_w, xy).a;
+	c.z = sample_c(uv.xw, uv_w, xy).a;
+	c.w = sample_c(uv.zw, uv_w, xy).a;
 
 	// Denormalize value
 	uint4 i;
@@ -605,7 +607,7 @@ float4 fetch_gXbY(int2 xy)
 	}
 }
 
-float4 sample_color(float2 st, float uv_w)
+float4 sample_color(float2 st, float uv_w, int2 xy)
 {
 	#if PS_TCOFFSETHACK
 	st += TC_OffsetHack.xy;
@@ -617,7 +619,7 @@ float4 sample_color(float2 st, float uv_w)
 
 	if (PS_LTF == 0 && PS_AEM_FMT == FMT_32 && PS_PAL_FMT == 0 && PS_REGION_RECT == 0 && PS_WMS < 2 && PS_WMT < 2)
 	{
-		c[0] = sample_c(st, uv_w);
+		c[0] = sample_c(st, uv_w, xy);
 	}
 	else
 	{
@@ -641,9 +643,9 @@ float4 sample_color(float2 st, float uv_w)
 		uv = clamp_wrap_uv(uv);
 
 #if PS_PAL_FMT != 0
-			c = sample_4p(sample_4_index(uv, uv_w));
+			c = sample_4p(sample_4_index(uv, uv_w, xy));
 #else
-			c = sample_4c(uv, uv_w);
+			c = sample_4c(uv, uv_w, xy);
 #endif
 	}
 
@@ -768,7 +770,7 @@ float4 ps_color(PS_INPUT input)
 #elif PS_DEPTH_FMT > 0
 	float4 T = sample_depth(st_int, input.p.xy);
 #else
-	float4 T = sample_color(st, input.t.w);
+	float4 T = sample_color(st, input.t.w, int2(input.p.xy));
 #endif
 
 	if (PS_SHUFFLE && !PS_SHUFFLE_SAME && !PS_READ16_SRC && !(PS_PROCESS_BA == SHUFFLE_READWRITE && PS_PROCESS_RG == SHUFFLE_READWRITE))
@@ -1063,6 +1065,36 @@ PS_OUTPUT ps_main(PS_INPUT input)
 		if (C.a < A_one) C.a += A_one;
 	}
 
+#if PS_DATE >= 5
+
+#if PS_WRITE_RG == 1
+	// Pseudo 16 bits access.
+	float rt_a = RtTexture.Load(int3(input.p.xy, 0)).g;
+#else
+	float rt_a = RtTexture.Load(int3(input.p.xy, 0)).a;
+#endif
+
+#if (PS_DATE & 3) == 1
+	// DATM == 0: Pixel with alpha equal to 1 will failed
+	#if PS_RTA_CORRECTION
+		bool bad = (254.5f / 255.0f) < rt_a;
+	#else
+		bool bad = (127.5f / 255.0f) < rt_a;
+	#endif
+#elif (PS_DATE & 3) == 2
+	// DATM == 1: Pixel with alpha equal to 0 will failed
+	#if PS_RTA_CORRECTION
+		bool bad = rt_a < (254.5f / 255.0f);
+	#else
+		bool bad = rt_a < (127.5f / 255.0f);
+	#endif
+#endif
+
+	if (bad)
+		discard;
+
+#endif
+
 #if PS_DATE == 3
 	// Note gl_PrimitiveID == stencil_ceil will be the primitive that will update
 	// the bad alpha value so we must keep it.
@@ -1154,7 +1186,7 @@ PS_OUTPUT ps_main(PS_INPUT input)
 
 	ps_fbmask(C, input.p.xy);
 
-#if PS_AFAIL == 3 // RGB_ONLY
+#if PS_AFAIL == 3 && !PS_NO_COLOR1 // RGB_ONLY
 	// Use alpha blend factor to determine whether to update A.
 	alpha_blend.a = float(atst_pass);
 #endif
@@ -1165,6 +1197,14 @@ PS_OUTPUT ps_main(PS_INPUT input)
 #if !PS_NO_COLOR1
 	output.c1 = alpha_blend;
 #endif
+#if PS_AFAIL == 3 && PS_NO_COLOR1 // RGB_ONLY, no dual src blend
+	if (!atst_pass)
+	{
+		float RTa = NEEDS_RT_FOR_AFAIL ? RtTexture.Load(int3(input.p.xy, 0)).a : 0.0f;
+		output.c0.a = RTa;
+	}
+#endif
+
 #endif // !PS_NO_COLOR
 
 #endif // PS_DATE != 1/2
@@ -1301,9 +1341,7 @@ VS_OUTPUT vs_main_expand(uint vid : SV_VertexID)
 	uint vid_base = vid >> 2;
 	bool is_bottom = vid & 2;
 	bool is_right = vid & 1;
-	// All lines will be a pair of vertices next to each other
-	// Since DirectX uses provoking vertex first, the bottom point will be the lower of the two
-	uint vid_other = is_bottom ? vid_base + 1 : vid_base - 1;
+	uint vid_other = is_bottom ? vid_base - 1 : vid_base + 1;
 	VS_OUTPUT vtx = vs_main(load_vertex(vid_base));
 	VS_OUTPUT other = vs_main(load_vertex(vid_other));
 

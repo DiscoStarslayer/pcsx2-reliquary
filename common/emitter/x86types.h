@@ -29,6 +29,9 @@ namespace x86Emitter
 	static constexpr int SHADOW_STACK_SIZE = 0;
 #endif
 
+	/// This will switch all SSE instructions to generate AVX instructions instead
+	extern bool use_avx;
+
 	extern void xWrite8(u8 val);
 	extern void xWrite16(u16 val);
 	extern void xWrite32(u32 val);
@@ -46,23 +49,6 @@ namespace x86Emitter
 
 	template <typename T>
 	void xWrite(T val);
-
-// --------------------------------------------------------------------------------------
-//  ALWAYS_USE_MOVAPS [define] / AlwaysUseMovaps [const]
-// --------------------------------------------------------------------------------------
-// This tells the recompiler's emitter to always use movaps instead of movdqa.  Both instructions
-// do the exact same thing, but movaps is 1 byte shorter, and thus results in a cleaner L1 cache
-// and some marginal speed gains as a result.  (it's possible someday in the future the per-
-// formance of the two instructions could change, so this constant is provided to restore MOVDQA
-// use easily at a later time, if needed).
-//
-#define ALWAYS_USE_MOVAPS
-
-#ifdef ALWAYS_USE_MOVAPS
-	static const bool AlwaysUseMovaps = true;
-#else
-	static const bool AlwaysUseMovaps = false;
-#endif
 
 // --------------------------------------------------------------------------------------
 //  __emitline - preprocessors definition

@@ -879,38 +879,6 @@ void EmuThread::endCapture()
 	MTGS::RunOnGSThread(&GSEndCapture);
 }
 
-void EmuThread::setAudioOutputVolume(int volume, int fast_forward_volume)
-{
-	if (!isOnEmuThread())
-	{
-		QMetaObject::invokeMethod(this, "setAudioOutputVolume", Qt::QueuedConnection, Q_ARG(int, volume),
-			Q_ARG(int, fast_forward_volume));
-		return;
-	}
-
-	if (!VMManager::HasValidVM())
-		return;
-
-	EmuConfig.SPU2.OutputVolume = static_cast<u32>(volume);
-	EmuConfig.SPU2.FastForwardVolume = static_cast<u32>(fast_forward_volume);
-	SPU2::SetOutputVolume(SPU2::GetResetVolume());
-}
-
-void EmuThread::setAudioOutputMuted(bool muted)
-{
-	if (!isOnEmuThread())
-	{
-		QMetaObject::invokeMethod(this, "setAudioOutputMuted", Qt::QueuedConnection, Q_ARG(bool, muted));
-		return;
-	}
-
-	if (!VMManager::HasValidVM())
-		return;
-
-	EmuConfig.SPU2.OutputMuted = muted;
-	SPU2::SetOutputVolume(SPU2::GetResetVolume());
-}
-
 std::optional<WindowInfo> EmuThread::acquireRenderWindow(bool recreate_window)
 {
 	// Check if we're wanting to get exclusive fullscreen. This should be safe to read, since we're going to be calling from the GS thread.
@@ -991,30 +959,33 @@ void Host::OnGameChanged(const std::string& title, const std::string& elf_overri
 
 void EmuThread::updatePerformanceMetrics(bool force)
 {
-	if (m_verbose_status && VMManager::HasValidVM())
+	if (VMManager::HasValidVM())
 	{
-		std::string gs_stat_str;
-		GSgetTitleStats(gs_stat_str);
-
 		QString gs_stat;
-		if (THREAD_VU1)
+		if (m_verbose_status)
 		{
-			gs_stat = tr("Slot: %1 | Volume: %2% | %3 | EE: %4% | VU: %5% | GS: %6%")
-						  .arg(SaveStateSelectorUI::GetCurrentSlot())
-						  .arg(SPU2::GetOutputVolume())
-						  .arg(gs_stat_str.c_str())
-						  .arg(PerformanceMetrics::GetCPUThreadUsage(), 0, 'f', 0)
-						  .arg(PerformanceMetrics::GetVUThreadUsage(), 0, 'f', 0)
-						  .arg(PerformanceMetrics::GetGSThreadUsage(), 0, 'f', 0);
-		}
-		else
-		{
-			gs_stat = tr("Slot: %1 | Volume: %2% | %3 | EE: %4% | GS: %5%")
-						  .arg(SaveStateSelectorUI::GetCurrentSlot())
-						  .arg(SPU2::GetOutputVolume())
-						  .arg(gs_stat_str.c_str())
-						  .arg(PerformanceMetrics::GetCPUThreadUsage(), 0, 'f', 0)
-						  .arg(PerformanceMetrics::GetGSThreadUsage(), 0, 'f', 0);
+			std::string gs_stat_str;
+			GSgetTitleStats(gs_stat_str);
+
+			if (THREAD_VU1)
+			{
+				gs_stat = tr("Slot: %1 | Volume: %2% | %3 | EE: %4% | VU: %5% | GS: %6%")
+				              .arg(SaveStateSelectorUI::GetCurrentSlot())
+				              .arg(SPU2::GetOutputVolume())
+				              .arg(gs_stat_str.c_str())
+				              .arg(PerformanceMetrics::GetCPUThreadUsage(), 0, 'f', 0)
+				              .arg(PerformanceMetrics::GetVUThreadUsage(), 0, 'f', 0)
+				              .arg(PerformanceMetrics::GetGSThreadUsage(), 0, 'f', 0);
+			}
+			else
+			{
+				gs_stat = tr("Slot: %1 | Volume: %2% | %3 | EE: %4% | GS: %5%")
+				              .arg(SaveStateSelectorUI::GetCurrentSlot())
+				              .arg(SPU2::GetOutputVolume())
+				              .arg(gs_stat_str.c_str())
+				              .arg(PerformanceMetrics::GetCPUThreadUsage(), 0, 'f', 0)
+				              .arg(PerformanceMetrics::GetGSThreadUsage(), 0, 'f', 0);
+			}
 		}
 
 		QMetaObject::invokeMethod(g_main_window->getStatusVerboseWidget(), "setText", Qt::QueuedConnection, Q_ARG(const QString&, gs_stat));
@@ -1054,8 +1025,14 @@ void EmuThread::updatePerformanceMetrics(bool force)
 
 		if (gfps != m_last_game_fps || force)
 		{
+			QString text;
+			if (gfps == 0)
+				text = tr("FPS: N/A");
+			else
+				text = tr("FPS: %1").arg(gfps, 0, 'f', 0);
+
 			QMetaObject::invokeMethod(g_main_window->getStatusFPSWidget(), "setText", Qt::QueuedConnection,
-				Q_ARG(const QString&, tr("FPS: %1").arg(gfps, 0, 'f', 0)));
+				Q_ARG(const QString&, text));
 			m_last_game_fps = gfps;
 		}
 
@@ -1123,9 +1100,9 @@ void Host::OnAchievementsRefreshed()
 		game_id = Achievements::GetGameID();
 
 		game_info = qApp
-						->translate("EmuThread", "Game: %1 (%2)\n")
-						.arg(QString::fromStdString(Achievements::GetGameTitle()))
-						.arg(game_id);
+		                ->translate("EmuThread", "Game: %1 (%2)\n")
+		                .arg(QString::fromStdString(Achievements::GetGameTitle()))
+		                .arg(game_id);
 
 		const std::string& rich_presence_string = Achievements::GetRichPresenceString();
 		if (!rich_presence_string.empty())
@@ -1175,7 +1152,7 @@ void Host::OpenHostFileSelectorAsync(std::string_view title, bool select_directo
 	if (!filters.empty())
 	{
 		filters_str.append(QStringLiteral("All File Types (%1)")
-							   .arg(QString::fromStdString(StringUtil::JoinString(filters.begin(), filters.end(), " "))));
+				.arg(QString::fromStdString(StringUtil::JoinString(filters.begin(), filters.end(), " "))));
 		for (const std::string& filter : filters)
 		{
 			filters_str.append(
@@ -2327,11 +2304,13 @@ bool QtHost::RunSetupWizard()
 	return true;
 }
 
-class PCSX2MainApplication : public QApplication {
+class PCSX2MainApplication : public QApplication
+{
 public:
 	using QApplication::QApplication;
 
-	bool event(QEvent* event) override {
+	bool event(QEvent* event) override
+	{
 		if (event->type() == QEvent::FileOpen)
 		{
 			QFileOpenEvent* open = static_cast<QFileOpenEvent*>(event);
@@ -2413,8 +2392,8 @@ int main(int argc, char* argv[])
 		g_main_window->activateWindow();
 	}
 
-	// Initialize big picture mode if requested.
-	if (s_start_fullscreen_ui)
+	// Initialize big picture mode if requested by command line or settings.
+	if (s_start_fullscreen_ui || Host::GetBaseBoolSettingValue("UI", "StartBigPictureMode", false))
 		g_emu_thread->startFullscreenUI(s_start_fullscreen_ui_fullscreen);
 
 	if (s_boot_and_debug || DebuggerWindow::shouldShowOnStartup())

@@ -234,6 +234,7 @@ private:
 	void updateEmulationActions(bool starting, bool running, bool stopping);
 	void updateDisplayRelatedActions(bool has_surface, bool render_to_main, bool fullscreen);
 	void updateGameDependentActions();
+	void updateGameGridActions(const bool show_game_grid);
 	void updateStatusBarWidgetVisibility();
 	void updateAdvancedSettingsVisibility();
 	void updateWindowTitle();
@@ -274,6 +275,7 @@ private:
 	void setGameListEntryCoverImage(const GameList::Entry* entry);
 	void clearGameListEntryPlayTime(const GameList::Entry* entry);
 	void goToWikiPage(const GameList::Entry* entry);
+	void openScreenshotsFolderForGame(const GameList::Entry* entry);
 
 	std::optional<bool> promptForResumeState(const QString& save_state_path);
 	void loadSaveStateSlot(s32 slot, bool load_backup = false);

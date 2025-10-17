@@ -20,14 +20,33 @@
 
 enum class MemoryViewType
 {
-	BYTE = 1,
-	BYTEHW = 2,
-	WORD = 4,
-	DWORD = 8,
+	BYTE = 0,
+	BYTEHW = 1,
+	WORD = 2,
+	DWORD = 3,
+	FLOAT = 4,
 };
 
-class MemoryViewTable
+const s32 MemoryViewTypeWidth[] = {
+	1, //	BYTE
+	2, //	BYTEHW
+	4, //	WORD
+	8, //	DWORD
+	4, //	FLOAT
+};
+
+const s32 MemoryViewTypeVisualWidth[] = {
+	2, //	BYTE
+	4, //	BYTEHW
+	8, //	WORD
+	16, //	DWORD
+	14, //	FLOAT
+};
+
+class MemoryViewTable : public QObject
 {
+	Q_OBJECT
+private:
 	QWidget* parent;
 	MemoryViewType displayType = MemoryViewType::BYTE;
 	bool littleEndian = true;
@@ -46,6 +65,7 @@ class MemoryViewTable
 	bool selectedNibbleHI = false;
 
 	void InsertIntoSelectedHexView(u8 value, DebugInterface& cpu);
+	bool InsertFloatIntoSelectedHexView(DebugInterface& cpu);
 
 	template <class T>
 	T convertEndian(T in)
@@ -60,8 +80,8 @@ class MemoryViewTable
 		}
 	}
 
-	u32 nextAddress(u32 addr);
-	u32 prevAddress(u32 addr);
+	static u32 nextAddress(u32 addr, u32 selected_address, MemoryViewType display_type, bool little_endian);
+	static u32 prevAddress(u32 addr, u32 selected_address, MemoryViewType display_type, bool little_endian);
 
 public:
 	MemoryViewTable(QWidget* parent)
@@ -71,6 +91,7 @@ public:
 
 	u32 startAddress;
 	u32 selectedAddress;
+	s32 selectedIndex;
 
 	void UpdateStartAddress(u32 start);
 	void UpdateSelectedAddress(u32 selected, bool page = false);

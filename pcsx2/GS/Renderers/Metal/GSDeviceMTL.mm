@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Host.h"
+#include "GS/GSGL.h"
 #include "GS/Renderers/Metal/GSMetalCPPAccessible.h"
 #include "GS/Renderers/Metal/GSDeviceMTL.h"
 #include "GS/Renderers/Metal/GSTextureMTL.h"
@@ -921,6 +922,7 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
 	m_features.primitive_id = m_dev.features.primid;
 	m_features.texture_barrier = true;
+	m_features.multidraw_fb_copy = false;
 	m_features.provoking_vertex_last = false;
 	m_features.point_expand = true;
 	m_features.line_expand = false;
@@ -1146,6 +1148,7 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 			case ShaderConvert::COPY:
 			case ShaderConvert::DOWNSAMPLE_COPY:
 			case ShaderConvert::RGBA_TO_8I: // Yes really
+			case ShaderConvert::RGB5A1_TO_8I:
 			case ShaderConvert::RTA_CORRECTION:
 			case ShaderConvert::RTA_DECORRECTION:
 			case ShaderConvert::TRANSPARENCY_FILTER:
@@ -1469,12 +1472,31 @@ void GSDeviceMTL::ClearSamplerCache()
 
 void GSDeviceMTL::CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY)
 { @autoreleasepool {
-	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
-
+	// Empty rect, abort copy.
+	if (r.rempty())
+	{
+		GL_INS("Metal: CopyRect rect empty.");
+		return;
+	}
+	
 	GSTextureMTL* sT = static_cast<GSTextureMTL*>(sTex);
 	GSTextureMTL* dT = static_cast<GSTextureMTL*>(dTex);
+	const GSVector4i dst_rect(0, 0, dT->GetWidth(), dT->GetHeight());
+	const bool full_draw_copy = dst_rect.eq(r);
 
-	// Process clears
+	// Source is cleared, if destination is a render target, we can carry the clear forward.
+	if (sT->GetState() == GSTexture::State::Cleared)
+	{
+		if (dT->IsRenderTargetOrDepthStencil() && ProcessClearsBeforeCopy(sTex, dTex, full_draw_copy))
+			return;
+
+		// Commit clear for the source texture.
+		sT->FlushClears();
+	}
+
+	g_perfmon.Put(GSPerfMon::TextureCopies, 1);
+
+	// Commit clear for the destination texture.
 	GSVector2i dsize = dTex->GetSize();
 	if (r.width() < dsize.x || r.height() < dsize.y)
 		dT->FlushClears();
@@ -2225,7 +2247,7 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 			pxAssert(config.require_full_barrier == false && config.drawlist == nullptr);
 			MRESetHWPipelineState(config.vs, config.ps, {}, {});
 			MREInitHWDraw(config, allocation);
-			SendHWDraw(config, m_current_render.encoder, index_buffer, index_buffer_offset);
+			SendHWDraw(config, m_current_render.encoder, index_buffer, index_buffer_offset, false, false);
 			config.ps.date = 3;
 			break;
 		}
@@ -2272,7 +2294,7 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 	MRESetHWPipelineState(config.vs, config.ps, config.blend, config.colormask);
 	MRESetDSS(config.depth);
 
-	SendHWDraw(config, mtlenc, index_buffer, index_buffer_offset);
+	SendHWDraw(config, mtlenc, index_buffer, index_buffer_offset, config.require_one_barrier, config.require_full_barrier);
 
 	if (config.alpha_second_pass.enable)
 	{
@@ -2283,7 +2305,7 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 		}
 		MRESetHWPipelineState(config.vs, config.alpha_second_pass.ps, config.blend, config.alpha_second_pass.colormask);
 		MRESetDSS(config.alpha_second_pass.depth);
-		SendHWDraw(config, mtlenc, index_buffer, index_buffer_offset);
+		SendHWDraw(config, mtlenc, index_buffer, index_buffer_offset, config.alpha_second_pass.require_one_barrier, config.alpha_second_pass.require_full_barrier);
 	}
 
 	if (colclip_rt)
@@ -2306,7 +2328,7 @@ void GSDeviceMTL::RenderHW(GSHWDrawConfig& config)
 		Recycle(primid_tex);
 }}
 
-void GSDeviceMTL::SendHWDraw(GSHWDrawConfig& config, id<MTLRenderCommandEncoder> enc, id<MTLBuffer> buffer, size_t off)
+void GSDeviceMTL::SendHWDraw(GSHWDrawConfig& config, id<MTLRenderCommandEncoder> enc, id<MTLBuffer> buffer, size_t off, bool one_barrier, bool full_barrier)
 {
 	MTLPrimitiveType topology;
 	switch (config.topology)
@@ -2316,9 +2338,25 @@ void GSDeviceMTL::SendHWDraw(GSHWDrawConfig& config, id<MTLRenderCommandEncoder>
 		case GSHWDrawConfig::Topology::Triangle: topology = MTLPrimitiveTypeTriangle; break;
 	}
 
-	if (config.drawlist)
+	if (!m_features.texture_barrier) [[unlikely]]
 	{
-		[enc pushDebugGroup:[NSString stringWithFormat:@"Full barrier split draw (%d sprites in %zu groups)", config.nindices / config.indices_per_prim, config.drawlist->size()]];
+		[enc drawIndexedPrimitives:topology
+		                indexCount:config.nindices
+		                 indexType:MTLIndexTypeUInt16
+		               indexBuffer:buffer
+		         indexBufferOffset:off];
+
+		g_perfmon.Put(GSPerfMon::DrawCalls, 1);
+		
+		return;
+	}
+
+
+	if (full_barrier)
+	{
+		pxAssert(config.drawlist && !config.drawlist->empty());
+
+		[enc pushDebugGroup:[NSString stringWithFormat:@"Full barrier split draw (%d primitives in %zu groups)", config.nindices / config.indices_per_prim, config.drawlist->size()]];
 #if defined(_DEBUG)
 		// Check how draw call is split.
 		std::map<size_t, size_t> frequency;
@@ -2329,7 +2367,7 @@ void GSDeviceMTL::SendHWDraw(GSHWDrawConfig& config, id<MTLRenderCommandEncoder>
 		for (const auto& it : frequency)
 			message += " " + std::to_string(it.first) + "(" + std::to_string(it.second) + ")";
 
-		[enc insertDebugSignpost:[NSString stringWithFormat:@"Split single draw (%d sprites) into %zu draws: consecutive draws(frequency):%s",
+		[enc insertDebugSignpost:[NSString stringWithFormat:@"Split single draw (%d primitives) into %zu draws: consecutive draws(frequency):%s",
 			config.nindices / config.indices_per_prim, config.drawlist->size(), message.c_str()]];
 #endif
 
@@ -2355,28 +2393,7 @@ void GSDeviceMTL::SendHWDraw(GSHWDrawConfig& config, id<MTLRenderCommandEncoder>
 		[enc popDebugGroup];
 		return;
 	}
-	else if (config.require_full_barrier)
-	{
-		const u32 indices_per_prim = config.indices_per_prim;
-		const u32 ndraws = config.nindices / indices_per_prim;
-		g_perfmon.Put(GSPerfMon::DrawCalls, ndraws);
-		g_perfmon.Put(GSPerfMon::Barriers, ndraws);
-		[enc pushDebugGroup:[NSString stringWithFormat:@"Full barrier split draw (%d prims)", ndraws]];
-
-		for (u32 p = 0; p < config.nindices; p += indices_per_prim)
-		{
-			textureBarrier(enc);
-			[enc drawIndexedPrimitives:topology
-			                indexCount:config.indices_per_prim
-			                 indexType:MTLIndexTypeUInt16
-			               indexBuffer:buffer
-			         indexBufferOffset:off + p * sizeof(*config.indices)];
-		}
-
-		[enc popDebugGroup];
-		return;
-	}
-	else if (config.require_one_barrier)
+	else if (one_barrier)
 	{
 		// One barrier needed
 		textureBarrier(enc);
@@ -2493,6 +2510,7 @@ void GSDeviceMTL::RenderImGui(ImDrawData* data)
 {
 	if (data->CmdListsCount == 0)
 		return;
+	UpdateImGuiTextures();
 	simd::float4 transform;
 	transform.xy = 2.f / simd::make_float2(data->DisplaySize.x, -data->DisplaySize.y);
 	transform.zw = ToSimd(data->DisplayPos) * -transform.xy + simd::make_float2(-1, 1);

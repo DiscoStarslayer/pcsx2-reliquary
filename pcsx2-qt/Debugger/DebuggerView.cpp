@@ -203,11 +203,6 @@ void DebuggerView::updateStyleSheet()
 #endif
 	}
 
-	// HACK: Make the font size smaller without applying a stylesheet to the
-	// whole window (which would impact performance).
-	if (g_debugger_window)
-		stylesheet += QString("font-size: %1pt;").arg(g_debugger_window->fontSize());
-
 	setStyleSheet(stylesheet);
 }
 
@@ -257,7 +252,8 @@ std::vector<QAction*> DebuggerView::createEventActionsImplementation(
 	u32 max_top_level_actions,
 	bool skip_self,
 	const char* event_type,
-	const char* action_prefix,
+	const char* action_string,
+	const char* action_overflow_string,
 	std::function<const DebuggerEvents::Event*()> event_func)
 {
 	if (!g_debugger_window)
@@ -278,8 +274,7 @@ std::vector<QAction*> DebuggerView::createEventActionsImplementation(
 	QMenu* submenu = nullptr;
 	if (receivers.size() > max_top_level_actions)
 	{
-		QString title_format = QCoreApplication::translate("DebuggerEvent", "%1...");
-		submenu = new QMenu(title_format.arg(QCoreApplication::translate("DebuggerEvent", action_prefix)), menu);
+		submenu = new QMenu(QCoreApplication::translate("DebuggerEvents", action_overflow_string), menu);
 	}
 
 	std::vector<QAction*> actions;
@@ -290,9 +285,8 @@ std::vector<QAction*> DebuggerView::createEventActionsImplementation(
 		QAction* action;
 		if (!submenu || i + 1 < max_top_level_actions)
 		{
-			QString title_format = QCoreApplication::translate("DebuggerEvent", "%1 %2");
-			QString event_title = QCoreApplication::translate("DebuggerEvent", action_prefix);
-			QString title = title_format.arg(event_title).arg(receiver->displayName());
+			QString title_format = QCoreApplication::translate("DebuggerEvents", action_string);
+			QString title = title_format.arg(receiver->displayName());
 			action = new QAction(title, menu);
 			menu->addAction(action);
 		}

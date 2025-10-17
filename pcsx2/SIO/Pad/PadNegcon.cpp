@@ -42,7 +42,7 @@ static const SettingInfo s_settings[] = {
 };
 
 const Pad::ControllerInfo PadNegcon::ControllerInfo = {Pad::ControllerType::Negcon, "NeGcon",
-	TRANSLATE_NOOP("Pad", "NeGcon"), ICON_PF_GAMEPAD_ALT, s_bindings, s_settings, Pad::VibrationCapabilities::LargeSmallMotors};
+	TRANSLATE_NOOP("Pad", "NeGcon"), ICON_PF_NEGCON, s_bindings, s_settings, Pad::VibrationCapabilities::LargeSmallMotors};
 
 void PadNegcon::ConfigLog()
 {
@@ -456,6 +456,16 @@ u32 PadNegcon::GetButtons() const
 u8 PadNegcon::GetPressure(u32 index) const
 {
 	return 0;
+}
+
+bool PadNegcon::IsAnalogLightEnabled() const
+{
+	return this->analogLight;
+}
+
+bool PadNegcon::IsAnalogLocked() const
+{
+	return this->analogLocked;
 }
 
 bool PadNegcon::Freeze(StateWrapper& sw)

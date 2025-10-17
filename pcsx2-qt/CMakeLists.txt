@@ -83,15 +83,15 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/ControllerSettingsWindow.h
 	Settings/ControllerSettingsWindow.ui
 	Settings/ControllerSettingWidgetBinder.h
+	Settings/DebugAnalysisSettingsTab.ui
 	Settings/DebugAnalysisSettingsWidget.cpp
 	Settings/DebugAnalysisSettingsWidget.h
 	Settings/DebugAnalysisSettingsWidget.ui
-	Settings/DebugUserInterfaceSettingsWidget.cpp
-	Settings/DebugUserInterfaceSettingsWidget.h
-	Settings/DebugUserInterfaceSettingsWidget.ui
+	Settings/DebugGSSettingsTab.ui
+	Settings/DebugLoggingSettingsTab.ui
+	Settings/DebugUserInterfaceSettingsTab.ui
 	Settings/DebugSettingsWidget.cpp
 	Settings/DebugSettingsWidget.h
-	Settings/DebugSettingsWidget.ui
 	Settings/EmulationSettingsWidget.cpp
 	Settings/EmulationSettingsWidget.h
 	Settings/EmulationSettingsWidget.ui
@@ -114,9 +114,19 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/GameSummaryWidget.cpp
 	Settings/GameSummaryWidget.h
 	Settings/GameSummaryWidget.ui
+	Settings/GraphicsAdvancedSettingsTab.ui
+	Settings/GraphicsDisplaySettingsTab.ui
+	Settings/GraphicsHardwareFixesSettingsTab.ui
+	Settings/GraphicsHardwareRenderingSettingsTab.ui
+	Settings/GraphicsMediaCaptureSettingsTab.ui
+	Settings/GraphicsOnScreenDisplaySettingsTab.ui
+	Settings/GraphicsPostProcessingSettingsTab.ui
+	Settings/GraphicsSettingsHeader.ui
 	Settings/GraphicsSettingsWidget.cpp
 	Settings/GraphicsSettingsWidget.h
-	Settings/GraphicsSettingsWidget.ui
+	Settings/GraphicsSoftwareRenderingSettingsTab.ui
+	Settings/GraphicsTextureReplacementSettingsTab.ui
+	Settings/GraphicsUpscalingFixesSettingsTab.ui
 	Settings/HotkeySettingsWidget.cpp
 	Settings/HotkeySettingsWidget.h
 	Settings/InputBindingDialog.cpp
@@ -152,6 +162,8 @@ target_sources(pcsx2-qt PRIVATE
     Settings/Python2SettingsWidget.h
     Settings/Python2SettingsWidget.ui
 	Settings/PatchDetailsWidget.ui
+	Settings/SettingsWidget.cpp
+	Settings/SettingsWidget.h
 	Settings/SettingsWindow.cpp
 	Settings/SettingsWindow.h
 	Settings/SettingsWindow.ui
@@ -272,6 +284,7 @@ target_link_libraries(pcsx2-qt PRIVATE
 	PCSX2
 	Qt6::Core
 	Qt6::Gui
+	Qt6::GuiPrivate
 	Qt6::Widgets
 	KDAB::kddockwidgets
 )

@@ -65,6 +65,7 @@ private:
 	bool IsDiscardingDstRGB();
 	bool IsDiscardingDstAlpha() const;
 	bool TextureCoversWithoutGapsNotEqual();
+	bool Is8PixelReverseSprite(const GSVertex& v0, const GSVertex& v1);
 
 	enum class CLUTDrawTestResult
 	{
@@ -92,6 +93,7 @@ private:
 	void DrawPrims(GSTextureCache::Target* rt, GSTextureCache::Target* ds, GSTextureCache::Source* tex, const TextureMinMaxResult& tmm);
 
 	void ResetStates();
+	void HandleProvokingVertexFirst();
 	void SetupIA(float target_scale, float sx, float sy, bool req_vert_backup);
 	void EmulateTextureShuffleAndFbmask(GSTextureCache::Target* rt, GSTextureCache::Source* tex);
 	bool EmulateChannelShuffle(GSTextureCache::Target* src, bool test_only, GSTextureCache::Target* rt = nullptr);
@@ -268,4 +270,7 @@ public:
 
 	/// Submits a previously set up HLE hardware draw, copying any textures as needed if there's hazards.
 	void EndHLEHardwareDraw(bool force_copy_on_hazard = false);
+
+	/// Compute the drawlist (if not already present) and bounding boxes for the current draw.
+	std::size_t ComputeDrawlistGetSize(float scale);
 };

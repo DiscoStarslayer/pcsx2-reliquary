@@ -599,6 +599,7 @@ void MemorySearchView::onSearchButtonClicked()
 	connect(workerWatcher, &QFutureWatcher<std::vector<u32>>::finished, onSearchFinished);
 
 	m_ui.btnSearch->setDisabled(true);
+	m_ui.btnFilterSearch->setDisabled(true);
 	if (!isFilterSearch)
 	{
 		m_searchResults.clear();

@@ -211,6 +211,76 @@ bool GSHwHack::GSC_NamcoGames(GSRendererHW& r, int& skip)
 	return true;
 }
 
+bool GSHwHack::GSC_SandGrainGames(GSRendererHW& r, int& skip)
+{
+	if (skip == 0)
+	{
+		// These games do a kind of manual shuffle from a real Z16S to a real C16S, by moving the first 8 pixels in to the second column of 8 pixels.
+		// In 32bit format this will mean that the whole contents of the 16bit depth buffer will be in the BA part of a 32bit colour.
+		// This then gets read as PSMT8H using a palette where the bottom two alphas are quite extreme, then a slight gradient, to create a kind of depth plain distance for the blur effect.
+		// This is kind of akin to a manual G->A shuffle (in this case it's the upper 8bits of the depth buffer), but with use of a palette in between.
+		// So here we use a channel shuffle to copy Green->Alpha (green being the upper 8 bits of the depth), then read itself in PSMT8H mode with the palette and update it to the correct value.
+		const int get_next_ctx = r.m_env.PRIM.CTXT;
+		const GSDrawingContext& next_ctx = r.m_env.CTXT[get_next_ctx];
+
+		if (r.PRIM->PRIM == GS_SPRITE && RTME && RFPSM == PSMCT16S && RTPSM == PSMZ16S && next_ctx.TEX0.TBP0 == RFBP && next_ctx.TEX0.PSM == PSMT8H)
+		{
+			GSTextureCache::Target* texsrc = g_texture_cache->LookupTarget(GIFRegTEX0::Create(RTBP0, RTBW, RTPSM),
+				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::DepthStencil);
+
+			if (!texsrc)
+				return false;
+
+			GSTextureCache::Target* rt = g_texture_cache->LookupTarget(GIFRegTEX0::Create(next_ctx.FRAME.Block(), next_ctx.FRAME.FBW, next_ctx.FRAME.PSM),
+				GSVector2i(1, 1), r.GetTextureScaleFactor(), GSTextureCache::RenderTarget);
+
+			if (!rt)
+				return false;
+
+			r.m_mem.m_clut.Read32(next_ctx.TEX0, r.m_env.TEXA);
+			std::shared_ptr<GSTextureCache::Palette> palette =
+				g_texture_cache->LookupPaletteObject(r.m_mem.m_clut, GSLocalMemory::m_psm[next_ctx.TEX0.PSM].pal, true);
+
+			if (!palette)
+				return false;
+
+			// Shuffle the green depth channel in to the destination RT alpha.
+			GSHWDrawConfig& config = r.BeginHLEHardwareDraw(
+				rt->GetTexture(), nullptr, rt->GetScale(), texsrc->GetTexture(), texsrc->GetScale(), texsrc->GetUnscaledRect());
+			config.ps.channel = ChannelFetch_GXBY;
+			config.cb_ps.ChannelShuffle = GSVector4i(0, 0, 0xFF, 0);
+			config.ps.depth_fmt = 2;
+			config.colormask.wrgba = 8;
+			config.ps.tfx = TFX_DECAL;
+			config.ps.tcc = true;
+			r.EndHLEHardwareDraw(true);
+
+			// Draw over itself using a palette to adjust the alpha value.
+			GSHWDrawConfig& modulate_config = r.BeginHLEHardwareDraw(
+				rt->GetTexture(), nullptr, rt->GetScale(), rt->GetTexture(), rt->GetScale(), rt->GetUnscaledRect());
+
+			modulate_config.pal = palette->GetPaletteGSTexture();
+			modulate_config.ps.aem_fmt = 0;
+			modulate_config.ps.aem = 0;
+			modulate_config.ps.pal_fmt = 3;
+			modulate_config.colormask.wrgba = 8;
+			modulate_config.ps.tfx = TFX_DECAL;
+			modulate_config.ps.tcc = true;
+			r.EndHLEHardwareDraw(true);
+
+			rt->m_alpha_min = 0;
+			rt->m_alpha_max = 128;
+			rt->m_rt_alpha_scale = false;
+			rt->ScaleRTAlpha();
+
+			const int pages = (rt->m_valid.w / 32) * rt->m_TEX0.TBW;
+			skip = pages;
+		}
+	}
+
+	return true;
+}
+
 bool GSHwHack::GSC_BurnoutGames(GSRendererHW& r, int& skip)
 {
 	// Burnout has a... creative way of achieving its bloom effect, to avoid horizontal page breaks.
@@ -481,11 +551,6 @@ bool GSHwHack::GSC_UrbanReign(GSRendererHW& r, int& skip)
 {
 	if (skip == 0)
 	{
-		if (RTME && RFBP == 0x0000 && RTBP0 == 0x3980 && RFPSM == RTPSM && RTPSM == PSMCT32 && RFBMSK == 0x0)
-		{
-			skip = 1; // Black shadow
-		}
-
 		// Urban Reign downsamples the framebuffer with page-wide columns at a time, and offsets the TBP0 forward as such,
 		// which would be fine, except their texture coordinates appear to be off by one. Which prevents the page translation
 		// from matching the last column, because it's trying to fit the last 65 columns of a 640x448 (effectively 641x448)
@@ -633,7 +698,7 @@ bool GSHwHack::GSC_PolyphonyDigitalGames(GSRendererHW& r, int& skip)
 		// get away with just hardcoding it.
 		const GSVector2i resolution = r.PCRTCDisplays.GetResolution();
 		const GSVector2i size = GSVector2i(resolution.x, resolution.y / 2);
-		const u32 page_offset = ((size.y + 31) / 32) * src->m_TEX0.TBW * BLOCKS_PER_PAGE;
+		const u32 page_offset = ((size.y + 31) / 32) * src->m_TEX0.TBW * GS_BLOCKS_PER_PAGE;
 		constexpr u32 base = 0;
 
 		GL_PUSH("GSC_PolyphonyDigitalGames(): HLE Gran Turismo A channel shuffle");
@@ -1023,7 +1088,7 @@ bool GSHwHack::OI_SonicUnleashed(GSRendererHW& r, GSTexture* rt, GSTexture* ds, 
 		rt_again->m_texture = tex;
 		rt = tex;
 	}
-	
+
 	GSVector2i rt_size(rt->GetSize());
 
 	// This is awful, but so is the CRC hack... it's a texture shuffle split horizontally instead of vertically.
@@ -1032,14 +1097,14 @@ bool GSHwHack::OI_SonicUnleashed(GSRendererHW& r, GSTexture* rt, GSTexture* ds, 
 		if (rt_again->m_unscaled_size.x < src->m_unscaled_size.x || rt_again->m_unscaled_size.y < src->m_unscaled_size.y)
 		{
 			GSVector2i new_size = GSVector2i(std::max(rt_again->m_unscaled_size.x, src->m_unscaled_size.x),
-									std::max(rt_again->m_unscaled_size.y, src->m_unscaled_size.y));
+				std::max(rt_again->m_unscaled_size.y, src->m_unscaled_size.y));
 			rt_again->ResizeTexture(new_size.x, new_size.y);
 			rt = rt_again->m_texture;
 			rt_size = new_size * GSVector2i(src->GetScale());
 			rt_again->UpdateDrawn(GSVector4i::loadh(new_size));
 		}
 	}
-	
+
 
 	const GSVector2i copy_size(std::min(rt_size.x, src_size.x), std::min(rt_size.y, src_size.y));
 
@@ -1337,6 +1402,7 @@ const GSHwHack::Entry<GSRendererHW::GSC_Ptr> GSHwHack::s_get_skip_count_function
 
 	// Channel Effect
 	CRC_F(GSC_NamcoGames),
+	CRC_F(GSC_SandGrainGames),
 	CRC_F(GSC_SteambotChronicles),
 
 	// Depth Issue

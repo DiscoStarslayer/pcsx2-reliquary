@@ -155,7 +155,7 @@ public:
 
 		/// Returns the end block for the target, but doesn't wrap at 0x3FFF.
 		/// Can be used for overlap tests.
-		u32 UnwrappedEndBlock() const { return (m_end_block + (Wraps() ? MAX_BLOCKS : 0)); }
+		u32 UnwrappedEndBlock() const { return (m_end_block + (Wraps() ? GS_MAX_BLOCKS : 0)); }
 
 		bool Inside(u32 bp, u32 bw, u32 psm, const GSVector4i& rect);
 		bool Overlaps(u32 bp, u32 bw, u32 psm, const GSVector4i& rect);
@@ -290,7 +290,7 @@ public:
 	public:
 		HashCacheEntry* m_from_hash_cache = nullptr;
 		std::shared_ptr<Palette> m_palette_obj;
-		std::unique_ptr<u32[]> m_valid;// each u32 bits map to the 32 blocks of that page
+		std::unique_ptr<u32[]> m_valid; // each u32 bits map to the 32 blocks of that page
 		GSTexture* m_palette = nullptr;
 		GSVector4i m_valid_rect = {};
 		GSVector2i m_lod = {};
@@ -312,7 +312,7 @@ public:
 		HashType m_layer_hash[7] = {};
 		// Keep a GSTextureCache::SourceMap::m_map iterator to allow fast erase
 		// Deliberately not initialized to save cycles.
-		std::array<u16, MAX_PAGES> m_erase_it;
+		std::array<u16, GS_MAX_PAGES> m_erase_it;
 		GSOffset::PageLooper m_pages;
 
 	public:
@@ -360,7 +360,7 @@ public:
 	{
 	public:
 		std::unordered_set<Source*> m_surfaces;
-		std::array<FastList<Source*>, MAX_PAGES> m_map;
+		std::array<FastList<Source*>, GS_MAX_PAGES> m_map;
 
 		void Add(Source* s, const GIFRegTEX0& TEX0);
 		void SwapTexture(GSTexture* old_tex, GSTexture* new_tex);
@@ -398,13 +398,13 @@ public:
 
 	struct SurfaceOffsetKey
 	{
-		std::array<SurfaceOffsetKeyElem, 2> elems;  // A and B elems.
+		std::array<SurfaceOffsetKeyElem, 2> elems; // A and B elems.
 	};
 
 	struct SurfaceOffset
 	{
 		bool is_valid;
-		GSVector4i b2a_offset;  // B to A offset in B coords.
+		GSVector4i b2a_offset; // B to A offset in B coords.
 	};
 
 	struct SurfaceOffsetKeyHash
@@ -491,7 +491,7 @@ public:
 	static bool FullRectDirty(Target* target, u32 rgba_mask);
 	static bool FullRectDirty(Target* target);
 	bool CanTranslate(u32 bp, u32 bw, u32 spsm, GSVector4i r, u32 dbp, u32 dpsm, u32 dbw);
-	GSVector4i TranslateAlignedRectByPage(u32 tbp, u32 tebp, u32 tbw, u32 tpsm, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);
+	GSVector4i TranslateAlignedRectByPage(u32 tbp, u32 tebp, u32 tbw, u32 tpsm, GSVector4i t_r, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);
 	GSVector4i TranslateAlignedRectByPage(Target* t, u32 sbp, u32 spsm, u32 sbw, GSVector4i src_r, bool is_invalidation = false);
 	void DirtyRectByPage(u32 sbp, u32 spsm, u32 sbw, Target* t, GSVector4i src_r);
 	void DirtyRectByPageOld(u32 sbp, u32 spsm, u32 sbw, Target* t, GSVector4i src_r);
@@ -504,9 +504,9 @@ public:
 	Target* FindTargetOverlap(Target* target, int type, int psm);
 	void CombineAlignedInsideTargets(Target* target, GSTextureCache::Source* src = nullptr);
 	Target* LookupTarget(GIFRegTEX0 TEX0, const GSVector2i& size, float scale, int type, bool used = true, u32 fbmask = 0,
-						 bool is_frame = false, bool preload = GSConfig.PreloadFrameWithGSData, bool preserve_rgb = true, bool preserve_alpha = true,
+		bool is_frame = false, bool preload = GSConfig.PreloadFrameWithGSData, bool preserve_rgb = true, bool preserve_alpha = true,
 		const GSVector4i draw_rc = GSVector4i::zero(), bool is_shuffle = false, bool possible_clear = false, bool preserve_scale = false, GSTextureCache::Source* src = nullptr, GSTextureCache::Target* ds = nullptr, int offset = -1);
-	Target* CreateTarget(GIFRegTEX0 TEX0, const GSVector2i& size, const GSVector2i& valid_size,float scale, int type, bool used = true, u32 fbmask = 0,
+	Target* CreateTarget(GIFRegTEX0 TEX0, const GSVector2i& size, const GSVector2i& valid_size, float scale, int type, bool used = true, u32 fbmask = 0,
 		bool is_frame = false, bool preload = GSConfig.PreloadFrameWithGSData, bool preserve_target = true,
 		const GSVector4i draw_rc = GSVector4i::zero(), GSTextureCache::Source* src = nullptr);
 	Target* LookupDisplayTarget(GIFRegTEX0 TEX0, const GSVector2i& size, float scale, bool is_feedback);
