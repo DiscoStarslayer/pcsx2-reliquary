@@ -52,7 +52,6 @@ set QTAPNG=1.3.0
 set LZ4=1.10.0
 set WEBP=1.6.0
 set LIBUSB=1.0.26
-set WEBP=1.5.0
 set ZLIB=1.3.1
 set ZLIBSHORT=131
 set ZSTD=1.5.7
