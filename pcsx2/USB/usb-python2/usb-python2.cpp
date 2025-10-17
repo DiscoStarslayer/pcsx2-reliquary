@@ -1,6 +1,7 @@
 ﻿#include "usb-python2.h"
 
 #include "Host.h"
+#include "IconsPromptFont.h"
 #include "StateWrapper.h"
 #include "common/Console.h"
 #include "common/FileSystem.h"
@@ -1037,6 +1038,12 @@ namespace usb_python2
 	{
 		return "python2io";
 	}
+
+	const char* Python2Device::IconName() const
+	{
+		return ICON_PF_KEYBOARDMANIA;
+	}
+
 
 	bool Python2Device::Freeze(USBDevice* dev, StateWrapper& sw) const
 	{
