@@ -2721,8 +2721,8 @@ MECHA_RESULT generateCardChallenge()
 	memcpy(&key1[8], g_keyStore.CardKeyHi[cdvd.cardKeyIndex], 8);
 
 	uint8_t key2[16];
-	memcpy(key2, g_keyStore.CardKeyLow[cdvd.cardKeyIndex], 8);
-	memcpy(&key2[8], g_keyStore.CardKeyHi[cdvd.cardKeyIndex], 8);
+	memcpy(key2, g_keyStore.CardKey2Low[cdvd.cardKeyIndex], 8);
+	memcpy(&key2[8], g_keyStore.CardKey2Hi[cdvd.cardKeyIndex], 8);
 
 	doubleDesEncrypt(key1, cdvd.memcard_key);
 	doubleDesEncrypt(key2, &cdvd.memcard_key[8]);
