@@ -1308,7 +1308,7 @@ void cdvdReset()
 		}
 	}
 
-	readAndDecryptKeyStore(EmuConfig.Security.MgKeyStoreMode); // 0: dev, 1: retail, 2: proto?, 3: arcade
+	readAndDecryptKeyStore(SecurityKeyStoreMode::Arcade);
 	cdvd.mecha_state = MECHA_STATE_READY;
 	std::memcpy(temp_mechaver, &s_mecha_version, 4);
 

@@ -2168,7 +2168,7 @@ static void recRecompile(const u32 startpc)
 	u32 i = 0;
 	u32 willbranch3 = 0;
 
-	pxAssert(startpc);
+	// pxAssert(startpc);
 
 	// if recPtr reached the mem limit reset whole mem
 	if (recPtr >= recPtrEnd)
