@@ -13,6 +13,242 @@
 static u8 phyregs[16];
 s8* fwregs;
 
+void logFwAction(u32 addr, u32 value, bool write)
+{
+	char * mode;
+	char * writeS = "write";
+	char * readS = "read";
+	if (write != 0)
+	{
+		mode = writeS;
+	}
+	else
+	{
+		mode = readS;
+	}
+
+	switch (addr)
+	{
+		case 0x1f808400:
+			DevCon.WriteLn("FW: %s node id 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808404:
+			DevCon.WriteLn("FW: %s cycle time 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808408:
+			DevCon.WriteLn("FW: %s ctrl 0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80840c:
+			DevCon.WriteLn("FW: %s ctrl 1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808410:
+			DevCon.WriteLn("FW: %s ctrl 2 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808414:
+			DevCon.WriteLn("FW: %s PHY Access 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808418:
+		case 0x1f80841c:
+			DevCon.WriteLn("FW: %s Unknown Register 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808420:
+			DevCon.WriteLn("FW: %s interrupt 0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808424:
+			DevCon.WriteLn("FW: %s interrupt mask 0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808428:
+			DevCon.WriteLn("FW: %s interrupt 1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80842c:
+			DevCon.WriteLn("FW: %s interrupt mask 1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808430:
+			DevCon.WriteLn("FW: %s interrupt 2 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808434:
+			DevCon.WriteLn("FW: %s interrupt mask 2 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808438:
+			DevCon.WriteLn("FW: %s dmar 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80843c:
+			DevCon.WriteLn("FW: %s ack status 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808440:
+			DevCon.WriteLn("FW: %s ubuf transmit next 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808444:
+			DevCon.WriteLn("FW: %s ubuf transmit last 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808448:
+			DevCon.WriteLn("FW: %s ubuf transmit clear 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80844c:
+			DevCon.WriteLn("FW: %s ubuf receive clear 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808450:
+			DevCon.WriteLn("FW: %s ubuf receive 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808454:
+			DevCon.WriteLn("FW: %s ubuf receive level 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808458:
+		case 0x1f80845c:
+		case 0x1f808460:
+		case 0x1f808464:
+		case 0x1f808468:
+		case 0x1f80846c:
+			DevCon.WriteLn("FW: %s unmapped 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808470:
+		case 0x1f808474:
+		case 0x1f808478:
+		case 0x1f80847c:
+			DevCon.WriteLn("FW: %s unknown register 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808480:
+			DevCon.WriteLn("FW: %s PHT ctrl st r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808484:
+			DevCon.WriteLn("FW: %s PHT split to r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808488:
+			DevCon.WriteLn("FW: %s PHT req res hdr0 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80848c:
+			DevCon.WriteLn("FW: %s PHT req res hdr1 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808490:
+			DevCon.WriteLn("FW: %s PHT req res hdr2 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808494:
+			DevCon.WriteLn("FW: %s STR x NID Sel0 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808498:
+			DevCon.WriteLn("FW: %s STR x NID Sel1 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80849c:
+			DevCon.WriteLn("FW: %s STR x HDR r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084a0:
+			DevCon.WriteLn("FW: %s STT x HDR r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084a4:
+			DevCon.WriteLn("FW: %s DTrans CTRL 0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084a8:
+			DevCon.WriteLn("FW: %s CIP Hdr Tx 0 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084ac:
+			DevCon.WriteLn("FW: %s CIP Hdr Tx 1 r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084b0:
+			DevCon.WriteLn("FW: %s padding 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084b4:
+			DevCon.WriteLn("FW: %s STT x time stamp offset r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084b8:
+			DevCon.WriteLn("FW: %s dma ctrl SR0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084bc:
+			DevCon.WriteLn("FW: %s dma trans TRSH0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084c0:
+			DevCon.WriteLn("FW: %s dbuf FIFO lvl r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084c4:
+			DevCon.WriteLn("FW: %s dbuf Tx data r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084c8:
+			DevCon.WriteLn("FW: %s dbuf Rx data r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084cc:
+			DevCon.WriteLn("FW: %s dbuf watermarks r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084d0:
+			DevCon.WriteLn("FW: %s dbuf FIFO size r0 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f8084d4:
+		case 0x1f8084d8:
+		case 0x1f8084dc:
+		case 0x1f8084e0:
+		case 0x1f8084e4:
+		case 0x1f8084e8:
+		case 0x1f8084ec:
+		case 0x1f8084f0:
+		case 0x1f8084f4:
+		case 0x1f8084f8:
+		case 0x1f8084fc:
+			DevCon.WriteLn("FW: %s unmapped 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808500:
+			DevCon.WriteLn("FW: %s PHT ctrl st r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808504:
+			DevCon.WriteLn("FW: %s PHT split to r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808508:
+			DevCon.WriteLn("FW: %s PHT req res hdr0 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80850c:
+			DevCon.WriteLn("FW: %s PHT req res hdr1 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808510:
+			DevCon.WriteLn("FW: %s PHT req res hdr2 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808514:
+			DevCon.WriteLn("FW: %s STR x NID Sel0 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808518:
+			DevCon.WriteLn("FW: %s STR x NID Sel1 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80851c:
+			DevCon.WriteLn("FW: %s STR x HDR r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808520:
+			DevCon.WriteLn("FW: %s STT x HDR r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808524:
+			DevCon.WriteLn("FW: %s DTrans CTRL 1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808528:
+			DevCon.WriteLn("FW: %s CIP Hdr Tx 0 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80852c:
+			DevCon.WriteLn("FW: %s CIP Hdr Tx 1 r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808530:
+			DevCon.WriteLn("FW: %s padding 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808534:
+			DevCon.WriteLn("FW: %s STT x time stamp offset r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808538:
+			DevCon.WriteLn("FW: %s dma ctrl SR1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80853c:
+			DevCon.WriteLn("FW: %s dma trans TRSH1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808540:
+			DevCon.WriteLn("FW: %s dbuf FIFO lvl r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808544:
+			DevCon.WriteLn("FW: %s dbuf Tx data r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808548:
+			DevCon.WriteLn("FW: %s dbuf Rx data r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f80854c:
+			DevCon.WriteLn("FW: %s dbuf watermarks r1 0x%x: 0x%x", mode, addr, value);
+			break;
+		case 0x1f808550:
+			DevCon.WriteLn("FW: %s dbuf FIFO size r1 0x%x: 0x%x", mode, addr, value);
+			break;
+	}
+}
+
 s32 FWopen()
 {
 	memset(phyregs, 0, sizeof(phyregs));
@@ -60,6 +296,7 @@ void PHYRead()
 
 u32 FWread32(u32 addr)
 {
+	logFwAction(addr, fwRu32(addr), false);
 	u32 ret = 0;
 
 	switch (addr)
@@ -90,13 +327,12 @@ u32 FWread32(u32 addr)
 			break;
 	}
 
-	DevCon.WriteLn("FW: read mem 0x%x: 0x%x", addr, ret);
-
 	return ret;
 }
 
 void FWwrite32(u32 addr, u32 value)
 {
+	logFwAction(addr, fwRu32(addr), true);
 	switch (addr)
 	{
 		//		Include other memory locations we want to catch here.
@@ -180,5 +416,4 @@ void FWwrite32(u32 addr, u32 value)
 			fwRu32(addr) = value;
 			break;
 	}
-	DevCon.WriteLn("FW: write mem 0x%x: 0x%x", addr, value);
 }
