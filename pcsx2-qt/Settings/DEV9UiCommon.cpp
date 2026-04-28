@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <QtWidgets/QLineEdit>
@@ -68,3 +68,5 @@ void IPItemDelegate::updateEditorGeometry(QWidget* editor, const QStyleOptionVie
 {
 	editor->setGeometry(option.rect);
 }
+
+#include "moc_DEV9UiCommon.cpp"

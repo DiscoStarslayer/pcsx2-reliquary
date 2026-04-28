@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "pcsx2/SIO/Pad/Pad.h"
@@ -33,7 +33,7 @@ GameSummaryWidget::GameSummaryWidget(const GameList::Entry* entry, SettingsWindo
 	for (int i = 0; i < m_ui.region->count(); i++)
 	{
 		m_ui.region->setItemIcon(i,
-			QIcon(QStringLiteral("%1/icons/flags/%2.svg").arg(base_path).arg(GameList::RegionToString(static_cast<GameList::Region>(i), false))));
+			QIcon(QStringLiteral("%1/icons/flags/%2.svg").arg(base_path).arg(GameList::RegionToFlagFilename(static_cast<GameList::Region>(i)))));
 	}
 
 	m_entry_path = entry->path;
@@ -45,7 +45,8 @@ GameSummaryWidget::GameSummaryWidget(const GameList::Entry* entry, SettingsWindo
 	connect(m_ui.inputProfile, &QComboBox::currentIndexChanged, this, &GameSummaryWidget::onInputProfileChanged);
 	connect(m_ui.verify, &QAbstractButton::clicked, this, &GameSummaryWidget::onVerifyClicked);
 	connect(m_ui.searchHash, &QAbstractButton::clicked, this, &GameSummaryWidget::onSearchHashClicked);
-	connect(m_ui.checkWiki, &QAbstractButton::clicked, this, [this, entry]() { onCheckWikiClicked(entry); });
+	connect(m_ui.checkWiki, &QAbstractButton::clicked, this,
+		[this, serial = entry->serial]() { onCheckWikiClicked(serial); });
 
 	bool has_custom_title = false, has_custom_region = false;
 	GameList::CheckCustomAttributesForPath(m_entry_path, has_custom_title, has_custom_region);
@@ -280,7 +281,8 @@ void GameSummaryWidget::onVerifyClicked()
 	Error error;
 	if (!hasher.Open(m_entry_path, &error))
 	{
-		setVerifyResult(QString::fromStdString(error.GetDescription()));
+		QString message(QString::fromStdString(error.GetDescription()));
+		QMessageBox::critical(QtUtils::GetRootWidget(this), tr("Error"), message);
 		return;
 	}
 
@@ -340,15 +342,15 @@ void GameSummaryWidget::onVerifyClicked()
 		if (!hentry->version.empty())
 		{
 			setVerifyResult(tr("Verified as %1 [%2] (Version %3).")
-								.arg(QString::fromStdString(hentry->name))
-								.arg(QString::fromStdString(hentry->serial))
-								.arg(QString::fromStdString(hentry->version)));
+					.arg(QString::fromStdString(hentry->name))
+					.arg(QString::fromStdString(hentry->serial))
+					.arg(QString::fromStdString(hentry->version)));
 		}
 		else
 		{
 			setVerifyResult(tr("Verified as %1 [%2].")
-								.arg(QString::fromStdString(hentry->name))
-								.arg(QString::fromStdString(hentry->serial)));
+					.arg(QString::fromStdString(hentry->name))
+					.arg(QString::fromStdString(hentry->serial)));
 		}
 	}
 	else
@@ -365,9 +367,9 @@ void GameSummaryWidget::onSearchHashClicked()
 	QtUtils::OpenURL(this, fmt::format("http://redump.org/discs/quicksearch/{}", m_redump_search_keyword).c_str());
 }
 
-void GameSummaryWidget::onCheckWikiClicked(const GameList::Entry* entry)
+void GameSummaryWidget::onCheckWikiClicked(const std::string& serial)
 {
-	QtUtils::OpenURL(this, fmt::format("https://wiki.pcsx2.net/{}", entry->serial).c_str());
+	QtUtils::OpenURL(this, fmt::format("https://wiki.pcsx2.net/{}", serial).c_str());
 }
 
 void GameSummaryWidget::setVerifyResult(QString error)
@@ -416,3 +418,5 @@ void GameSummaryWidget::setCustomRegion(int region)
 	GameList::SaveCustomRegionForPath(m_entry_path, region);
 	repopulateCurrentDetails();
 }
+
+#include "moc_GameSummaryWidget.cpp"

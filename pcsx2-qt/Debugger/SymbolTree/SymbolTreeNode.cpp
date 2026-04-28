@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SymbolTreeNode.h"
@@ -390,15 +390,13 @@ QString SymbolTreeNode::generateDisplayString(
 		}
 		case ccc::ast::ENUM:
 		{
-			s32 value = (s32)location.read32(cpu);
+			s32 value = static_cast<s32>(location.read32(cpu));
 			const auto& enum_type = physical_type.as<ccc::ast::Enum>();
-			for (auto [test_value, name] : enum_type.constants)
-			{
+			for (const auto& [test_value, name] : enum_type.constants)
 				if (test_value == value)
 					return QString::fromStdString(name);
-			}
 
-			break;
+			return display_options.signedIntegerToString(value, 32);
 		}
 		case ccc::ast::POINTER_OR_REFERENCE:
 		{

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -123,6 +123,7 @@ struct microVU
 	s32 cycles;       // Cycles Counter
 
 	VURegs& regs() const { return ::vuRegs[index]; }
+	void* textPtr() const { return (index && THREAD_VU1) ? (void*)&regs().VF[9] : (void*)R5900_TEXTPTR; }
 
 	__fi REG_VI& getVI(uint reg) const { return regs().VI[reg]; }
 	__fi VECTOR& getVF(uint reg) const { return regs().VF[reg]; }
@@ -233,7 +234,13 @@ public:
 			const u64 quick64 = pState->quick64[0];
 			for (const microBlockLinkRef& ref : quickLookup)
 			{
-				if (ref.quick != quick64) continue;
+				// if we're using the flag hack, ignore the mac flags going in to the new block too if an exact match wasn't requested.
+				if (mVUsFlagHack)
+				{
+					if ((ref.quick & ~0x0C04) != (quick64 & ~0x0C04)) continue;
+				}
+				else if (ref.quick != quick64) continue;
+
 				if (doConstProp && (ref.pBlock->pState.vi15 != pState->vi15))  continue;
 				if (doConstProp && (ref.pBlock->pState.vi15v != pState->vi15v)) continue;
 				return ref.pBlock;

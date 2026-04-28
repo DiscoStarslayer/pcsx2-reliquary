@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DebuggerSettingsManager.h"
@@ -153,7 +153,7 @@ void DebuggerSettingsManager::saveGameSettings(QAbstractTableModel* abstractTabl
 	if (path.empty())
 		return;
 
-	const std::lock_guard<std::mutex> lock(writeLock);
+	std::lock_guard<std::mutex> lock(writeLock);
 	QJsonObject loadedSettings = loadGameSettingsJSON();
 	QJsonArray rowsArray;
 	QStringList keys;

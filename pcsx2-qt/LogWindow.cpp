@@ -1,14 +1,22 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "LogWindow.h"
+
 #include "MainWindow.h"
 #include "QtHost.h"
 #include "SettingWidgetBinder.h"
 
+#include "Achievements.h"
+#include "Host.h"
+#include "VMManager.h"
+
 #include <QtCore/QLatin1StringView>
 #include <QtCore/QUtf8StringView>
 #include <QtGui/QIcon>
+#include <QtWidgets/QCheckBox>
+#include <QtWidgets/QHBoxLayout>
+#include <QtWidgets/QLineEdit>
 #include <QtWidgets/QMenuBar>
 #include <QtWidgets/QScrollBar>
 
@@ -46,6 +54,12 @@ void LogWindow::updateSettings()
 	const bool new_enabled = Host::GetBaseBoolSettingValue("Logging", "EnableLogWindow", false) && !Host::InNoGUIMode();
 	const bool attach_to_main = Host::GetBaseBoolSettingValue("Logging", "AttachLogWindowToMainWindow", true);
 	const bool curr_enabled = Log::IsHostOutputEnabled();
+	const bool input_enabled = Host::GetBaseBoolSettingValue("Logging", "ShowEESIOInput");
+
+	if (g_log_window && g_log_window->m_line_input)
+	{
+		g_log_window->m_input_widget->setVisible(input_enabled);
+	}
 
 	if (new_enabled == curr_enabled)
 	{
@@ -171,6 +185,10 @@ void LogWindow::createUi()
 	action->setCheckable(true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, action, "Logging", "EnableTimestamps", true);
 
+	action = settings_menu->addAction(tr("Show EE SIO &Input"));
+	action->setCheckable(true);
+	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, action, "Logging", "ShowEESIOInput", false);
+
 	settings_menu->addSeparator();
 
 	// TODO: Log Level
@@ -181,6 +199,28 @@ void LogWindow::createUi()
 	m_text->setTextInteractionFlags(Qt::TextSelectableByKeyboard | Qt::TextSelectableByMouse);
 	m_text->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 	m_text->setWordWrapMode(QTextOption::WrapAnywhere);
+	m_text->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+	m_line_input = new QLineEdit(this);
+	connect(m_line_input, &QLineEdit::returnPressed, this, &LogWindow::onInputEntered);
+
+	m_local_echo_checkbox = new QCheckBox(tr("Local Echo"), this);
+	m_local_echo_checkbox->setChecked(m_local_echo);
+	connect(m_local_echo_checkbox, &QCheckBox::checkStateChanged, this, [&](Qt::CheckState state) {
+		m_local_echo = state == Qt::CheckState::Checked;
+	});
+
+	m_newline_on_enter_checkbox = new QCheckBox(tr("Newline on send"), this);
+	m_newline_on_enter_checkbox->setChecked(m_newline_on_enter);
+	connect(m_newline_on_enter_checkbox, &QCheckBox::checkStateChanged, this, [&](Qt::CheckState state) {
+		m_newline_on_enter = state == Qt::CheckState::Checked;
+	});
+
+	m_input_hbox = new QHBoxLayout(this);
+	m_input_hbox->addWidget(m_line_input, 1);
+	m_input_hbox->addWidget(m_local_echo_checkbox);
+	m_input_hbox->addWidget(m_newline_on_enter_checkbox);
+	m_input_hbox->setSpacing(8);
 
 #if defined(_WIN32)
 	QFont font("Consolas");
@@ -194,7 +234,18 @@ void LogWindow::createUi()
 #endif
 	m_text->setFont(font);
 
-	setCentralWidget(m_text);
+	QWidget* central_widget = new QWidget(this);
+	m_input_widget = new QWidget(this);
+	m_input_widget->setVisible(Host::GetBaseBoolSettingValue("Logging", "ShowEESIOInput"));
+	m_input_widget->setLayout(m_input_hbox);
+
+	QVBoxLayout* vlayout = new QVBoxLayout(central_widget);
+	vlayout->setContentsMargins(0, 0, 0, 0);
+	vlayout->setSpacing(0);
+	vlayout->addWidget(m_text);
+	vlayout->addWidget(m_input_widget);
+
+	setCentralWidget(central_widget);
 }
 
 void LogWindow::onClearTriggered()
@@ -361,6 +412,69 @@ void LogWindow::appendMessage(quint32 level, quint32 color, const QString& messa
 	}
 }
 
+void LogWindow::onInputEntered()
+{
+	QString text = m_line_input->text();
+	if (text.isEmpty() && !m_newline_on_enter)
+		return;
+
+	if (m_newline_on_enter)
+		text.append('\n');
+
+	if (!m_line_input->isEnabled())
+		return;
+
+	bool focus = m_line_input->hasFocus();
+	m_line_input->setDisabled(true);
+
+	const QPointer<LogWindow> window(this);
+	std::string str = text.toUtf8().toStdString();
+
+	Host::RunOnCPUThread([str = std::move(str), focus, window]() {
+		bool success = true;
+
+		if (!VMManager::HasValidVM())
+		{
+			Console.Warning("Cannot write to EE SIO RX FIFO while there is no virtual machine running.");
+			success = false;
+		}
+
+		if (success && Achievements::IsHardcoreModeActive())
+		{
+			Console.Warning("Cannot write to EE SIO RX FIFO while RetroAchievements hardcore mode is active.");
+			success = false;
+		}
+
+		if (success)
+			success = VMManager::WriteBytesToEESIORXFIFO({reinterpret_cast<const u8*>(str.data()), str.size()});
+
+		QtHost::RunOnUIThread([success, str = std::move(str), focus, window]() {
+			if (!window)
+				return;
+
+			if (success)
+			{
+				window->m_line_input->clear();
+
+				if (window->m_local_echo)
+				{
+					// appendMessage expects a newline to be at the end of the string
+					QString text = QString::fromStdString(str);
+					window->appendMessage(0, 0, window->m_newline_on_enter ? text : (text + '\n'));
+				}
+
+				QTextCursor cursor(window->m_text->textCursor());
+				cursor.movePosition(QTextCursor::End);
+				window->m_text->setTextCursor(cursor);
+			}
+
+			window->m_line_input->setDisabled(false);
+			if (focus)
+				window->m_line_input->setFocus();
+		});
+	});
+}
+
 void LogWindow::saveSize()
 {
 	const int current_width = Host::GetBaseIntSettingValue("UI", "LogWindowWidth", DEFAULT_WIDTH);
@@ -389,3 +503,5 @@ void LogWindow::restoreSize()
 	const int height = Host::GetBaseIntSettingValue("UI", "LogWindowHeight", DEFAULT_HEIGHT);
 	resize(width, height);
 }
+
+#include "moc_LogWindow.cpp"

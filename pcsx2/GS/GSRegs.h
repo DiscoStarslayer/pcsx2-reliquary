@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -199,6 +199,15 @@ enum GS_AFAIL
 	AFAIL_FB_ONLY  = 1,
 	AFAIL_ZB_ONLY  = 2,
 	AFAIL_RGB_ONLY = 3,
+};
+
+enum GS_ALPHA_BITS
+{
+	ALPHA_ABC_CS = 0,
+	ALPHA_ABC_CD = 1,
+	ALPHA_C_AS   = 0,
+	ALPHA_C_AD   = 1,
+	ALPHA_C_FIX  = 2,
 };
 
 enum class GS_MIN_FILTER : uint8_t
@@ -773,9 +782,6 @@ REG64_(GIFReg, TEST)
 	u32 _PAD1 : 13;
 	u32 _PAD2 : 32;
 REG_END2
-	__forceinline bool DoFirstPass() const { return !ATE || ATST != ATST_NEVER; } // not all pixels fail automatically
-	__forceinline bool DoSecondPass() const { return ATE && ATST != ATST_ALWAYS && AFAIL != AFAIL_KEEP; } // pixels may fail, write fb/z
-	__forceinline bool NoSecondPass() const { return ATE && ATST != ATST_ALWAYS && AFAIL == AFAIL_KEEP; } // pixels may fail, no output
 	__forceinline u32 GetAFAIL(u32 fpsm) const { return (AFAIL == AFAIL_RGB_ONLY && (fpsm & 0xF) != 0) ? static_cast<u32>(AFAIL_FB_ONLY) : AFAIL; } // FB Only when not 32bit Framebuffer
 REG_END2
 

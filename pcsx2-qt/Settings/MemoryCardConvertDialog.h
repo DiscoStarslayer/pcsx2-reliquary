@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -64,4 +64,4 @@ namespace CardCapacity
 	static constexpr size_t _16_MB = 0x3e80 * 512 * 2; //(0x3fa7 - 0x49) * 2 * 512;
 	static constexpr size_t _32_MB = 0x7d00 * 512 * 2; //(0x7f67 - 0x89) * 2 * 512;
 	static constexpr size_t _64_MB = 0xfde8 * 512 * 2; //(0xfee7 - 0x0109) * 2 * 512;
-}
+} // namespace CardCapacity

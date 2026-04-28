@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DisassemblyView.h"
 
+#include "AsyncDialogs.h"
 #include "Debugger/DebuggerWindow.h"
 #include "Debugger/JsonValueWrapper.h"
 #include "Debugger/Breakpoints/BreakpointModel.h"
@@ -18,8 +19,6 @@
 #include <QtGui/QMouseEvent>
 #include <QtWidgets/QMenu>
 #include <QtGui/QClipboard>
-#include <QtWidgets/QInputDialog>
-#include <QtWidgets/QMessageBox>
 #include "SymbolTree/NewSymbolDialogs.h"
 #include "common/StringUtil.h"
 
@@ -111,18 +110,18 @@ void DisassemblyView::contextPasteInstructionText()
 {
 	if (!cpu().isCpuPaused())
 	{
-		QMessageBox::warning(this, tr("Assemble Error"), tr("Unable to change assembly while core is running"));
+		AsyncDialogs::warning(this, tr("Assemble Error"), tr("Unable to change assembly while core is running"));
 		return;
 	}
 
 	// split text in clipboard by new lines
 	QString clipboardText = QApplication::clipboard()->text();
 	std::vector<std::string> newInstructions = StringUtil::splitOnNewLine(clipboardText.toLocal8Bit().constData());
-	int newInstructionsSize = newInstructions.size();
+	u32 newInstructionsSize = static_cast<u32>(newInstructions.size());
 
 	// validate new instructions before pasting them
 	std::vector<u32> encodedInstructions;
-	for (int instructionIdx = 0; instructionIdx < newInstructionsSize; instructionIdx++)
+	for (u32 instructionIdx = 0; instructionIdx < newInstructionsSize; instructionIdx++)
 	{
 		u32 replaceAddress = m_selectedAddressStart + instructionIdx * 4;
 		u32 encodedInstruction;
@@ -130,14 +129,14 @@ void DisassemblyView::contextPasteInstructionText()
 		bool valid = MipsAssembleOpcode(newInstructions[instructionIdx].c_str(), &cpu(), replaceAddress, encodedInstruction, errorText);
 		if (!valid)
 		{
-			QMessageBox::warning(this, tr("Assemble Error"), QString("%1 %2").arg(errorText.c_str()).arg(newInstructions[instructionIdx].c_str()));
+			AsyncDialogs::warning(this, tr("Assemble Error"), QString("%1 %2").arg(errorText.c_str()).arg(newInstructions[instructionIdx].c_str()));
 			return;
 		}
 		encodedInstructions.push_back(encodedInstruction);
 	}
 
 	// paste validated instructions
-	for (int instructionIdx = 0; instructionIdx < newInstructionsSize; instructionIdx++)
+	for (u32 instructionIdx = 0; instructionIdx < newInstructionsSize; instructionIdx++)
 	{
 		u32 replaceAddress = m_selectedAddressStart + instructionIdx * 4;
 		setInstructions(replaceAddress, replaceAddress, encodedInstructions[instructionIdx]);
@@ -148,29 +147,28 @@ void DisassemblyView::contextAssembleInstruction()
 {
 	if (!cpu().isCpuPaused())
 	{
-		QMessageBox::warning(this, tr("Assemble Error"), tr("Unable to change assembly while core is running"));
+		AsyncDialogs::warning(this, tr("Assemble Error"), tr("Unable to change assembly while core is running"));
 		return;
 	}
 
 	DisassemblyLineInfo line;
-	bool ok;
 	m_disassemblyManager.getLine(m_selectedAddressStart, false, line);
-	QString instruction = QInputDialog::getText(this, tr("Assemble Instruction"), "",
-		QLineEdit::Normal, QString("%1 %2").arg(line.name.c_str()).arg(line.params.c_str()), &ok);
 
-	if (!ok)
-		return;
+	const QString title = tr("Assemble Instruction");
+	const QString text = QString("%1 %2").arg(line.name.c_str()).arg(line.params.c_str());
 
-	u32 encodedInstruction;
-	std::string errorText;
-	bool valid = MipsAssembleOpcode(instruction.toLocal8Bit().constData(), &cpu(), m_selectedAddressStart, encodedInstruction, errorText);
-	if (!valid)
-	{
-		QMessageBox::warning(this, tr("Assemble Error"), QString::fromStdString(errorText));
-		return;
-	}
+	AsyncDialogs::getText(this, title, "", text, [this](QString instruction) {
+		u32 encodedInstruction;
+		std::string errorText;
+		bool valid = MipsAssembleOpcode(instruction.toLocal8Bit().constData(), &cpu(), m_selectedAddressStart, encodedInstruction, errorText);
+		if (!valid)
+		{
+			AsyncDialogs::warning(this, tr("Assemble Error"), QString::fromStdString(errorText));
+			return;
+		}
 
-	setInstructions(m_selectedAddressStart, m_selectedAddressEnd, encodedInstruction);
+		setInstructions(m_selectedAddressStart, m_selectedAddressEnd, encodedInstruction);
+	});
 }
 
 void DisassemblyView::contextNoopInstruction()
@@ -206,7 +204,7 @@ void DisassemblyView::contextRestoreInstruction()
 		{
 			u32 address = start + i * 4;
 			if (original_instructions[i].has_value())
-				cpu->write32(address, *original_instructions[i]);
+				cpu->Write32(address, *original_instructions[i]);
 		}
 		DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
 	});
@@ -249,34 +247,34 @@ void DisassemblyView::contextFollowBranch()
 
 void DisassemblyView::contextGoToAddress()
 {
-	bool ok;
-	const QString targetString = QInputDialog::getText(this, tr("Go To In Disassembly"), "",
-		QLineEdit::Normal, "", &ok);
+	const QString title = tr("Go To In Disassembly");
 
-	if (!ok)
-		return;
+	AsyncDialogs::getText(this, title, "", "", [this](QString expression) {
+		u64 address = 0;
+		std::string error;
+		if (!cpu().evaluateExpression(expression.toStdString().c_str(), address, error))
+		{
+			AsyncDialogs::warning(this, tr("Cannot Go To"), QString::fromStdString(error));
+			return;
+		}
 
-	u64 address = 0;
-	std::string error;
-	if (!cpu().evaluateExpression(targetString.toStdString().c_str(), address, error))
-	{
-		QMessageBox::warning(this, tr("Cannot Go To"), QString::fromStdString(error));
-		return;
-	}
-
-	gotoAddressAndSetFocus(static_cast<u32>(address) & ~3);
+		gotoAddressAndSetFocus(static_cast<u32>(address) & ~3);
+	});
 }
 
 void DisassemblyView::contextAddFunction()
 {
 	NewFunctionDialog* dialog = new NewFunctionDialog(cpu(), this);
-	dialog->setAttribute(Qt::WA_DeleteOnClose);
 	dialog->setName(QString("func_%1").arg(m_selectedAddressStart, 8, 16, QChar('0')));
 	dialog->setAddress(m_selectedAddressStart);
+	dialog->setAttribute(Qt::WA_DeleteOnClose);
+
 	if (m_selectedAddressEnd != m_selectedAddressStart)
 		dialog->setCustomSize(m_selectedAddressEnd - m_selectedAddressStart + 4);
-	if (dialog->exec() == QDialog::Accepted)
-		update();
+
+	connect(dialog, &QDialog::accepted, this, [this]() { update(); });
+
+	dialog->open();
 }
 
 void DisassemblyView::contextCopyFunctionName()
@@ -304,28 +302,26 @@ void DisassemblyView::contextRemoveFunction()
 void DisassemblyView::contextRenameFunction()
 {
 	const FunctionInfo curFunc = cpu().GetSymbolGuardian().FunctionOverlappingAddress(m_selectedAddressStart);
-
 	if (!curFunc.address.valid())
 	{
-		QMessageBox::warning(this, tr("Rename Function Error"), tr("No function / symbol is currently selected."));
+		AsyncDialogs::warning(this, tr("Rename Function Error"), tr("No function / symbol is currently selected."));
 		return;
 	}
 
-	QString oldName = QString::fromStdString(curFunc.name);
+	const QString title = tr("Rename Function");
+	const QString label = tr("Function name");
+	const QString oldName = QString::fromStdString(curFunc.name);
 
-	bool ok;
-	QString newName = QInputDialog::getText(this, tr("Rename Function"), tr("Function name"), QLineEdit::Normal, oldName, &ok);
-	if (!ok)
-		return;
+	AsyncDialogs::getText(this, title, label, oldName, [this, curFunc](QString newName) {
+		if (newName.isEmpty())
+		{
+			AsyncDialogs::warning(this, tr("Rename Function Error"), tr("Function name cannot be nothing."));
+			return;
+		}
 
-	if (newName.isEmpty())
-	{
-		QMessageBox::warning(this, tr("Rename Function Error"), tr("Function name cannot be nothing."));
-		return;
-	}
-
-	cpu().GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
-		database.functions.rename_symbol(curFunc.handle, newName.toStdString());
+		cpu().GetSymbolGuardian().ReadWrite([&](ccc::SymbolDatabase& database) {
+			database.functions.rename_symbol(curFunc.handle, newName.toStdString());
+		});
 	});
 }
 
@@ -336,11 +332,11 @@ void DisassemblyView::contextStubFunction()
 
 	const QPointer<DisassemblyView> view(this);
 	Host::RunOnCPUThread([view, address, cpu = &cpu()] {
-		const u32 first_instruction = cpu->read32(address);
-		const u32 second_instruction = cpu->read32(address + 4);
+		const u32 first_instruction = cpu->Read32(address);
+		const u32 second_instruction = cpu->Read32(address + 4);
 
-		cpu->write32(address, 0x03E00008); // jr ra
-		cpu->write32(address + 4, 0x00000000); // nop
+		cpu->Write32(address, 0x03E00008); // jr ra
+		cpu->Write32(address + 4, 0x00000000); // nop
 
 		QtHost::RunOnUIThread([view, address, first_instruction, second_instruction]() {
 			if (!view)
@@ -368,14 +364,14 @@ void DisassemblyView::contextRestoreFunction()
 		m_stubbedFunctions.erase(stub);
 
 		Host::RunOnCPUThread([address, cpu = &cpu(), first_instruction, second_instruction] {
-			cpu->write32(address, first_instruction);
-			cpu->write32(address + 4, second_instruction);
+			cpu->Write32(address, first_instruction);
+			cpu->Write32(address + 4, second_instruction);
 			DebuggerView::broadcastEvent(DebuggerEvents::VMUpdate());
 		});
 	}
 	else
 	{
-		QMessageBox::warning(this, tr("Restore Function Error"), tr("Unable to stub selected address."));
+		AsyncDialogs::warning(this, tr("Restore Function Error"), tr("Unable to stub selected address."));
 	}
 }
 
@@ -424,7 +420,7 @@ void DisassemblyView::paintEvent(QPaintEvent* event)
 	bool alternate = m_visibleStart % 8;
 
 	// Draw visible disassembly rows
-	for (u32 i = 0; i <= m_visibleRows; i++)
+	for (u32 i = 0; i < m_visibleRows + 1; i++)
 	{
 		// Address of instruction being displayed on row
 		const u32 rowAddress = (i * 4) + m_visibleStart;
@@ -923,7 +919,7 @@ inline QString DisassemblyView::DisassemblyStringFromAddress(u32 address, QFont 
 
 	if (showOpcode)
 	{
-		const u32 opcode = cpu().read32(address);
+		const u32 opcode = cpu().Read32(address);
 		lineString = lineString.arg(QtUtils::FilledQStringFromValue(opcode, 16));
 	}
 
@@ -939,7 +935,7 @@ inline QString DisassemblyView::DisassemblyStringFromAddress(u32 address, QFont 
 QColor DisassemblyView::GetAddressFunctionColor(u32 address)
 {
 	std::array<QColor, 6> colors;
-	if (QtUtils::IsLightTheme(palette()))
+	if (!QtHost::IsDarkApplicationTheme())
 	{
 		colors = {
 			QColor::fromRgba(0xFFFA3434),
@@ -977,23 +973,23 @@ QColor DisassemblyView::GetAddressFunctionColor(u32 address)
 QString DisassemblyView::FetchSelectionInfo(SelectionInfo selInfo)
 {
 	QString infoBlock;
-	for (u32 i = m_selectedAddressStart; i <= m_selectedAddressEnd; i += 4)
+	for (u64 i = m_selectedAddressStart; i <= m_selectedAddressEnd; i += 4)
 	{
 		if (i != m_selectedAddressStart)
 			infoBlock += '\n';
 		if (selInfo == SelectionInfo::ADDRESS)
 		{
-			infoBlock += FilledQStringFromValue(i, 16);
+			infoBlock += FilledQStringFromValue(static_cast<u32>(i), 16);
 		}
 		else if (selInfo == SelectionInfo::INSTRUCTIONTEXT)
 		{
 			DisassemblyLineInfo line;
-			m_disassemblyManager.getLine(i, true, line);
+			m_disassemblyManager.getLine(static_cast<u32>(i), true, line);
 			infoBlock += QString("%1 %2").arg(line.name.c_str()).arg(line.params.c_str());
 		}
 		else // INSTRUCTIONHEX
 		{
-			infoBlock += FilledQStringFromValue(cpu().read32(i), 16);
+			infoBlock += FilledQStringFromValue(cpu().Read32(i), 16);
 		}
 	}
 	return infoBlock;
@@ -1054,8 +1050,8 @@ void DisassemblyView::setInstructions(u32 start, u32 end, u32 value)
 		for (u32 i = 0; i < count; i++)
 		{
 			const u32 address = start + i * 4;
-			original_instructions.emplace_back(cpu->read32(address));
-			cpu->write32(address, value);
+			original_instructions.emplace_back(cpu->Read32(address));
+			cpu->Write32(address, value);
 		}
 
 		QtHost::RunOnUIThread([view, start, count, original_instructions = std::move(original_instructions)]() {
@@ -1075,9 +1071,9 @@ void DisassemblyView::setInstructions(u32 start, u32 end, u32 value)
 
 bool DisassemblyView::AddressCanRestore(u32 start, u32 end)
 {
-	for (u32 i = start; i <= end; i += 4)
+	for (u64 i = start; i <= end; i += 4)
 	{
-		if (this->m_nopedInstructions.find(i) != this->m_nopedInstructions.end())
+		if (this->m_nopedInstructions.find(static_cast<u32>(i)) != this->m_nopedInstructions.end())
 		{
 			return true;
 		}
@@ -1093,3 +1089,5 @@ bool DisassemblyView::FunctionCanRestore(u32 address)
 
 	return m_stubbedFunctions.find(address) != m_stubbedFunctions.end();
 }
+
+#include "moc_DisassemblyView.cpp"

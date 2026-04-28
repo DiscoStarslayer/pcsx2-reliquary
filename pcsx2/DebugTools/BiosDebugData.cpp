@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "BiosDebugData.h"
@@ -8,22 +8,19 @@
 
 std::vector<std::unique_ptr<BiosThread>> getEEThreads()
 {
-	std::vector<std::unique_ptr<BiosThread>> threads;
-
-	if (CurrentBiosInformation.eeThreadListAddr <= 0)
-		return threads;
+	if (!VMManager::HasValidVM() || CurrentBiosInformation.eeThreadListAddr == 0)
+		return {};
 
 	const u32 start = CurrentBiosInformation.eeThreadListAddr & 0x3fffff;
 
+	std::vector<std::unique_ptr<BiosThread>> threads;
 	for (int tid = 0; tid < 256; tid++)
 	{
+		EEInternalThread* internal = static_cast<EEInternalThread*>(
+			PSM(start + tid * sizeof(EEInternalThread)));
 
-		EEInternalThread* internal = static_cast<EEInternalThread*>(PSM(start + tid * sizeof(EEInternalThread)));
-		if (internal->status != (int)ThreadStatus::THS_BAD)
-		{
-			auto thread = std::make_unique<EEThread>(tid, *internal);
-			threads.push_back(std::move(thread));
-		}
+		if (internal && internal->status != (int)ThreadStatus::THS_BAD)
+			threads.emplace_back(std::make_unique<EEThread>(tid, *internal));
 	}
 
 	return threads;
@@ -56,15 +53,15 @@ std::vector<std::unique_ptr<BiosThread>> getIOPThreads()
 		data.status = iopMemRead8(item + 0xc);
 		data.tid = iopMemRead16(item + 0xa);
 		data.entrypoint = iopMemRead32(item + 0x38);
-		data.waitstate = iopMemRead16(item + 0xe);
-		data.initPriority = iopMemRead16(item + 0x2e);
+		data.waitstate = iopMemRead16(item + 0x1c);
+		data.waitId = iopMemRead32(item + 0x20);
+		data.initPriority = iopMemRead16(item + 0xe);
 
 		data.SavedSP = iopMemRead32(item + 0x10);
 
 		data.PC = iopMemRead32(data.SavedSP + 0x8c);
 
-		auto thread = std::make_unique<IOPThread>(data);
-		threads.push_back(std::move(thread));
+		threads.emplace_back(std::make_unique<IOPThread>(data));
 
 		item = iopMemRead32(item + 0x24);
 	}
@@ -83,17 +80,16 @@ std::vector<IopMod> getIOPModules()
 
 	for (int i = 0; maddr != 0; i++)
 	{
-		if (maddr >= 0x200000)
+		if (maddr >= Ps2MemSize::ExposedIopRam)
 		{
 			// outside of memory
-			// change if we ever support IOP ram extension
 			return {};
 		}
 
 		if (i > 1000)
 			return {};
 
-		IopMod mod;
+		IopMod& mod = modlist.emplace_back();
 
 		u32 nstr = iopMemRead32(maddr + 4);
 		if (nstr)
@@ -112,8 +108,6 @@ std::vector<IopMod> getIOPModules()
 		mod.text_size = iopMemRead32(maddr + 0x1c);
 		mod.data_size = iopMemRead32(maddr + 0x20);
 		mod.bss_size = iopMemRead32(maddr + 0x24);
-
-		modlist.push_back(mod);
 
 		maddr = iopMemRead32(maddr);
 	}

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -24,6 +24,7 @@ private:
 	void updateOptimalFramePacing();
 	void updateUseVSyncForTimingEnabled();
 	void onManuallySetRealTimeClockChanged();
+	void onUseSystemLocaleFormatChanged();
 
 	Ui::EmulationSettingsWidget m_ui;
 };

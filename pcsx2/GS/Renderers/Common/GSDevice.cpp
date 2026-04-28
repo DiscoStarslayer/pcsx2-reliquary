@@ -1,9 +1,10 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/Common/GSDevice.h"
 #include "GS/GSGL.h"
 #include "GS/GS.h"
+#include "GS/GSUtil.h"
 #include "Host.h"
 
 #include "common/Console.h"
@@ -18,6 +19,8 @@
 #include "imgui.h"
 
 #include <algorithm>
+#include <ostream>
+#include <fstream>
 
 int SetDATMShader(SetDATM datm)
 {
@@ -64,6 +67,8 @@ const char* shaderName(ShaderConvert value)
 		case ShaderConvert::RGBA8_TO_FLOAT24_BILN:  return "ps_convert_rgba8_float24_biln";
 		case ShaderConvert::RGBA8_TO_FLOAT16_BILN:  return "ps_convert_rgba8_float16_biln";
 		case ShaderConvert::RGB5A1_TO_FLOAT16_BILN: return "ps_convert_rgb5a1_float16_biln";
+		case ShaderConvert::FLOAT32_DEPTH_TO_COLOR: return "ps_convert_float32_depth_to_color";
+		case ShaderConvert::FLOAT32_COLOR_TO_DEPTH: return "ps_convert_float32_color_to_depth";
 		case ShaderConvert::FLOAT32_TO_FLOAT24:     return "ps_convert_float32_float24";
 		case ShaderConvert::DEPTH_COPY:             return "ps_depth_copy";
 		case ShaderConvert::DOWNSAMPLE_COPY:        return "ps_downsample_copy";
@@ -244,7 +249,7 @@ const char* GSDevice::RenderAPIToString(RenderAPI api)
 
 bool GSDevice::GetRequestedExclusiveFullscreenMode(u32* width, u32* height, float* refresh_rate)
 {
-	const std::string mode = Host::GetBaseStringSettingValue("EmuCore/GS", "FullscreenMode", "");
+	const std::string mode = Host::GetStringSettingValue("EmuCore/GS", "FullscreenMode", "");
 	if (!mode.empty())
 	{
 		const std::string_view mode_view = mode;
@@ -310,6 +315,31 @@ void GSDevice::GenerateExpansionIndexBuffer(void* buffer)
 		*(idx_buffer++) = base + 2;
 		*(idx_buffer++) = base + 3;
 	}
+}
+
+GSVector4i GSDevice::ProcessCopyArea(const GSVector4i& rtsize, const GSVector4i& drawarea)
+{
+	GSVector4i snapped_drawarea(drawarea);
+	// We don't want the snapped box adjustments when the rect is empty as it might make the copy to pass.
+	// The empty rect itself needs to be handled in renderer properly.
+	if (snapped_drawarea.rempty())
+		return snapped_drawarea;
+
+	// If copy area exceeds 95% coverage then we can do a full copy instead which should be faster.
+	const float rt_area = static_cast<float>(rtsize.width() * rtsize.height());
+	const float copy_area = static_cast<float>(drawarea.width() * drawarea.height());
+	constexpr float coverage = 0.95f;
+	if ((copy_area / rt_area) >= coverage)
+	{
+		snapped_drawarea = rtsize;
+		return snapped_drawarea;
+	}
+
+	// Aligning bbox to 4 pixel boundaries so copies will be faster using Direct Memory Access,
+	// otherwise it may stall as more commands need to be issued.
+	snapped_drawarea = snapped_drawarea.ralign<Align_Outside>(GSVector2i(4, 4)).rintersect(rtsize);
+
+	return snapped_drawarea;
 }
 
 std::optional<std::string> GSDevice::ReadShaderSource(const char* filename)
@@ -723,6 +753,39 @@ GSTexture* GSDevice::CreateTexture(int w, int h, int mipmap_levels, GSTexture::F
 	return FetchSurface(GSTexture::Type::Texture, w, h, levels, format, false, m_features.prefer_new_textures && !prefer_reuse);
 }
 
+void GSDevice::DoStretchRectWithAssertions(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+	GSHWDrawConfig::ColorMaskSelector cms, ShaderConvert shader, bool linear)
+{
+	pxAssert((dTex && dTex->IsDepthStencil()) == HasDepthOutput(shader));
+	pxAssert(linear ? SupportsBilinear(shader) : SupportsNearest(shader));
+	GL_INS("StretchRect(%d) {%d,%d} %dx%d -> {%d,%d) %dx%d", shader, int(sRect.left), int(sRect.top),
+		int(sRect.right - sRect.left), int(sRect.bottom - sRect.top), int(dRect.left), int(dRect.top),
+		int(dRect.right - dRect.left), int(dRect.bottom - dRect.top));
+	DoStretchRect(sTex, sRect, dTex, dRect, cms, shader, linear);
+}
+
+void GSDevice::StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+	bool red, bool green, bool blue, bool alpha, ShaderConvert shader)
+{
+	GSHWDrawConfig::ColorMaskSelector cms;
+
+	cms.wr = red;
+	cms.wg = green;
+	cms.wb = blue;
+	cms.wa = alpha;
+
+	pxAssert(HasVariableWriteMask(shader));
+	GL_INS("ColorCopy Red:%d Green:%d Blue:%d Alpha:%d", cms.wr, cms.wg, cms.wb, cms.wa);
+
+	DoStretchRectWithAssertions(sTex, sRect, dTex, dRect, cms, shader, false);
+}
+
+void GSDevice::StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+	ShaderConvert shader, bool linear)
+{
+	DoStretchRectWithAssertions(sTex, sRect, dTex, dRect, GSHWDrawConfig::ColorMaskSelector(ShaderConvertWriteMask(shader)), shader, linear);
+}
+
 void GSDevice::StretchRect(GSTexture* sTex, GSTexture* dTex, const GSVector4& dRect, ShaderConvert shader, bool linear)
 {
 	StretchRect(sTex, GSVector4(0, 0, 1, 1), dTex, dRect, shader, linear);
@@ -734,11 +797,11 @@ void GSDevice::DrawMultiStretchRects(
 	for (u32 i = 0; i < num_rects; i++)
 	{
 		const MultiStretchRect& sr = rects[i];
-		pxAssert(shader == ShaderConvert::COPY || shader == ShaderConvert::RTA_CORRECTION || rects[0].wmask.wrgba == 0xf);
+		pxAssert(HasVariableWriteMask(shader) || rects[0].wmask.wrgba == 0xf);
 		if (rects[0].wmask.wrgba != 0xf)
 		{
 			g_gs_device->StretchRect(sr.src, sr.src_rect, dTex, sr.dst_rect, rects[0].wmask.wr,
-				rects[0].wmask.wg, rects[0].wmask.wb, rects[0].wmask.wa);
+				rects[0].wmask.wg, rects[0].wmask.wb, rects[0].wmask.wa, shader);
 		}
 		else
 		{
@@ -866,14 +929,13 @@ void GSDevice::ShadeBoost()
 	if (ResizeRenderTarget(&m_target_tmp, m_current->GetWidth(), m_current->GetHeight(), false, false))
 	{
 		// predivide to avoid the divide (multiply) in the shader
-		const float params[4] = {
+		const GSVector4 params(
 			static_cast<float>(GSConfig.ShadeBoost_Brightness) * (1.0f / 50.0f),
 			static_cast<float>(GSConfig.ShadeBoost_Contrast) * (1.0f / 50.0f),
 			static_cast<float>(GSConfig.ShadeBoost_Saturation) * (1.0f / 50.0f),
-			static_cast<float>(GSConfig.ShadeBoost_Gamma) * (1.0f / 50.0f),
-		};
+			static_cast<float>(GSConfig.ShadeBoost_Gamma) * (1.0f / 50.0f));
 
-		DoShadeBoost(m_current, m_target_tmp, params);
+		DoShadeBoost(m_current, m_target_tmp, params.v);
 
 		m_current = m_target_tmp;
 	}
@@ -885,10 +947,15 @@ void GSDevice::Resize(int width, int height)
 	GSVector2i s = m_current->GetSize();
 	int multiplier = 1;
 
-	while (width > s.x || height > s.y)
+	if ((width > s.x || height > s.y))
 	{
-		s = m_current->GetSize() * GSVector2i(++multiplier);
+		while (width > s.x || height > s.y)
+		{
+			s = m_current->GetSize() * GSVector2i(++multiplier);
+		}
 	}
+	else
+		s = GSVector2i(width, height);
 
 	if (ResizeRenderTarget(&dTex, s.x, s.y, false, false))
 	{
@@ -938,6 +1005,23 @@ bool GSDevice::ResizeRenderTarget(GSTexture** t, int w, int h, bool preserve_con
 
 	*t = new_tex;
 	return true;
+}
+
+void GSDevice::BeginDSAsRT(GSTexture* ds, const GSVector4i& drawarea)
+{
+	// Create a temporary RT and copy the area needed for the draw.
+	const int w = ds->GetWidth();
+	const int h = ds->GetHeight();
+	m_ds_as_rt = g_gs_device->CreateRenderTarget(w, h, GSTexture::Format::Float32, false, true);
+	const GSVector4 dRect(drawarea);
+	const GSVector4 sRect(dRect.x / w, dRect.y / h, dRect.z / w, dRect.w / h);
+	StretchRect(ds, sRect, m_ds_as_rt, dRect, ShaderConvert::FLOAT32_DEPTH_TO_COLOR, false);
+}
+
+void GSDevice::EndDSAsRT()
+{
+	Recycle(m_ds_as_rt);
+	m_ds_as_rt = nullptr;
 }
 
 #if defined(__clang__)
@@ -1014,7 +1098,531 @@ void GSDevice::CAS(GSTexture*& tex, GSVector4i& src_rect, GSVector4& src_uv, con
 bool GSHWDrawConfig::BlendState::IsEffective(ColorMaskSelector colormask) const
 {
 	return enable && (((colormask.key & 7u) && (src_factor != GSDevice::CONST_ONE || dst_factor != GSDevice::CONST_ZERO)) ||
-						 ((colormask.key & 8u) && (src_factor_alpha != GSDevice::CONST_ONE || dst_factor_alpha != GSDevice::CONST_ZERO)));
+	                  ((colormask.key & 8u) && (src_factor_alpha != GSDevice::CONST_ONE || dst_factor_alpha != GSDevice::CONST_ZERO)));
+}
+
+struct DrawConfigWriter
+{
+	fmt::memory_buffer buffer;
+	u32 indent = 0;
+	bool beginning_of_line = true;
+
+	/// Uses RAII to add 1 to indent on construction and remove on destruction
+	struct RAIIIndent
+	{
+		DrawConfigWriter& writer;
+		RAIIIndent(RAIIIndent&&) = delete;
+		explicit RAIIIndent(DrawConfigWriter& writer): writer(writer) { writer.PushIndent(); }
+		~RAIIIndent() { writer.PopIndent(); }
+		operator DrawConfigWriter&() { return writer; }
+	};
+
+	void PushIndent() { indent++; }
+	void PopIndent() { indent--; }
+	RAIIIndent WithIndent() { return RAIIIndent(*this); }
+
+	template <typename... T>
+	FMT_INLINE void WriteLn(fmt::format_string<T...> fmt, T&&... args)
+	{
+		fmt::vargs<T...> va = {{args...}};
+		if (beginning_of_line)
+			WriteIndent();
+		beginning_of_line = true;
+		fmt::detail::vformat_to(buffer, fmt.str, va);
+		buffer.push_back('\n');
+	}
+
+	template <typename... T>
+	FMT_INLINE void Write(fmt::format_string<T...> fmt, T&&... args)
+	{
+		fmt::vargs<T...> va = {{args...}};
+		if (beginning_of_line)
+			WriteIndent();
+		beginning_of_line = false;
+		fmt::detail::vformat_to(buffer, fmt.str, va);
+	}
+
+private:
+	void WriteIndent()
+	{
+		size_t sz = buffer.size();
+		buffer.resize(sz + indent);
+		for (u32 i = 0; i < indent; i++)
+			buffer[sz + i] = '\t';
+	}
+};
+
+static const char* GetTopologyName(GSHWDrawConfig::Topology topology)
+{
+	switch (topology)
+	{
+		case GSHWDrawConfig::Topology::Point:    return "Point";
+		case GSHWDrawConfig::Topology::Line:     return "Line";
+		case GSHWDrawConfig::Topology::Triangle: return "Triangle";
+	}
+	return "Unknown";
+}
+
+static const char* GetVSExpandName(GSHWDrawConfig::VSExpand vsexpand)
+{
+	switch (vsexpand)
+	{
+		case GSHWDrawConfig::VSExpand::None:        return "None";
+		case GSHWDrawConfig::VSExpand::Point:       return "Point";
+		case GSHWDrawConfig::VSExpand::Line:        return "Line";
+		case GSHWDrawConfig::VSExpand::Sprite:      return "Sprite";
+		case GSHWDrawConfig::VSExpand::LineAA1:     return "LineAA1";
+		case GSHWDrawConfig::VSExpand::TriangleAA1: return "TriangleAA1";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSDateName(u32 date)
+{
+	switch (date)
+	{
+		case 0: return "Off";
+		case 1: return "PrimID Init DATM=0";
+		case 2: return "PrimID Init DATM=1";
+		case 3: return "PrimID Main";
+		case 5: return "Barrier DATM=0";
+		case 6: return "Barrier DATM=1";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSAlphaTestName(GSShader::PS_ATST atst)
+{
+	using GSShader::PS_ATST;
+	switch (atst)
+	{
+		case PS_ATST::NONE:     return "NONE";
+		case PS_ATST::LEQUAL:   return "LEQUAL";
+		case PS_ATST::GEQUAL:   return "GEQUAL";
+		case PS_ATST::EQUAL:    return "EQUAL";
+		case PS_ATST::NOTEQUAL: return "NOTEQUAL";
+	};
+	return "UNKNOWN";
+}
+
+static const char* GetPSAFAILName(GSShader::PS_AFAIL afail)
+{
+	using GSShader::PS_AFAIL;
+	switch (afail)
+	{
+		case PS_AFAIL::KEEP:          return "KEEP";
+		case PS_AFAIL::FB_ONLY:       return "FB_ONLY";
+		case PS_AFAIL::ZB_ONLY:       return "ZB_ONLY";
+		case PS_AFAIL::RGB_ONLY:      return "RGB_ONLY";
+		case PS_AFAIL::RGB_ONLY_DSB:  return "RGB_ONLY_DSB";
+		case PS_AFAIL::RGB_ONLY_SW_Z: return "RGB_ONLY_SW_Z";
+	};
+	return "UNKNOWN";
+}
+
+static const char* GetPSDstFmtName(u32 dstfmt)
+{
+	switch (dstfmt)
+	{
+		case 0: return "32bit";
+		case 1: return "24bit";
+		case 2: return "16bit";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSDepthFmtName(u32 depthfmt)
+{
+	switch (depthfmt)
+	{
+		case 0: return "None";
+		case 1: return "32bit";
+		case 2: return "16bit";
+		case 3: return "RGBA";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSBlendABDName(u32 abd)
+{
+	switch (abd)
+	{
+		case 0: return "Cs";
+		case 1: return "Cd";
+		case 2: return "0";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSBlendCName(u32 c)
+{
+	switch (c)
+	{
+		case 0: return "As";
+		case 1: return "Ad";
+		case 2: return "Af";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSBlendHWName(HWBlendType blendhw)
+{
+	switch (blendhw)
+	{
+		case HWBlendType::SRC_ONE_DST_FACTOR:      return "SRC_ONE_DST_FACTOR";
+		case HWBlendType::SRC_ALPHA_DST_FACTOR:    return "SRC_ALPHA_DST_FACTOR";
+		case HWBlendType::SRC_DOUBLE:              return "SRC_DOUBLE";
+		case HWBlendType::SRC_HALF_ONE_DST_FACTOR: return "SRC_HALF_ONE_DST_FACTOR";
+		case HWBlendType::SRC_INV_DST_BLEND_HALF:  return "SRC_INV_DST_BLEND_HALF";
+		case HWBlendType::INV_SRC_DST_BLEND_HALF:  return "INV_SRC_DST_BLEND_HALF";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSBlendMixName(HWBlendType blendmix)
+{
+	switch (blendmix)
+	{
+		case HWBlendType::BMIX1_ALPHA_HIGH_ONE: return "BMIX1_ALPHA_HIGH_ONE";
+		case HWBlendType::BMIX1_SRC_HALF:       return "BMIX1_SRC_HALF";
+		case HWBlendType::BMIX2_OVERFLOW:       return "BMIX2_OVERFLOW";
+		case HWBlendType::SRC_HALF_ONE_DST_FACTOR:
+		case HWBlendType::SRC_INV_DST_BLEND_HALF:
+		case HWBlendType::INV_SRC_DST_BLEND_HALF:
+			return "INVALID (Blend Mix)";
+	}
+	return "Unknown";
+}
+
+static const char* GetHWBlendTypeName(HWBlendType blend, bool mix)
+{
+	if (static_cast<u32>(blend) == 0)
+		return "Off";
+	return mix ? GetPSBlendMixName(blend) : GetPSBlendHWName(blend);
+}
+
+static const char* GetPSChannelName(ChannelFetch channel)
+{
+	switch (channel)
+	{
+		case ChannelFetch_NONE:  return "None";
+		case ChannelFetch_RED:   return "FetchRed";
+		case ChannelFetch_GREEN: return "FetchGreen";
+		case ChannelFetch_BLUE:  return "FetchBlue";
+		case ChannelFetch_ALPHA: return "FetchAlpha";
+		case ChannelFetch_RGB:   return "FetchRGB";
+		case ChannelFetch_GXBY:  return "FetchGXBY";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSDitherName(u32 dither)
+{
+	switch (dither)
+	{
+		case 0: return "None";
+		case 1: return "Standard";
+		case 2: return "ReciprocalScaled";
+	}
+	return "Unknown";
+}
+
+static const char* GetSSTrilnName(GS_MIN_FILTER triln)
+{
+	switch (triln)
+	{
+		case GS_MIN_FILTER::Nearest: return "Nearest";
+		case GS_MIN_FILTER::Linear: return "Linear";
+		case GS_MIN_FILTER::Nearest_Mipmap_Nearest: return "Nearest_Mipmap_Nearest";
+		case GS_MIN_FILTER::Nearest_Mipmap_Linear: return "Nearest_Mipmap_Linear";
+		case GS_MIN_FILTER::Linear_Mipmap_Nearest: return "Linear_Mipmap_Nearest";
+		case GS_MIN_FILTER::Linear_Mipmap_Linear: return "Linear_Mipmap_Linear";
+	}
+	return "Unknown";
+}
+
+static const char* GetBlendOpSymbol(GSDevice::BlendOp op)
+{
+	switch (op)
+	{
+		case GSDevice::OP_ADD:          return "+";
+		case GSDevice::OP_SUBTRACT:     return "-";
+		case GSDevice::OP_REV_SUBTRACT: return "-";
+	}
+	return "Unknown";
+}
+
+static const char* GetBlendFactorFormula(GSDevice::BlendFactor blendfactor)
+{
+	switch (blendfactor)
+	{
+		case GSDevice::SRC_COLOR:       return "Cs";
+		case GSDevice::INV_SRC_COLOR:   return "(1 - Cs)";
+		case GSDevice::DST_COLOR:       return "Cd";
+		case GSDevice::INV_DST_COLOR:   return "(1 - Cd)";
+		case GSDevice::SRC1_COLOR:      return "Cs1";
+		case GSDevice::INV_SRC1_COLOR:  return "(1 - Cs1)";
+		case GSDevice::SRC_ALPHA:       return "As";
+		case GSDevice::INV_SRC_ALPHA:   return "(1 - As)";
+		case GSDevice::DST_ALPHA:       return "Ad";
+		case GSDevice::INV_DST_ALPHA:   return "(1 - Ad)";
+		case GSDevice::SRC1_ALPHA:      return "As1";
+		case GSDevice::INV_SRC1_ALPHA:  return "(1 - As1)";
+		case GSDevice::CONST_COLOR:     return "Cf";
+		case GSDevice::INV_CONST_COLOR: return "(1 - Cf)";
+		case GSDevice::CONST_ONE:       return "1";
+		case GSDevice::CONST_ZERO:      return "0";
+	}
+	return "Unknown";
+}
+
+static const char* GetDestinationAlphaModeName(GSHWDrawConfig::DestinationAlphaMode datm)
+{
+	switch (datm)
+	{
+		case GSHWDrawConfig::DestinationAlphaMode::Off:            return "Off";
+		case GSHWDrawConfig::DestinationAlphaMode::Stencil:        return "Stencil";
+		case GSHWDrawConfig::DestinationAlphaMode::StencilOne:     return "StencilOne";
+		case GSHWDrawConfig::DestinationAlphaMode::PrimIDTracking: return "PrimIDTracking";
+		case GSHWDrawConfig::DestinationAlphaMode::Full:           return "Full";
+	}
+	return "Unknown";
+}
+
+static const char* GetColClipModeName(GSHWDrawConfig::ColClipMode ccmode)
+{
+	switch (ccmode)
+	{
+		case GSHWDrawConfig::ColClipMode::NoModify:          return "NoModify";
+		case GSHWDrawConfig::ColClipMode::ConvertOnly:       return "ConvertOnly";
+		case GSHWDrawConfig::ColClipMode::ResolveOnly:       return "ResolveOnly";
+		case GSHWDrawConfig::ColClipMode::ConvertAndResolve: return "ConvertAndResolve";
+		case GSHWDrawConfig::ColClipMode::EarlyResolve:      return "EarlyResolve";
+	}
+	return "Unknown";
+}
+
+static const char* GetSetDATMName(SetDATM datm)
+{
+	switch (datm)
+	{
+		case SetDATM::DATM0: return "DATM0";
+		case SetDATM::DATM1: return "DATM1";
+		case SetDATM::DATM0_RTA_CORRECTION: return "DATM0_RTA_CORRECTION";
+		case SetDATM::DATM1_RTA_CORRECTION: return "DATM1_RTA_CORRECTION";
+	}
+	return "Unknown";
+}
+
+static const char* GetPSAA1Name(u32 aa1)
+{
+	switch (static_cast<GSHWDrawConfig::PS_AA1>(aa1))
+	{
+		case GSHWDrawConfig::PS_AA1::NONE: return "NONE";
+		case GSHWDrawConfig::PS_AA1::LINE: return "LINE";
+		case GSHWDrawConfig::PS_AA1::TRIANGLE: return "TRIANGLE";
+		case GSHWDrawConfig::PS_AA1::TRIANGLE_SW_Z: return "TRIANGLE_SW_Z";
+	}
+	return "Unknown";
+}
+
+static void DumpPSSelector(DrawConfigWriter& out, const GSHWDrawConfig::PSSelector& ps)
+{
+	out.WriteLn("aem_fmt: {}", ps.aem_fmt);
+	out.WriteLn("pal_fmt: {}", ps.pal_fmt);
+	out.WriteLn("dst_fmt: {} ({})", GetPSDstFmtName(ps.dst_fmt), ps.depth_fmt);
+	out.WriteLn("depth_fmt: {} ({})", GetPSDepthFmtName(ps.depth_fmt), ps.depth_fmt);
+	out.WriteLn("aem: {}", ps.aem);
+	out.WriteLn("fba: {}", ps.fba);
+	out.WriteLn("fog: {}", ps.fog);
+	out.WriteLn("iip: {}", ps.iip);
+	out.WriteLn("date: {} ({})", GetPSDateName(ps.date), ps.date);
+	out.WriteLn("atst: {} ({})", GetPSAlphaTestName(ps.atst), static_cast<u32>(ps.atst));
+	out.WriteLn("afail: {} ({})", GetPSAFAILName(ps.afail), static_cast<u32>(ps.afail));
+	out.WriteLn("fst: {}", ps.fst);
+	out.WriteLn("tfx: {}", ps.tfx);
+	out.WriteLn("tcc: {} ({})", GSUtil::GetTCCName(ps.tcc), ps.tcc);
+	out.WriteLn("wms: {} ({})", GSUtil::GetWMName(ps.wms), ps.wms);
+	out.WriteLn("wmt: {} ({})", GSUtil::GetWMName(ps.wmt), ps.wmt);
+	out.WriteLn("adjs: {}", ps.adjs);
+	out.WriteLn("adjt: {}", ps.adjt);
+	out.WriteLn("ltf: {}", ps.ltf);
+	out.WriteLn("shuffle: {}", ps.shuffle);
+	out.WriteLn("shuffle_same: {}", ps.shuffle_same);
+	out.WriteLn("real16src: {}", ps.real16src);
+	out.WriteLn("process_ba: {}", ps.process_ba);
+	out.WriteLn("process_rg: {}", ps.process_rg);
+	out.WriteLn("shuffle_across: {}", ps.shuffle_across);
+	out.WriteLn("write_rg: {}", ps.write_rg);
+	out.WriteLn("fbmask: {}", ps.fbmask);
+	out.WriteLn("blend: ({} - {}) * {} + {}", GetPSBlendABDName(ps.blend_a), GetPSBlendABDName(ps.blend_b), GetPSBlendCName(ps.blend_c), GetPSBlendABDName(ps.blend_d));
+	out.WriteLn("fixed_one_a: {}", ps.fixed_one_a);
+	out.WriteLn("blend_hw: {} ({})", GetHWBlendTypeName(static_cast<HWBlendType>(ps.blend_hw), ps.blend_mix), ps.blend_hw);
+	out.WriteLn("a_masked: {}", ps.a_masked);
+	out.WriteLn("colclip_hw: {}", ps.colclip_hw);
+	out.WriteLn("rta_correction: {}", ps.rta_correction);
+	out.WriteLn("rta_source_correction: {}", ps.rta_source_correction);
+	out.WriteLn("colclip: {}", ps.colclip);
+	out.WriteLn("blend_mix: {}", ps.blend_mix);
+	out.WriteLn("round_inv: {}", ps.round_inv);
+	out.WriteLn("pabe: {}", ps.pabe);
+	out.WriteLn("no_color: {}", ps.no_color);
+	out.WriteLn("no_color1: {}", ps.no_color1);
+	out.WriteLn("channel: {} ({})", GetPSChannelName(static_cast<ChannelFetch>(ps.channel)), ps.channel);
+	out.WriteLn("channel_fb: {}", ps.channel_fb);
+	out.WriteLn("dither: {} ({})", GetPSDitherName(ps.dither), ps.dither);
+	out.WriteLn("dither_adjust: {}", ps.dither_adjust);
+	out.WriteLn("zclamp: {}", ps.zclamp);
+	out.WriteLn("tcoffsethack: {}", ps.tcoffsethack);
+	out.WriteLn("urban_chaos_hle: {}", ps.urban_chaos_hle);
+	out.WriteLn("tales_of_abyss_hle: {}", ps.tales_of_abyss_hle);
+	out.WriteLn("tex_is_fb: {}", ps.tex_is_fb);
+	out.WriteLn("automatic_lod: {}", ps.automatic_lod);
+	out.WriteLn("manual_lod: {}", ps.manual_lod);
+	out.WriteLn("point_sampler: {}", ps.point_sampler);
+	out.WriteLn("region_rect: {}", ps.region_rect);
+	out.WriteLn("scanmsk: {} ({})", GSUtil::GetSCANMSKName(ps.scanmsk), ps.scanmsk);
+	out.WriteLn("aa1: {} ({})", static_cast<u32>(ps.aa1), GetPSAA1Name(static_cast<u32>(ps.aa1)));
+	out.WriteLn("abe: {}", static_cast<u32>(ps.abe));
+	out.WriteLn("sw_aniso: {}", ps.sw_aniso);
+}
+
+static void DumpVSSelector(DrawConfigWriter& out, const GSHWDrawConfig::VSSelector& vs)
+{
+	out.WriteLn("fst: {}", vs.fst);
+	out.WriteLn("tme: {}", vs.tme);
+	out.WriteLn("iip: {}", vs.iip);
+	out.WriteLn("point_size: {}", vs.point_size);
+	out.WriteLn("expand: {} ({})", GetVSExpandName(vs.expand), static_cast<u32>(vs.expand));
+}
+
+static void DumpBlendEquation(DrawConfigWriter& out, const char* name, u32 op, u32 src_factor, u32 dst_factor)
+{
+	const char* src_formula = GetBlendFactorFormula(static_cast<GSDevice::BlendFactor>(src_factor));
+	const char* dst_formula = GetBlendFactorFormula(static_cast<GSDevice::BlendFactor>(dst_factor));
+	const char* symbol = GetBlendOpSymbol(static_cast<GSDevice::BlendOp>(op));
+	if (op == GSDevice::OP_REV_SUBTRACT)
+		out.WriteLn("{}: Cd * {} - Cs * {}", name, dst_formula, src_formula);
+	else
+		out.WriteLn("{}: Cs * {} {} Cd * {}", name, src_formula, symbol, dst_formula);
+}
+
+static void DumpBlendState(DrawConfigWriter& out, const GSHWDrawConfig::BlendState& bs)
+{
+	out.WriteLn("enable: {}", bs.enable);
+	out.WriteLn("constant_enable: {}", bs.constant_enable);
+	out.WriteLn("constant: {}", bs.constant);
+	DumpBlendEquation(out, "equation", bs.op, bs.src_factor, bs.dst_factor);
+	DumpBlendEquation(out, "equation_alpha", GSDevice::OP_ADD, bs.src_factor_alpha, bs.dst_factor_alpha);
+}
+
+static void DumpDepthStencilSelctor(DrawConfigWriter& out, const GSHWDrawConfig::DepthStencilSelector& dss)
+{
+	out.WriteLn("ztst: {} ({})", GSUtil::GetZTSTName(dss.ztst), dss.ztst);
+	out.WriteLn("zwe: {}", dss.zwe);
+	out.WriteLn("date: {}", dss.date);
+	out.WriteLn("date_one: {}", dss.date_one);
+}
+
+static void DumpSamplerSelector(DrawConfigWriter& out, const GSHWDrawConfig::SamplerSelector& ss)
+{
+	out.WriteLn("tau: {}", ss.tau);
+	out.WriteLn("tav: {}", ss.tav);
+	out.WriteLn("biln: {}", ss.biln);
+	out.WriteLn("triln: {} ({})", GetSSTrilnName(static_cast<GS_MIN_FILTER>(ss.triln)), ss.triln);
+	out.WriteLn("lodclamp: {}", ss.lodclamp);
+}
+
+static void DumpAlphaPass(DrawConfigWriter& out, const GSHWDrawConfig::AlphaPass& ap)
+{
+	out.WriteLn("enable: {}", ap.enable);
+	out.WriteLn("require_one_barrier: {}", ap.require_one_barrier);
+	out.WriteLn("require_full_barrier: {}", ap.require_full_barrier);
+	out.WriteLn("colormask: {:x}", ap.colormask.wrgba);
+	out.WriteLn("ps_aref: {}", ap.ps_aref);
+
+	out.WriteLn("ps:");
+	DumpPSSelector(out.WithIndent(), ap.ps);
+
+	out.WriteLn("dss:");
+	DumpDepthStencilSelctor(out.WithIndent(), ap.depth);
+}
+
+static void DumpBlendMultipass(DrawConfigWriter& out, const GSHWDrawConfig::BlendMultiPass& bmp)
+{
+	out.WriteLn("enable: {}", bmp.enable);
+	out.WriteLn("no_color1: {}", bmp.no_color1);
+	out.WriteLn("blend_hw: {} ({})", GetPSBlendHWName(static_cast<HWBlendType>(bmp.blend_hw)), bmp.blend_hw);
+	out.WriteLn("dither: {}", bmp.dither);
+
+	out.WriteLn("blend:");
+	DumpBlendState(out.WithIndent(), bmp.blend);
+}
+
+static void DumpConfig(DrawConfigWriter& out, const GSHWDrawConfig& conf,
+	bool ps, bool vs, bool bs, bool dss, bool ss, bool asp, bool bmp)
+{
+	out.WriteLn("topology: {} ({})", GetTopologyName(conf.topology), static_cast<u32>(conf.topology));
+	out.WriteLn("require_one_barrier: {}", conf.require_one_barrier);
+	out.WriteLn("require_full_barrier: {}", conf.require_full_barrier);
+
+	out.WriteLn("destination_alpha: {} ({})", GetDestinationAlphaModeName(conf.destination_alpha), static_cast<u32>(conf.destination_alpha));
+	out.WriteLn("datm: {} ({})", GetSetDATMName(conf.datm), static_cast<u32>(conf.datm));
+	out.WriteLn("line_expand: {}", conf.line_expand);
+	out.WriteLn("colormask: {:x}", conf.colormask.wrgba);
+
+	if (ps)
+	{
+		out.WriteLn("ps:");
+		DumpPSSelector(out.WithIndent(), conf.ps);
+	}
+
+	if (vs)
+	{
+		out.WriteLn("vs:");
+		DumpVSSelector(out.WithIndent(), conf.vs);
+	}
+
+	if (bs)
+	{
+		out.WriteLn("blend:");
+		DumpBlendState(out.WithIndent(), conf.blend);
+	}
+
+	if (ss)
+	{
+		out.WriteLn("sampler:");
+		DumpSamplerSelector(out.WithIndent(), conf.sampler);
+	}
+
+	if (dss)
+	{
+		out.WriteLn("depth:");
+		DumpDepthStencilSelctor(out.WithIndent(), conf.depth);
+	}
+	
+	if (asp)
+	{
+		out.WriteLn("alpha_second_pass:");
+		DumpAlphaPass(out.WithIndent(), conf.alpha_second_pass);
+	}
+
+	if (bmp)
+	{
+		out.WriteLn("blend_multi_pass:");
+		DumpBlendMultipass(out.WithIndent(), conf.blend_multi_pass);
+	}
+}
+
+void GSHWDrawConfig::DumpConfig(const std::string& path, const GSHWDrawConfig& conf,
+	bool ps, bool vs, bool bs, bool dss, bool ss, bool asp, bool bmp)
+{
+	if (FileSystem::ManagedCFilePtr file = FileSystem::OpenManagedCFile(path.c_str(), "w"))
+	{
+		DrawConfigWriter writer;
+		::DumpConfig(writer, conf, ps, vs, bs, dss, ss, asp, bmp);
+		fwrite(writer.buffer.data(), 1, writer.buffer.size(), file.get());
+	}
 }
 
 // clang-format off

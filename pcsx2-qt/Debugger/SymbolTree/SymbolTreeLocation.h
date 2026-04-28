@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -19,7 +19,7 @@ struct SymbolTreeLocation
 		MEMORY,
 		NONE // Put NONE last so nodes of this type sort to the bottom.
 	};
-	
+
 	Type type = NONE;
 	u32 address = 0;
 

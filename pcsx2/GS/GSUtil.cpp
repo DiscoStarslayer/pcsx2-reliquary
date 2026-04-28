@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/GS.h"
@@ -176,6 +176,40 @@ const char* GSUtil::GetACName(u32 ac)
 	return (ac < std::size(names)) ? names[ac] : "";
 }
 
+const char* GSUtil::GetPerfMonCounterName(GSPerfMon::counter_t counter, bool hw)
+{
+	if (hw)
+	{
+		static constexpr const char* names_hw[GSPerfMon::CounterLastHW] = {
+			"Prim",
+			"Draw",
+			"DrawCalls",
+			"Readbacks",
+			"Swizzle",
+			"Unswizzle",
+			"TextureCopies",
+			"TextureUploads",
+			"Barriers",
+			"RenderPasses"
+		};
+		return counter < std::size(names_hw) ? names_hw[counter] : "";
+	}
+	else
+	{
+		static constexpr const char* names_sw[GSPerfMon::CounterLastSW] = {
+			"Prim",
+			"Draw",
+			"DrawCalls",
+			"Readbacks",
+			"Swizzle",
+			"Unswizzle",
+			"Fillrate",
+			"SyncPoint"
+		};
+		return counter < std::size(names_sw) ? names_sw[counter] : "";
+	}
+}
+
 const u32* GSUtil::HasSharedBitsPtr(u32 dpsm)
 {
 	return s_maps.SharedBitsField[dpsm];
@@ -248,7 +282,7 @@ GSRendererType GSUtil::GetPreferredRenderer()
 #if defined(__APPLE__)
 		// Mac: Prefer Metal hardware.
 		preferred_renderer = GSRendererType::Metal;
-#elif defined(_WIN32) && defined(_M_ARM64)
+#elif defined(_WIN32) && defined(ARCH_ARM64)
 		// Default to DX12 on Windows-on-ARM.
 		preferred_renderer = GSRendererType::DX12;
 #elif defined(_WIN32)

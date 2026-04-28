@@ -1,45 +1,58 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 #include "common/WindowInfo.h"
-#include <QtWidgets/QStackedWidget>
-#include <QtWidgets/QWidget>
+#include <QtCore/QTimer>
+#include <QtGui/QDragMoveEvent>
+#include <QtGui/QWindow>
 #include <optional>
 #include <vector>
 
 class QCloseEvent;
 
-class DisplayWidget final : public QWidget
+class DisplaySurface final : public QWindow
 {
 	Q_OBJECT
 
 public:
-	explicit DisplayWidget(QWidget* parent);
-	~DisplayWidget();
+	explicit DisplaySurface();
+	~DisplaySurface();
 
-	QPaintEngine* paintEngine() const override;
-
-	int scaledWindowWidth() const;
-	int scaledWindowHeight() const;
+	// while QWindow can be used directly as a window, Popups requre a QWidget parent.
+	// Additionally, we use saveGeometry/restoreGeometry for render to seperate window mode
+	// but those functions only exist on QWidget.
+	// Thus, we always need a container widget.
+	QWidget* createWindowContainer(QWidget* parent = nullptr);
 
 	std::optional<WindowInfo> getWindowInfo();
 
 	void updateRelativeMode(bool enabled);
 	void updateCursor(bool hidden);
 
-	void handleCloseEvent(QCloseEvent* event);
-	void destroy();
+	bool isFullScreen() const;
+	void setFocus();
+
+	QByteArray saveGeometry() const;
+	void restoreGeometry(const QByteArray& geometry);
 
 Q_SIGNALS:
-	void windowResizedEvent(int width, int height, float scale);
+	void windowResizedEvent(u32 width, u32 height, float scale);
 	void windowRestoredEvent();
 
+	void dragEnterEvent(QDragEnterEvent* event);
+	void dropEvent(QDropEvent* event);
+
 protected:
+	void handleCloseEvent(QCloseEvent* event);
+	void handleKeyInputEvent(QEvent* event);
 	bool event(QEvent* event) override;
+	bool eventFilter(QObject* object, QEvent* event) override;
+
+private Q_SLOTS:
+	void onResizeDebounceTimer();
 
 private:
-	bool isActuallyFullscreen() const;
 	void updateCenterPos();
 
 	QPoint m_relative_mouse_start_pos{};
@@ -49,34 +62,17 @@ private:
 	bool m_clip_mouse_enabled = false;
 #endif
 	bool m_cursor_hidden = false;
-	bool m_destroying = false;
 
 	std::vector<int> m_keys_pressed_with_modifiers;
 
 	u32 m_last_window_width = 0;
 	u32 m_last_window_height = 0;
 	float m_last_window_scale = 1.0f;
-};
 
-class DisplayContainer final : public QStackedWidget
-{
-	Q_OBJECT
+	QTimer* m_resize_debounce_timer = nullptr;
+	u32 m_pending_window_width = 0;
+	u32 m_pending_window_height = 0;
+	float m_pending_window_scale = 1.0f;
 
-public:
-	DisplayContainer();
-	~DisplayContainer();
-
-	// Wayland is broken in lots of ways, so we need to check for it.
-	static bool isRunningOnWayland();
-
-	static bool isNeeded(bool fullscreen, bool render_to_main);
-
-	void setDisplayWidget(DisplayWidget* widget);
-	DisplayWidget* removeDisplayWidget();
-
-protected:
-	bool event(QEvent* event) override;
-
-private:
-	DisplayWidget* m_display_widget = nullptr;
+	QWidget* m_container = nullptr;
 };

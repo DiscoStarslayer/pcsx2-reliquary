@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0
 
 #include "GS/Renderers/SW/GSDrawScanlineCodeGenerator.arm64.h"
@@ -77,8 +77,10 @@ static const auto& _d4_f = v9;
 static const auto& _test = v8;
 static const auto& _fd = v2;
 
-#define _local(field) MemOperand(_locals, offsetof(GSScanlineLocalData, field))
-#define _global(field) MemOperand(_globals, offsetof(GSScanlineGlobalData, field))
+// Yay, you can't offsetof with non-constant array indices in GCC
+#define OFFSETOF(base, field) (reinterpret_cast<uptr>(&reinterpret_cast<base*>(0)->field))
+#define _local(field) MemOperand(_locals, OFFSETOF(GSScanlineLocalData, field))
+#define _global(field) MemOperand(_globals, OFFSETOF(GSScanlineGlobalData, field))
 #define armAsm (&m_emitter)
 
 GSDrawScanlineCodeGenerator::GSDrawScanlineCodeGenerator(u64 key, void* code, size_t maxsize)

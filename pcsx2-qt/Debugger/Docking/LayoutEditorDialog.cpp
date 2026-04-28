@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "LayoutEditorDialog.h"
@@ -105,3 +105,5 @@ void LayoutEditorDialog::onNameChanged()
 	m_ui.buttonBox->button(QDialogButtonBox::Ok)->setEnabled(error_message.isEmpty());
 	m_ui.errorMessage->setText(error_message);
 }
+
+#include "moc_LayoutEditorDialog.cpp"

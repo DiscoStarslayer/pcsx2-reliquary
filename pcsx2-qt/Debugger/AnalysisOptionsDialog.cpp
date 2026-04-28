@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "AnalysisOptionsDialog.h"
@@ -33,3 +33,5 @@ void AnalysisOptionsDialog::analyse()
 	if (m_ui.closeCheckBox->isChecked())
 		accept();
 }
+
+#include "moc_AnalysisOptionsDialog.cpp"

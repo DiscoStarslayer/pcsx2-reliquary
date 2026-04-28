@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -335,6 +335,7 @@ enum class AccBlendLevel : u8
 	High,
 	Full,
 	Maximum,
+	MaxCount
 };
 
 enum class OsdOverlayPos : u8
@@ -432,6 +433,13 @@ enum class GSTextureInRtMode : u8
 	MergeTargets,
 };
 
+enum class GSLimit24BitDepth : u8
+{
+	Disabled,
+	PrioritizeUpper,
+	PrioritizeLower,
+};
+
 enum class GSBilinearDirtyMode : u8
 {
 	Automatic,
@@ -456,7 +464,17 @@ enum class GSNativeScaling : u8
 	Off,
 	Normal,
 	Aggressive,
+	NormalUpscaled,
+	AggressiveUpscaled,
 	MaxCount
+};
+
+enum class GSDepthFeedbackMode : u8
+{
+	None      = 0,
+	Auto      = 1,
+	Depth     = 2,
+	DepthAsRT = 3,
 };
 
 enum class AchievementOverlayPosition : u8
@@ -700,11 +718,27 @@ struct Pcsx2Config
 		/// Converts a tri-state option to an optional boolean value.
 		static std::optional<bool> TriStateToOptionalBoolean(int value);
 
+		/// Constants for determining default values.
 		static constexpr float DEFAULT_FRAME_RATE_NTSC = 59.94f;
 		static constexpr float DEFAULT_FRAME_RATE_PAL = 50.00f;
 
+		static constexpr GSRendererType DEFAULT_HW_RENDERER = GSRendererType::Auto;
+
 		static constexpr AspectRatioType DEFAULT_ASPECT_RATIO = AspectRatioType::RAuto4_3_3_2;
 		static constexpr GSInterlaceMode DEFAULT_INTERLACE_MODE = GSInterlaceMode::Automatic;
+		static constexpr GSPostBilinearMode DEFAULT_BILINEAR_FILTERING_MODE = GSPostBilinearMode::BilinearSmooth;
+		static constexpr FMVAspectRatioSwitchType DEFAULT_FMV_ASPECT_RATIO = FMVAspectRatioSwitchType::Off;
+		static constexpr GSCASMode DEFAULT_CAS_MODE = GSCASMode::Disabled;
+
+		static constexpr float DEFAULT_UPSCALE_MULTIPLIER = 1.0f;
+		static constexpr AccBlendLevel DEFAULT_BLENDING_ACCURACY = AccBlendLevel::Basic;
+		static constexpr BiFiltering DEFAULT_TEXTURE_FILTERING_MODE = BiFiltering::PS2;
+		static constexpr TriFiltering DEFAULT_TRILINEAR_FILTERING_MODE = TriFiltering::Automatic;
+
+		static constexpr float DEFAULT_OSD_SCALE = 100.0f;
+		static constexpr float DEFAULT_OSD_MARGIN = 10.0f;
+		static constexpr OsdOverlayPos DEFAULT_OSD_MESSAGE_POS = OsdOverlayPos::TopLeft;
+		static constexpr OsdOverlayPos DEFAULT_OSD_PERFORMANCE_POS = OsdOverlayPos::TopRight;
 
 		static constexpr int DEFAULT_VIDEO_CAPTURE_BITRATE = 6000;
 		static constexpr int DEFAULT_VIDEO_CAPTURE_WIDTH = 640;
@@ -719,7 +753,7 @@ struct Pcsx2Config
 
 		union
 		{
-			u64 bitset[2];
+			u64 bitsets[2];
 
 			struct
 			{
@@ -742,19 +776,22 @@ struct Pcsx2Config
 					OsdShowSpeed : 1,
 					OsdShowFPS : 1,
 					OsdShowVPS : 1,
-					OsdShowCPU : 1,
-					OsdShowGPU : 1,
 					OsdShowResolution : 1,
 					OsdShowGSStats : 1,
+					OsdShowCPU : 1,
+					OsdShowGPU : 1,
+					OsdShowGPUDebug : 1,
 					OsdShowIndicators : 1,
+					OsdShowFrameTimes : 1,
+					OsdShowHardwareInfo : 1,
+					OsdShowVersion : 1,
 					OsdShowSettings : 1,
 					OsdshowPatches : 1,
 					OsdShowInputs : 1,
-					OsdShowFrameTimes : 1,
-					OsdShowVersion : 1,
 					OsdShowVideoCapture : 1,
 					OsdShowInputRec : 1,
-					OsdShowHardwareInfo : 1,
+					OsdShowTextureReplacements : 1,
+					OsdBoldText : 1,
 					HWSpinGPUForReadbacks : 1,
 					HWSpinCPUForReadbacks : 1,
 					GPUPaletteConversion : 1,
@@ -762,6 +799,8 @@ struct Pcsx2Config
 					PreloadFrameWithGSData : 1,
 					Mipmap : 1,
 					HWMipmap : 1,
+					HWAccurateAlphaTest: 1,
+					HWAA1 : 1,
 					ManualUserHacks : 1,
 					UserHacks_AlignSpriteX : 1,
 					UserHacks_CPUFBConversion : 1,
@@ -774,6 +813,7 @@ struct Pcsx2Config
 					UserHacks_ForceEvenSpritePosition : 1,
 					UserHacks_NativePaletteDraw : 1,
 					UserHacks_EstimateTextureRegion : 1,
+					UserHacks_DrawBuffering : 1,
 					FXAA : 1,
 					ShadeBoost : 1,
 					DumpGSData : 1,
@@ -784,6 +824,9 @@ struct Pcsx2Config
 					SaveAlpha : 1,
 					SaveInfo : 1,
 					SaveTransferImages : 1,
+					SaveDrawStats : 1,
+					SaveFrameStats : 1,
+					SaveHWConfig : 1,
 					DumpReplaceableTextures : 1,
 					DumpReplaceableMipmaps : 1,
 					DumpTexturesWithFMVActive : 1,
@@ -797,7 +840,8 @@ struct Pcsx2Config
 					VideoCaptureAutoResolution : 1,
 					EnableAudioCapture : 1,
 					EnableAudioCaptureParameters : 1,
-					OrganizeScreenshotsByGame : 1;
+					OrganizeSnapshotsByGame : 1,
+					OrganizeVideoCaptureByGame : 1;
 			};
 		};
 
@@ -807,26 +851,28 @@ struct Pcsx2Config
 		float FrameratePAL = DEFAULT_FRAME_RATE_PAL;
 
 		AspectRatioType AspectRatio = DEFAULT_ASPECT_RATIO;
-		FMVAspectRatioSwitchType FMVAspectRatioSwitch = FMVAspectRatioSwitchType::Off;
+		FMVAspectRatioSwitchType FMVAspectRatioSwitch = DEFAULT_FMV_ASPECT_RATIO;
 		GSInterlaceMode InterlaceMode = DEFAULT_INTERLACE_MODE;
-		GSPostBilinearMode LinearPresent = GSPostBilinearMode::BilinearSmooth;
+		GSPostBilinearMode LinearPresent = DEFAULT_BILINEAR_FILTERING_MODE;
 
 		float StretchY = 100.0f;
 		int Crop[4] = {};
 
-		float OsdScale = 100.0f;
-		OsdOverlayPos OsdMessagesPos = OsdOverlayPos::TopLeft;
-		OsdOverlayPos OsdPerformancePos = OsdOverlayPos::TopRight;
+		float OsdScale = DEFAULT_OSD_SCALE;
+		float OsdMargin = DEFAULT_OSD_MARGIN;
+		std::string OsdFontPath;
+		OsdOverlayPos OsdMessagesPos = DEFAULT_OSD_MESSAGE_POS;
+		OsdOverlayPos OsdPerformancePos = DEFAULT_OSD_PERFORMANCE_POS;
 
-		GSRendererType Renderer = GSRendererType::Auto;
-		float UpscaleMultiplier = 1.0f;
+		GSRendererType Renderer = DEFAULT_HW_RENDERER;
+		float UpscaleMultiplier = DEFAULT_UPSCALE_MULTIPLIER;
 
-		AccBlendLevel AccurateBlendingUnit = AccBlendLevel::Basic;
-		BiFiltering TextureFiltering = BiFiltering::PS2;
+		AccBlendLevel AccurateBlendingUnit = DEFAULT_BLENDING_ACCURACY;
+		BiFiltering TextureFiltering = DEFAULT_TEXTURE_FILTERING_MODE;
 		TexturePreloadingLevel TexturePreloading = TexturePreloadingLevel::Full;
 		GSDumpCompressionMethod GSDumpCompression = GSDumpCompressionMethod::Zstandard;
 		GSHardwareDownloadMode HWDownloadMode = GSHardwareDownloadMode::Enabled;
-		GSCASMode CASMode = GSCASMode::Disabled;
+		GSCASMode CASMode = DEFAULT_CAS_MODE;
 		u8 Dithering = 2;
 		u8 MaxAnisotropy = 0;
 		u8 TVShader = 0;
@@ -847,9 +893,11 @@ struct Pcsx2Config
 		u8 UserHacks_CPUCLUTRender = 0;
 		GSGPUTargetCLUTMode UserHacks_GPUTargetCLUTMode = GSGPUTargetCLUTMode::Disabled;
 		GSTextureInRtMode UserHacks_TextureInsideRt = GSTextureInRtMode::Disabled;
+		GSLimit24BitDepth UserHacks_Limit24BitDepth = GSLimit24BitDepth::Disabled;
 		GSBilinearDirtyMode UserHacks_BilinearHack = GSBilinearDirtyMode::Automatic;
-		TriFiltering TriFilter = TriFiltering::Automatic;
+		TriFiltering TriFilter = DEFAULT_TRILINEAR_FILTERING_MODE;
 		s8 OverrideTextureBarriers = -1;
+		GSDepthFeedbackMode DepthFeedbackMode = GSDepthFeedbackMode::Auto;
 
 		u8 CAS_Sharpness = 50;
 		u8 ShadeBoost_Brightness = DEFAULT_SHADEBOOST_BRIGHTNESS;
@@ -912,7 +960,7 @@ struct Pcsx2Config
 		bool operator!=(const GSOptions& right) const;
 
 		// Should we dump this draw/frame?
-		bool ShouldDump(int draw, int frame) const;
+		bool ShouldDump(u64 draw, int frame) const;
 	};
 
 	struct SPU2Options
@@ -1248,9 +1296,6 @@ struct Pcsx2Config
 		static constexpr u32 MAXIMUM_NOTIFICATION_DURATION = 30;
 		static constexpr u32 DEFAULT_NOTIFICATION_DURATION = 5;
 		static constexpr u32 DEFAULT_LEADERBOARD_DURATION = 10;
-		static constexpr const char* DEFAULT_INFO_SOUND_NAME = "sounds/achievements/message.wav";
-		static constexpr const char* DEFAULT_UNLOCK_SOUND_NAME = "sounds/achievements/unlock.wav";
-		static constexpr const char* DEFAULT_LBSUBMIT_SOUND_NAME = "sounds/achievements/lbsubmit.wav";
 
 		static const char* OverlayPositionNames[(size_t)AchievementOverlayPosition::MaxCount + 1];
 
@@ -1344,8 +1389,8 @@ struct Pcsx2Config
 		UseSavestateSelector : 1,
 		InhibitScreensaver : 1,
 		BackupSavestate : 1,
-		McdFolderAutoManage : 1,
-		ManuallySetRealTimeClock : 1,
+		ManuallySetRealTimeClock : 1, // passes user-set real-time clock information to cdvd at startup
+		UseSystemLocaleFormat : 1, // presents OS time format instead of yyyy-MM-dd HH:mm:ss for manual RTC
 
 		HostFs : 1,
 
@@ -1390,6 +1435,7 @@ struct Pcsx2Config
 	std::string CurrentBlockdump;
 	std::string CurrentIRX;
 	std::string CurrentGameArgs;
+	std::string CustomDataPath;
 	AspectRatioType CurrentAspectRatio = AspectRatioType::RAuto4_3_3_2;
 	// Fall back aspect ratio for games that have patches (when AspectRatioType::RAuto4_3_3_2) is active.
 	float CurrentCustomAspectRatio = 0.f;

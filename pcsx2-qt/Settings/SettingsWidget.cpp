@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SettingsWidget.h"
 
+#include <QtWidgets/QGridLayout>
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QScrollBar>
 #include <QtWidgets/QTabBar>
@@ -114,3 +115,30 @@ void SettingsWidget::updateTabMargins(QScrollArea* scroll_area)
 		scroll_area->widget()->layout()->setContentsMargins(-1, -1, -1, -1);
 	}
 }
+
+void SettingsWidget::reflowCheckBoxes(QGridLayout* layout)
+{
+	std::vector<QWidget*> widgets;
+
+	for (int row = 0; row < layout->rowCount(); row++)
+	{
+		for (int column = 0; column < layout->columnCount(); column++)
+		{
+			QLayoutItem* item = layout->itemAtPosition(row, column);
+			if (item && item->widget())
+			{
+				widgets.push_back(item->widget());
+				layout->removeWidget(item->widget());
+			}
+		}
+	}
+
+	for (size_t i = 0; i < widgets.size(); i++)
+	{
+		int row = static_cast<int>(i / 2);
+		int column = static_cast<int>(i % 2);
+		layout->addWidget(widgets[i], row, column);
+	}
+}
+
+#include "moc_SettingsWidget.cpp"

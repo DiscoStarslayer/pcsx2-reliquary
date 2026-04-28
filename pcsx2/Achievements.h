@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -73,9 +73,13 @@ namespace Achievements
 	/// Forces hardcore mode off until next reset.
 	void DisableHardcoreMode();
 
-	/// Prompts the user to disable hardcore mode, if they agree, returns true.
-	bool ConfirmHardcoreModeDisable(const char* trigger);
-	void ConfirmHardcoreModeDisableAsync(const char* trigger, std::function<void(bool)> callback);
+	/// Returns the translated title to display for the message box asking the
+	// user to disable hardcore mode.
+	const char* GetHardcoreModeDisableTitle();
+
+	/// Returns the translated text to display in the message box asking the
+	/// user to disable hardcore mode.
+	std::string GetHardcoreModeDisableText(const char* reason);
 
 	/// Returns true if hardcore mode is active, and functionality should be restricted.
 	bool IsHardcoreModeActive();

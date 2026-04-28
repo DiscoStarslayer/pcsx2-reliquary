@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -21,6 +21,14 @@ namespace D3D12MA
 	class Allocator;
 }
 
+struct D3D12CommandList
+{
+	// Main command list
+	wil::com_ptr_nothrow<ID3D12GraphicsCommandList4> list4;
+	// Enhanced barriers command list
+	wil::com_ptr_nothrow<ID3D12GraphicsCommandList7> list7;
+};
+
 class GSDevice12 final : public GSDevice
 {
 public:
@@ -42,6 +50,12 @@ public:
 		NUM_TIMESTAMP_QUERIES_PER_CMDLIST = 2,
 	};
 
+	union D3D12_RESOURCE_DESCU
+	{
+		D3D12_RESOURCE_DESC1 desc1;
+		D3D12_RESOURCE_DESC desc;
+	};
+
 	__fi IDXGIAdapter1* GetAdapter() const { return m_adapter.get(); }
 	__fi ID3D12Device* GetDevice() const { return m_device.get(); }
 	__fi ID3D12CommandQueue* GetCommandQueue() const { return m_command_queue.get(); }
@@ -50,14 +64,16 @@ public:
 	/// Returns the PCI vendor ID of the device, if known.
 	u32 GetAdapterVendorID() const;
 
+	bool UseEnhancedBarriers() const { return m_enhanced_barriers; }
+
 	/// Returns the current command list, commands can be recorded directly.
-	ID3D12GraphicsCommandList4* GetCommandList() const
+	const D3D12CommandList& GetCommandList() const
 	{
-		return m_command_lists[m_current_command_list].command_lists[1].get();
+		return m_command_lists[m_current_command_list].command_lists[1];
 	}
 
 	/// Returns the init command list for uploading.
-	ID3D12GraphicsCommandList4* GetInitCommandList();
+	const D3D12CommandList& GetInitCommandList();
 
 	/// Returns the per-frame SRV/CBV/UAV allocator.
 	D3D12DescriptorAllocator& GetDescriptorAllocator()
@@ -99,6 +115,9 @@ public:
 	/// Test for support for the specified texture format.
 	bool SupportsTextureFormat(DXGI_FORMAT format);
 
+	// Partial depth copies require ProgrammableSamplePositions tier 1.
+	bool SupportsProgrammableSamplePositions();
+
 	enum class WaitType
 	{
 		None, ///< Don't wait (async)
@@ -129,12 +148,13 @@ public:
 	// Allocates a temporary CPU staging buffer, fires the callback with it to populate, then copies to a GPU buffer.
 	bool AllocatePreinitializedGPUBuffer(u32 size, ID3D12Resource** gpu_buffer, D3D12MA::Allocation** gpu_allocation,
 		const std::function<void(void*)>& fill_callback);
+	void UploadIndices(D3D12StreamBuffer& buffer, const void* index, size_t count);
 
 private:
 	struct CommandListResources
 	{
 		std::array<ComPtr<ID3D12CommandAllocator>, 2> command_allocators;
-		std::array<ComPtr<ID3D12GraphicsCommandList4>, 2> command_lists;
+		std::array<D3D12CommandList, 2> command_lists;
 		D3D12DescriptorAllocator descriptor_allocator;
 		D3D12GroupedSamplerAllocator<SAMPLER_GROUP_SIZE> sampler_allocator;
 		std::vector<std::pair<D3D12MA::Allocation*, ID3D12DeviceChild*>> pending_resources;
@@ -143,6 +163,8 @@ private:
 		bool init_command_list_used = false;
 		bool has_timestamp_query = false;
 	};
+
+	void LoadAgilitySDK();
 
 	bool CreateDevice(u32& vendor_id);
 	bool CreateDescriptorHeaps();
@@ -170,6 +192,7 @@ private:
 	double m_timestamp_frequency = 0.0;
 	float m_accumulated_gpu_time = 0.0f;
 	bool m_gpu_timing_enabled = false;
+	bool m_programmable_sample_positions = false;
 
 	D3D12DescriptorHeapManager m_descriptor_heap_manager;
 	D3D12DescriptorHeapManager m_rtv_heap_manager;
@@ -190,6 +213,7 @@ public:
 			{
 				u32 topology : 2;
 				u32 rt : 1;
+				u32 ds_as_rt : 1;
 				u32 ds : 1;
 			};
 
@@ -253,9 +277,15 @@ public:
 
 	enum : u32
 	{
+		TEXTURE_TEXTURE = 0,
+		TEXTURE_PALETTE = 1,
+		TEXTURE_RT = 2,
+		TEXTURE_PRIMID = 3,
+		TEXTURE_DEPTH = 4,
+
 		NUM_TFX_CONSTANT_BUFFERS = 2,
 		NUM_TFX_TEXTURES = 2,
-		NUM_TFX_RT_TEXTURES = 2,
+		NUM_TFX_RT_TEXTURES = 3,
 		NUM_TOTAL_TFX_TEXTURES = NUM_TFX_TEXTURES + NUM_TFX_RT_TEXTURES,
 		NUM_TFX_SAMPLERS = 1,
 		NUM_UTILITY_TEXTURES = 1,
@@ -269,10 +299,12 @@ public:
 
 		TFX_ROOT_SIGNATURE_PARAM_VS_CBV = 0,
 		TFX_ROOT_SIGNATURE_PARAM_PS_CBV = 1,
-		TFX_ROOT_SIGNATURE_PARAM_VS_SRV = 2,
-		TFX_ROOT_SIGNATURE_PARAM_PS_TEXTURES = 3,
-		TFX_ROOT_SIGNATURE_PARAM_PS_SAMPLERS = 4,
-		TFX_ROOT_SIGNATURE_PARAM_PS_RT_TEXTURES = 5,
+		TFX_ROOT_SIGNATURE_PARAM_VS_VB_SRV = 2,
+		TFX_ROOT_SIGNATURE_PARAM_VS_IB_SRV = 3,
+		TFX_ROOT_SIGNATURE_PARAM_PS_TEXTURES = 4,
+		TFX_ROOT_SIGNATURE_PARAM_PS_SAMPLERS = 5,
+		TFX_ROOT_SIGNATURE_PARAM_PS_RT_TEXTURES = 6,
+		TFX_ROOT_SIGNATURE_PARAM_VS_PUSH_CONSTANTS = 7,
 
 		UTILITY_ROOT_SIGNATURE_PARAM_PUSH_CONSTANTS = 0,
 		UTILITY_ROOT_SIGNATURE_PARAM_PS_TEXTURES = 1,
@@ -292,6 +324,9 @@ private:
 	bool m_allow_tearing_supported = false;
 	bool m_using_allow_tearing = false;
 	bool m_is_exclusive_fullscreen = false;
+	bool m_uma = false;
+	bool m_typed_casting_supported = false;
+	bool m_enhanced_barriers = false;
 	bool m_device_lost = false;
 
 	ComPtr<ID3D12RootSignature> m_tfx_root_signature;
@@ -299,6 +334,7 @@ private:
 
 	D3D12StreamBuffer m_vertex_stream_buffer;
 	D3D12StreamBuffer m_index_stream_buffer;
+	D3D12StreamBuffer m_expand_index_stream_buffer;
 	D3D12StreamBuffer m_vertex_constant_buffer;
 	D3D12StreamBuffer m_pixel_constant_buffer;
 	D3D12StreamBuffer m_texture_stream_buffer;
@@ -333,6 +369,7 @@ private:
 
 	GSHWDrawConfig::VSConstantBuffer m_vs_cb_cache;
 	GSHWDrawConfig::PSConstantBuffer m_ps_cb_cache;
+	GSHWDrawConfig::VSPushConstants m_vs_pc_cache;
 
 	D3D12ShaderCache m_shader_cache;
 	ComPtr<ID3DBlob> m_convert_vs;
@@ -373,6 +410,8 @@ private:
 	ComPtr<ID3DBlob> GetUtilityVertexShader(const std::string& source, const char* entry_point);
 	ComPtr<ID3DBlob> GetUtilityPixelShader(const std::string& source, const char* entry_point);
 
+	void FeedbackBarrier(const GSTexture12* texture);
+
 	bool CheckFeatures(const u32& vendor_id);
 	bool CreateNullTexture();
 	bool CreateBuffers();
@@ -390,6 +429,10 @@ private:
 
 	void DestroyResources();
 
+protected:
+	virtual void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+		GSHWDrawConfig::ColorMaskSelector cms, ShaderConvert shader, bool linear) override;
+
 public:
 	GSDevice12();
 	~GSDevice12() override;
@@ -403,7 +446,7 @@ public:
 	void Destroy() override;
 
 	bool UpdateWindow() override;
-	void ResizeWindow(s32 new_window_width, s32 new_window_height, float new_window_scale) override;
+	void ResizeWindow(u32 new_window_width, u32 new_window_height, float new_window_scale) override;
 	bool SupportsExclusiveFullscreen() const override;
 	void DestroySurface() override;
 	std::string GetDriverInfo() const override;
@@ -420,18 +463,20 @@ public:
 	void PopDebugGroup() override;
 	void InsertDebugMessage(DebugMessageCategory category, const char* fmt, ...) override;
 
+	// Helpers and utility draws.
 	void DrawPrimitive();
 	void DrawIndexedPrimitive();
 	void DrawIndexedPrimitive(int offset, int count);
+	void DrawIndexedPrimitiveVSExpand(int offset, int count, bool vs_indexing, int vs_indexing_expansion);
+
+	// Main GS primitive draws.
+	void Draw(const GSHWDrawConfig& config);
+	void Draw(const GSHWDrawConfig& config, int offset, int count);
 
 	std::unique_ptr<GSDownloadTexture> CreateDownloadTexture(u32 width, u32 height, GSTexture::Format format) override;
 
 	void CopyRect(GSTexture* sTex, GSTexture* dTex, const GSVector4i& r, u32 destX, u32 destY) override;
 
-	void StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
-		ShaderConvert shader = ShaderConvert::COPY, bool linear = true) override;
-	void StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, bool red,
-		bool green, bool blue, bool alpha, ShaderConvert shader = ShaderConvert::COPY) override;
 	void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
 		PresentShader shader, float shaderTime, bool linear) override;
 	void UpdateCLUTTexture(
@@ -455,21 +500,26 @@ public:
 
 	void IASetVertexBuffer(const void* vertex, size_t stride, size_t count);
 	void IASetIndexBuffer(const void* index, size_t count);
+	void VSSetIndexBuffer(const void* index, size_t count);
 
-	void PSSetShaderResource(int i, GSTexture* sr, bool check_state);
+	void PSSetShaderResource(int i, GSTexture* sr, bool check_state, bool feedback = false);
 	void PSSetSampler(GSHWDrawConfig::SamplerSelector sel);
 
-	void OMSetRenderTargets(GSTexture* rt, GSTexture* ds, const GSVector4i& scissor);
+	void OMSetRenderTargets(GSTexture* rt, GSTexture* ds, GSTexture* ds_as_rt, const GSVector4i& scissor,
+		bool depth_read = false);
 
 	void SetVSConstantBuffer(const GSHWDrawConfig::VSConstantBuffer& cb);
 	void SetPSConstantBuffer(const GSHWDrawConfig::PSConstantBuffer& cb);
+	void SetVSPushConstants(u32 base_vertex, u32 base_index = 0, bool force_update = false);
 	bool BindDrawPipeline(const PipelineSelector& p);
 
 	void RenderHW(GSHWDrawConfig& config) override;
-	void SendHWDraw(const PipelineSelector& pipe, const GSHWDrawConfig& config, GSTexture12* draw_rt_clone, GSTexture12* draw_rt, const bool one_barrier, const bool full_barrier, const bool skip_first_barrier);
+	void SendHWDraw(const PipelineSelector& pipe, const GSHWDrawConfig& config, GSTexture12* draw_rt,
+		GSTexture12* draw_ds, const bool feedback_rt, const bool feedback_depth, const bool one_barrier,
+		const bool full_barrier);
 
 	void UpdateHWPipelineSelector(GSHWDrawConfig& config);
-	void UploadHWDrawVerticesAndIndices(const GSHWDrawConfig& config);
+	void UploadHWDrawVerticesAndIndices(GSHWDrawConfig& config);
 
 public:
 	/// Ends any render pass, executes the command buffer, and invalidates cached state.
@@ -531,29 +581,34 @@ private:
 		DIRTY_FLAG_VS_CONSTANT_BUFFER_BINDING = (1 << 5),
 		DIRTY_FLAG_PS_CONSTANT_BUFFER_BINDING = (1 << 6),
 		DIRTY_FLAG_VS_VERTEX_BUFFER_BINDING = (1 << 7),
-		DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE = (1 << 8),
-		DIRTY_FLAG_SAMPLERS_DESCRIPTOR_TABLE = (1 << 9),
-		DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE_2 = (1 << 10),
+		DIRTY_FLAG_VS_INDEX_BUFFER_BINDING = (1 << 8),
+		DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE = (1 << 9),
+		DIRTY_FLAG_SAMPLERS_DESCRIPTOR_TABLE = (1 << 10),
+		DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE_2 = (1 << 11),
+		DIRTY_FLAG_VS_PUSH_CONSTANTS = (1 << 12),
 
-		DIRTY_FLAG_VERTEX_BUFFER = (1 << 11),
-		DIRTY_FLAG_INDEX_BUFFER = (1 << 12),
-		DIRTY_FLAG_PRIMITIVE_TOPOLOGY = (1 << 13),
-		DIRTY_FLAG_VIEWPORT = (1 << 14),
-		DIRTY_FLAG_SCISSOR = (1 << 15),
-		DIRTY_FLAG_RENDER_TARGET = (1 << 16),
-		DIRTY_FLAG_PIPELINE = (1 << 17),
-		DIRTY_FLAG_BLEND_CONSTANTS = (1 << 18),
-		DIRTY_FLAG_STENCIL_REF = (1 << 19),
+		DIRTY_FLAG_VERTEX_BUFFER = (1 << 13),
+		DIRTY_FLAG_INDEX_BUFFER = (1 << 14),
+		DIRTY_FLAG_PRIMITIVE_TOPOLOGY = (1 << 15),
+		DIRTY_FLAG_VIEWPORT = (1 << 16),
+		DIRTY_FLAG_SCISSOR = (1 << 17),
+		DIRTY_FLAG_RENDER_TARGET = (1 << 18),
+		DIRTY_FLAG_PIPELINE = (1 << 19),
+		DIRTY_FLAG_BLEND_CONSTANTS = (1 << 20),
+		DIRTY_FLAG_STENCIL_REF = (1 << 21),
 
-		DIRTY_BASE_STATE = DIRTY_FLAG_VS_CONSTANT_BUFFER_BINDING | DIRTY_FLAG_PS_CONSTANT_BUFFER_BINDING |
-		                   DIRTY_FLAG_VS_VERTEX_BUFFER_BINDING | DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE |
-		                   DIRTY_FLAG_SAMPLERS_DESCRIPTOR_TABLE | DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE_2 |
-		                   DIRTY_FLAG_VERTEX_BUFFER | DIRTY_FLAG_INDEX_BUFFER | DIRTY_FLAG_PRIMITIVE_TOPOLOGY |
+		DIRTY_ROOT_PARAMS = DIRTY_FLAG_VS_CONSTANT_BUFFER_BINDING | DIRTY_FLAG_PS_CONSTANT_BUFFER_BINDING |
+		                    DIRTY_FLAG_VS_VERTEX_BUFFER_BINDING | DIRTY_FLAG_VS_INDEX_BUFFER_BINDING |
+		                    DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE | DIRTY_FLAG_SAMPLERS_DESCRIPTOR_TABLE |
+		                    DIRTY_FLAG_TEXTURES_DESCRIPTOR_TABLE_2 | DIRTY_FLAG_VS_PUSH_CONSTANTS,
+
+		DIRTY_BASE_STATE = DIRTY_FLAG_VERTEX_BUFFER | DIRTY_FLAG_INDEX_BUFFER | DIRTY_FLAG_PRIMITIVE_TOPOLOGY |
 		                   DIRTY_FLAG_VIEWPORT | DIRTY_FLAG_SCISSOR | DIRTY_FLAG_RENDER_TARGET | DIRTY_FLAG_PIPELINE |
 		                   DIRTY_FLAG_BLEND_CONSTANTS | DIRTY_FLAG_STENCIL_REF,
 
-		DIRTY_TFX_STATE =
-			DIRTY_BASE_STATE | DIRTY_FLAG_TFX_TEXTURES | DIRTY_FLAG_TFX_SAMPLERS | DIRTY_FLAG_TFX_RT_TEXTURES,
+		DIRTY_TFX_STATE = DIRTY_BASE_STATE | DIRTY_ROOT_PARAMS | DIRTY_FLAG_TFX_TEXTURES | DIRTY_FLAG_TFX_SAMPLERS |
+		                  DIRTY_FLAG_TFX_RT_TEXTURES,
+
 		DIRTY_UTILITY_STATE = DIRTY_BASE_STATE,
 		DIRTY_CONSTANT_BUFFER_STATE = DIRTY_FLAG_VS_CONSTANT_BUFFER | DIRTY_FLAG_PS_CONSTANT_BUFFER,
 	};
@@ -579,7 +634,9 @@ private:
 	D3D12_PRIMITIVE_TOPOLOGY m_primitive_topology = {};
 
 	GSTexture12* m_current_render_target = nullptr;
+	GSTexture12* m_current_depth_render_target = nullptr;
 	GSTexture12* m_current_depth_target = nullptr;
+	bool m_current_depth_read_only = false;
 
 	D3D12_VIEWPORT m_viewport = {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 1.0f};
 	GSVector4i m_scissor = GSVector4i::zero();

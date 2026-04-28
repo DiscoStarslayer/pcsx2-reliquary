@@ -1,11 +1,13 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "BreakpointModel.h"
 
+#include "AsyncDialogs.h"
 #include "QtHost.h"
 #include "QtUtils.h"
 #include "Debugger/DebuggerSettingsManager.h"
+#include "Debugger/DebuggerWindow.h"
 
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/Breakpoints.h"
@@ -13,7 +15,6 @@
 #include "common/Console.h"
 
 #include <QtCore/QPointer>
-#include <QtWidgets/QMessageBox>
 
 #include <algorithm>
 
@@ -385,7 +386,7 @@ bool BreakpointModel::setData(const QModelIndex& index, const QVariant& value, i
 				std::string error;
 				if (!m_cpu.initExpression(condValue.toLocal8Bit().constData(), expr, error))
 				{
-					QMessageBox::warning(nullptr, "Condition Error", QString::fromStdString(error));
+					AsyncDialogs::warning(g_debugger_window, "Condition Error", QString::fromStdString(error));
 					return false;
 				}
 
@@ -419,7 +420,7 @@ bool BreakpointModel::setData(const QModelIndex& index, const QVariant& value, i
 				std::string error;
 				if (!m_cpu.initExpression(condValue.toLocal8Bit().constData(), expr, error))
 				{
-					QMessageBox::warning(nullptr, "Condition Error", QString::fromStdString(error));
+					AsyncDialogs::warning(g_debugger_window, "Condition Error", QString::fromStdString(error));
 					return false;
 				}
 
@@ -698,3 +699,5 @@ void BreakpointModel::clear()
 	m_breakpoints.clear();
 	endResetModel();
 }
+
+#include "moc_BreakpointModel.cpp"

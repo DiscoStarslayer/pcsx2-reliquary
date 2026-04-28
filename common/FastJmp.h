@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -10,7 +10,7 @@ struct fastjmp_buf
 {
 #if defined(_WIN32)
 	static constexpr std::size_t BUF_SIZE = 240;
-#elif defined(_M_ARM64)
+#elif defined(ARCH_ARM64)
 	static constexpr std::size_t BUF_SIZE = 168;
 #else
 	static constexpr std::size_t BUF_SIZE = 64;

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DebuggerView.h"
@@ -310,3 +310,5 @@ std::vector<QAction*> DebuggerView::createEventActionsImplementation(
 
 	return actions;
 }
+
+#include "moc_DebuggerView.cpp"

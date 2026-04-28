@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <QtWidgets/QMessageBox>
@@ -42,17 +42,14 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* settings_dialog, 
 	m_ui.eeClampMode->setCurrentIndex(getClampingModeIndex(-1));
 	m_ui.vu0ClampMode->setCurrentIndex(getClampingModeIndex(0));
 	m_ui.vu1ClampMode->setCurrentIndex(getClampingModeIndex(1));
-	connect(m_ui.eeClampMode, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index) { setClampingMode(-1, index); });
-	connect(m_ui.vu0ClampMode, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index) { setClampingMode(0, index); });
-	connect(m_ui.vu1ClampMode, QOverload<int>::of(&QComboBox::currentIndexChanged), [this](int index) { setClampingMode(1, index); });
+	connect(m_ui.eeClampMode, &QComboBox::currentIndexChanged, [this](int index) { setClampingMode(-1, index); });
+	connect(m_ui.vu0ClampMode, &QComboBox::currentIndexChanged, [this](int index) { setClampingMode(0, index); });
+	connect(m_ui.vu1ClampMode, &QComboBox::currentIndexChanged, [this](int index) { setClampingMode(1, index); });
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.iopRecompiler, "EmuCore/CPU/Recompiler", "EnableIOP", true);
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.gameFixes, "EmuCore", "EnableGameFixes", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.patches, "EmuCore", "EnablePatches", true);
-
-	dialog()->registerWidgetHelp(m_ui.savestateSelector, tr("Use Save State Selector"), tr("Checked"),
-		tr("Show a save state selector UI when switching slots instead of showing a notification bubble."));
 
 	SettingWidgetBinder::BindWidgetToIntSetting(
 		sif, m_ui.savestateCompressionMethod, "EmuCore", "SavestateCompressionType", static_cast<int>(SavestateCompressionMethod::Zstandard));
@@ -60,12 +57,11 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* settings_dialog, 
 	SettingWidgetBinder::BindWidgetToIntSetting(
 		sif, m_ui.savestateCompressionLevel, "EmuCore", "SavestateCompressionRatio", static_cast<int>(SavestateCompressionLevel::Medium));
 
-	connect(m_ui.savestateCompressionMethod, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+	connect(m_ui.savestateCompressionMethod, &QComboBox::currentIndexChanged, this,
 		&AdvancedSettingsWidget::onSavestateCompressionTypeChanged);
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.backupSaveStates, "EmuCore", "BackupSavestate", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.saveStateOnShutdown, "EmuCore", "SaveStateOnShutdown", false);
-	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.savestateSelector, "EmuCore", "UseSavestateSelector", true);
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.pineEnable, "EmuCore", "EnablePINE", false);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_ui.pineSlot, "EmuCore", "PINESlot", 28011);
@@ -114,8 +110,8 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* settings_dialog, 
 		   "end of the block, not on the instruction which caused the exception. Refer to the console to see the address where the invalid "
 		   "access occurred."));
 
-	dialog()->registerWidgetHelp(m_ui.extraMemory, tr("Enable 128MB RAM (Dev Console)"), tr("Unchecked"),
-		tr("Exposes an additional 96MB of memory to the virtual machine."));
+	dialog()->registerWidgetHelp(m_ui.extraMemory, tr("Enable Extended RAM (Dev Console)"), tr("Unchecked"),
+		tr("Exposes additional memory to the virtual machine, expanding the EE and IOP memory to 128MB and 8MB respectively."));
 
 	dialog()->registerWidgetHelp(m_ui.vu0RoundingMode, tr("VU0 Rounding Mode"), tr("Chop/Zero (Default)"), tr("Changes how PCSX2 handles rounding while emulating the Emotion Engine's Vector Unit 0 (EE VU0). "
 																											  "The default value handles the vast majority of games; <b>modifying this setting when a game is not having a visible problem will cause stability issues and/or crashes.</b>"));
@@ -273,3 +269,5 @@ void AdvancedSettingsWidget::onBrowseClicked(QLineEdit* pathElement)
 	pathElement->setText(path);
 	pathElement->editingFinished();
 }
+
+#include "moc_AdvancedSettingsWidget.cpp"

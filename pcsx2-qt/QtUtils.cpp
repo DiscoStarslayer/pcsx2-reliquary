@@ -1,17 +1,18 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "QtUtils.h"
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QFileInfo>
+#include <QtCore/QLocale>
 #include <QtCore/QtGlobal>
 #include <QtCore/QMetaObject>
 #include <QtGui/QAction>
-#include <QtGui/QGuiApplication>
 #include <QtGui/QDesktopServices>
+#include <QtGui/QIcon>
 #include <QtGui/QKeyEvent>
-#include <QtGui/QScreen>
+#include <QtGui/QPainter>
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDialog>
 #include <QtWidgets/QHeaderView>
@@ -36,12 +37,11 @@
 
 #include "common/CocoaTools.h"
 #include "common/Console.h"
+#include "QtHost.h"
 
 #if defined(_WIN32)
 #include "common/RedtapeWindows.h"
 #include <Shlobj.h>
-#elif !defined(APPLE)
-#include <qpa/qplatformnativeinterface.h>
 #endif
 
 namespace QtUtils
@@ -90,7 +90,9 @@ namespace QtUtils
 
 		const int min_column_width = header->minimumSectionSize();
 		const int scrollbar_width = ((view->verticalScrollBar() && view->verticalScrollBar()->isVisible()) ||
-			view->verticalScrollBarPolicy() == Qt::ScrollBarAlwaysOn) ? view->verticalScrollBar()->width() : 0;
+										view->verticalScrollBarPolicy() == Qt::ScrollBarAlwaysOn) ?
+		                                view->verticalScrollBar()->width() :
+		                                0;
 		int num_flex_items = 0;
 		int total_width = 0;
 		int column_index = 0;
@@ -137,6 +139,128 @@ namespace QtUtils
 		ResizeColumnsForView(view, widths);
 	}
 
+	void resizeAndScalePixmap(QPixmap* pm, const int expected_width, const int expected_height, const qreal dpr, const ScalingMode scaling_mode, const float opacity)
+	{
+		if (!pm || pm->width() <= 0 || pm->height() <= 0)
+			return;
+
+		if (dpr <= 0.0)
+		{
+			Console.ErrorFmt("resizeAndScalePixmap: Invalid device pixel ratio ({}) - pixmap will be null", dpr);
+			*pm = QPixmap();
+			return;
+		}
+
+		const int dpr_expected_width = qRound(expected_width * dpr);
+		const int dpr_expected_height = qRound(expected_height * dpr);
+
+		if (pm->width() == dpr_expected_width &&
+			pm->height() == dpr_expected_height &&
+			pm->devicePixelRatio() == dpr &&
+			opacity == 100.0f)
+		{
+			switch (scaling_mode)
+			{
+				case ScalingMode::Fit:
+				case ScalingMode::Stretch:
+				case ScalingMode::Center:
+					return;
+
+				case ScalingMode::Fill:
+				case ScalingMode::Tile:
+				default:
+					break;
+			}
+		}
+
+		QPixmap final_pixmap(dpr_expected_width, dpr_expected_height);
+		final_pixmap.setDevicePixelRatio(dpr);
+		final_pixmap.fill(Qt::transparent);
+
+		QPainter painter;
+		painter.begin(&final_pixmap);
+		painter.setRenderHint(QPainter::Antialiasing, true);
+		painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+		painter.setOpacity(opacity / 100.0f);
+		painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+
+		const QRectF srcRect(0, 0, pm->width(), pm->height());
+		const QRectF painterRect(0, 0, expected_width, expected_height);
+
+		switch (scaling_mode)
+		{
+			case ScalingMode::Fit:
+			case ScalingMode::Fill:
+			{
+				auto const aspect_mode = (scaling_mode == ScalingMode::Fit) ?
+				                             Qt::KeepAspectRatio :
+				                             Qt::KeepAspectRatioByExpanding;
+
+				QSizeF scaledSize(pm->width(), pm->height());
+				scaledSize.scale(dpr_expected_width, dpr_expected_height, aspect_mode);
+
+				*pm = pm->scaled(
+					qRound(scaledSize.width()),
+					qRound(scaledSize.height()),
+					Qt::IgnoreAspectRatio,
+					Qt::SmoothTransformation);
+
+				const QRectF scaledSrcRect(0, 0, pm->width(), pm->height());
+
+				QSizeF logicalSize = pm->size() / dpr;
+				QRectF destRect(QPointF(0, 0), logicalSize);
+
+				destRect.moveCenter(painterRect.center());
+
+				painter.drawPixmap(destRect, *pm, scaledSrcRect);
+				break;
+			}
+			case ScalingMode::Stretch:
+			{
+				painter.drawPixmap(painterRect, *pm, srcRect);
+				break;
+			}
+			case ScalingMode::Center:
+			{
+				const qreal pmWidth = pm->width() / dpr;
+				const qreal pmHeight = pm->height() / dpr;
+
+				QRectF destRect(0, 0, pmWidth, pmHeight);
+				destRect.moveCenter(painterRect.center());
+
+				painter.drawPixmap(destRect, *pm, srcRect);
+				break;
+			}
+			case ScalingMode::Tile:
+			{
+				const qreal tileWidth = pm->width() / dpr;
+				const qreal tileHeight = pm->height() / dpr;
+
+				if (tileWidth <= 0 || tileHeight <= 0)
+					break;
+
+				if (pm->devicePixelRatio() == dpr)
+				{
+					QBrush tileBrush(*pm);
+					painter.fillRect(painterRect, tileBrush);
+				}
+				else
+				{
+					QPixmap tileSource = pm->scaled(tileWidth, tileHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+					tileSource.setDevicePixelRatio(dpr);
+					QBrush tileBrush(tileSource);
+					tileBrush.setTextureImage(tileSource.toImage());
+					painter.fillRect(painterRect, tileBrush);
+				}
+				break;
+			}
+			default:
+				break;
+		}
+		painter.end();
+		*pm = std::move(final_pixmap);
+	}
+
 	void ShowInFileExplorer(QWidget* parent, const QFileInfo& file)
 	{
 #if defined(_WIN32)
@@ -163,12 +287,12 @@ namespace QtUtils
 	{
 #if defined(_WIN32)
 		//: Windows action to show a file in Windows Explorer
-		return QCoreApplication::translate("FileOperations", "Show in Folder");
+		return QCoreApplication::translate("FileOperations", "Show in Explorer");
 #elif defined(__APPLE__)
 		//: macOS action to show a file in Finder
 		return QCoreApplication::translate("FileOperations", "Show in Finder");
 #else
-		//: Opens the system file manager to the directory containing a selected file
+		//: Linux/*NIX: Opens the system file manager to the directory containing a selected file
 		return QCoreApplication::translate("FileOperations", "Open Containing Directory");
 #endif
 	}
@@ -242,6 +366,25 @@ namespace QtUtils
 		}
 	}
 
+	void SetWindowResizeable(QWindow* window, bool resizeable)
+	{
+		if (resizeable)
+		{
+			// Min/max numbers come from uic.
+			window->setMinimumWidth(1);
+			window->setMinimumHeight(1);
+			window->setMaximumWidth(16777215);
+			window->setMaximumHeight(16777215);
+		}
+		else
+		{
+			window->setMinimumWidth(window->width());
+			window->setMinimumHeight(window->height());
+			window->setMaximumWidth(window->width());
+			window->setMaximumHeight(window->height());
+		}
+	}
+
 	void ResizePotentiallyFixedSizeWindow(QWidget* widget, int width, int height)
 	{
 		width = std::max(width, 1);
@@ -252,66 +395,20 @@ namespace QtUtils
 		widget->resize(width, height);
 	}
 
-	std::optional<WindowInfo> GetWindowInfoForWidget(QWidget* widget)
+	void ResizePotentiallyFixedSizeWindow(QWindow* window, int width, int height)
 	{
-		WindowInfo wi;
+		width = std::max(width, 1);
+		height = std::max(height, 1);
 
-		// Windows and Apple are easy here since there's no display connection.
-#if defined(_WIN32)
-		wi.type = WindowInfo::Type::Win32;
-		wi.window_handle = reinterpret_cast<void*>(widget->winId());
-#elif defined(__APPLE__)
-		wi.type = WindowInfo::Type::MacOS;
-		wi.window_handle = reinterpret_cast<void*>(widget->winId());
-#else
-		QPlatformNativeInterface* pni = QGuiApplication::platformNativeInterface();
-		const QString platform_name = QGuiApplication::platformName();
-		if (platform_name == QStringLiteral("xcb"))
+		if (window->minimumHeight() == window->maximumHeight())
 		{
-			// Can't get a handle for an unmapped window in X, it doesn't like it.
-			if (!widget->isVisible())
-			{
-				Console.WriteLn("Returning null window info for widget because it is not visible.");
-				return std::nullopt;
-			}
-
-			wi.type = WindowInfo::Type::X11;
-			wi.display_connection = pni->nativeResourceForWindow("display", widget->windowHandle());
-			wi.window_handle = reinterpret_cast<void*>(widget->winId());
-		}
-		else if (platform_name == QStringLiteral("wayland"))
-		{
-			wi.type = WindowInfo::Type::Wayland;
-			wi.display_connection = pni->nativeResourceForWindow("display", widget->windowHandle());
-			wi.window_handle = pni->nativeResourceForWindow("surface", widget->windowHandle());
-		}
-		else
-		{
-			Console.WriteLn("Unknown PNI platform '%s'.", platform_name.toUtf8().constData());
-			return std::nullopt;
-		}
-#endif
-
-		const qreal dpr = widget->devicePixelRatioF();
-		wi.surface_width = static_cast<u32>(static_cast<qreal>(widget->width()) * dpr);
-		wi.surface_height = static_cast<u32>(static_cast<qreal>(widget->height()) * dpr);
-		wi.surface_scale = static_cast<float>(dpr);
-
-		// Query refresh rate, we need it for sync.
-		std::optional<float> surface_refresh_rate = WindowInfo::QueryRefreshRateForWindow(wi);
-		if (!surface_refresh_rate.has_value())
-		{
-			// Fallback to using the screen, getting the rate for Wayland is an utter mess otherwise.
-			const QScreen* widget_screen = widget->screen();
-			if (!widget_screen)
-				widget_screen = QGuiApplication::primaryScreen();
-			surface_refresh_rate = widget_screen ? static_cast<float>(widget_screen->refreshRate()) : 0.0f;
+			window->setMinimumWidth(width);
+			window->setMinimumHeight(height);
+			window->setMaximumWidth(width);
+			window->setMaximumHeight(height);
 		}
 
-		wi.surface_refresh_rate = surface_refresh_rate.value();
-		INFO_LOG("Surface refresh rate: {} hz", wi.surface_refresh_rate);
-
-		return wi;
+		window->resize(width, height);
 	}
 
 	QString AbstractItemModelToCSV(QAbstractItemModel* model, int role, bool useQuotes)
@@ -344,11 +441,6 @@ namespace QtUtils
 			csv += "\n";
 		}
 		return csv;
-	}
-
-	bool IsLightTheme(const QPalette& palette)
-	{
-		return palette.text().color().lightnessF() < 0.5;
 	}
 
 	bool IsCompositorManagerRunning()
@@ -395,5 +487,67 @@ namespace QtUtils
 	void SetScalableIcon(QLabel* lbl, const QIcon& icon, const QSize& size)
 	{
 		new IconVariableDpiFilter(lbl, icon, size, lbl);
+	}
+
+	QString GetSystemLanguageCode()
+	{
+		std::vector<std::pair<QString, QString>> available = QtHost::GetAvailableLanguageList();
+		QString locale = QLocale::system().name();
+		locale.replace('_', '-');
+		for (const std::pair<QString, QString>& entry : available)
+		{
+			if (entry.second == locale)
+				return locale;
+		}
+		QStringView lang = QStringView(locale);
+		lang = lang.left(lang.indexOf('-'));
+		for (const std::pair<QString, QString>& entry : available)
+		{
+			QStringView avail = QStringView(entry.second);
+			avail = avail.left(avail.indexOf('-'));
+			if (avail == lang)
+				return entry.second;
+		}
+		// No matches, default to English
+		return QStringLiteral("en-US");
+	}
+
+	QIcon GetFlagIconForLanguage(const QString& language_code)
+	{
+		QString actual_language_code = language_code;
+		if (language_code == QStringLiteral("system"))
+		{
+			actual_language_code = GetSystemLanguageCode();
+		}
+
+		QString country_code;
+
+		const int dash_index = actual_language_code.indexOf('-');
+		if (dash_index > 0 && dash_index < actual_language_code.length() - 1)
+		{
+			country_code = actual_language_code.mid(dash_index + 1);
+		}
+		else
+		{
+			if (actual_language_code == QStringLiteral("en"))
+				country_code = QStringLiteral("US");
+			else
+				return QIcon(); // No flag available
+		}
+
+		// Special cases
+		if (actual_language_code == QStringLiteral("es-419"))
+		{
+			// Latin America (es-419) use Mexico flag as representative
+			country_code = QStringLiteral("MX");
+		}
+		else if (actual_language_code == QStringLiteral("sr-SP"))
+		{
+			// Serbia (SP) is not a valid ISO code, use RS (Serbia)
+			country_code = QStringLiteral("RS");
+		}
+
+		const QString flag_path = QStringLiteral("%1/icons/flags/%2.svg").arg(QtHost::GetResourcesBasePath()).arg(country_code.toLower());
+		return QIcon(flag_path);
 	}
 } // namespace QtUtils

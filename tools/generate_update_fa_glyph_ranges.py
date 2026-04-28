@@ -7,7 +7,7 @@ import re
 import functools
 
 # PCSX2 - PS2 Emulator for PCs
-# Copyright (C) 2002-2025 PCSX2 Dev Team
+# Copyright (C) 2002-2026 PCSX2 Dev Team
 #
 # PCSX2 is free software: you can redistribute it and/or modify it under the terms
 # of the GNU General Public License as published by the Free Software Found-
@@ -23,7 +23,7 @@ import functools
 # pylint: disable=bare-except, disable=missing-function-docstring
 
 src_dirs = [os.path.join(os.path.dirname(__file__), "..", "pcsx2"), os.path.join(os.path.dirname(__file__), "..", "pcsx2-qt")]
-fa_file = os.path.join(os.path.dirname(__file__), "..", "3rdparty", "include", "IconsFontAwesome6.h")
+fa_file = os.path.join(os.path.dirname(__file__), "..", "3rdparty", "include", "IconsFontAwesome.h")
 pf_file = os.path.join(os.path.dirname(__file__), "..", "3rdparty", "include", "IconsPromptFont.h")
 dst_file = os.path.join(os.path.dirname(__file__), "..", "pcsx2", "ImGui", "ImGuiManager.cpp")
 

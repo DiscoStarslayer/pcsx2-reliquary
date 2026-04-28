@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <QtWidgets/QMessageBox>
@@ -62,8 +62,8 @@ DEV9SettingsWidget::DEV9SettingsWidget(SettingsWindow* settings_dialog, QWidget*
 	//////////////////////////////////////////////////////////////////////////
 	// Eth Device Settings
 	//////////////////////////////////////////////////////////////////////////
-	connect(m_ui.ethDevType, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &DEV9SettingsWidget::onEthDeviceTypeChanged);
-	connect(m_ui.ethDev, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &DEV9SettingsWidget::onEthDeviceChanged);
+	connect(m_ui.ethDevType, &QComboBox::currentIndexChanged, this, &DEV9SettingsWidget::onEthDeviceTypeChanged);
+	connect(m_ui.ethDev, &QComboBox::currentIndexChanged, this, &DEV9SettingsWidget::onEthDeviceChanged);
 	//Comboboxes populated in show event
 
 	//////////////////////////////////////////////////////////////////////////
@@ -125,12 +125,12 @@ DEV9SettingsWidget::DEV9SettingsWidget(SettingsWindow* settings_dialog, QWidget*
 	SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.ethDNS1Mode, "DEV9/Eth", "ModeDNS1",
 		s_dns_name, Pcsx2Config::DEV9Options::DnsModeNames, Pcsx2Config::DEV9Options::DnsModeNames[static_cast<int>(Pcsx2Config::DEV9Options::DnsMode::Auto)], "DEV9SettingsWidget");
 	onEthDNSModeChanged(m_ui.ethDNS1Mode, m_ui.ethDNS1Mode->currentIndex(), m_ui.ethDNS1Addr, "DEV9/Eth", "ModeDNS1");
-	connect(m_ui.ethDNS1Mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [&](int index) { onEthDNSModeChanged(m_ui.ethDNS1Mode, index, m_ui.ethDNS1Addr, "DEV9/Eth", "ModeDNS1"); });
+	connect(m_ui.ethDNS1Mode, &QComboBox::currentIndexChanged, this, [&](int index) { onEthDNSModeChanged(m_ui.ethDNS1Mode, index, m_ui.ethDNS1Addr, "DEV9/Eth", "ModeDNS1"); });
 
 	SettingWidgetBinder::BindWidgetToEnumSetting(sif, m_ui.ethDNS2Mode, "DEV9/Eth", "ModeDNS2",
 		s_dns_name, Pcsx2Config::DEV9Options::DnsModeNames, Pcsx2Config::DEV9Options::DnsModeNames[static_cast<int>(Pcsx2Config::DEV9Options::DnsMode::Auto)], "DEV9SettingsWidget");
 	onEthDNSModeChanged(m_ui.ethDNS2Mode, m_ui.ethDNS2Mode->currentIndex(), m_ui.ethDNS2Addr, "DEV9/Eth", "ModeDNS2");
-	connect(m_ui.ethDNS2Mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [&](int index) { onEthDNSModeChanged(m_ui.ethDNS2Mode, index, m_ui.ethDNS2Addr, "DEV9/Eth", "ModeDNS2"); });
+	connect(m_ui.ethDNS2Mode, &QComboBox::currentIndexChanged, this, [&](int index) { onEthDNSModeChanged(m_ui.ethDNS2Mode, index, m_ui.ethDNS2Addr, "DEV9/Eth", "ModeDNS2"); });
 
 	//////////////////////////////////////////////////////////////////////////
 	// DNS Settings
@@ -139,12 +139,12 @@ DEV9SettingsWidget::DEV9SettingsWidget(SettingsWindow* settings_dialog, QWidget*
 
 	QStringList headers;
 	headers.push_back(tr("Name"));
-	headers.push_back(tr("Url"));
+	headers.push_back(tr("Hostname"));
 	headers.push_back(tr("Address"));
 	headers.push_back(tr("Enabled"));
 	m_ethHost_model->setHorizontalHeaderLabels(headers);
 
-	connect(m_ethHost_model, QOverload<QStandardItem*>::of(&QStandardItemModel::itemChanged), this, &DEV9SettingsWidget::onEthHostEdit);
+	connect(m_ethHost_model, &QStandardItemModel::itemChanged, this, &DEV9SettingsWidget::onEthHostEdit);
 
 	m_ethHosts_proxy = new QSortFilterProxyModel(m_ui.ethHosts);
 	m_ethHosts_proxy->setSourceModel(m_ethHost_model);
@@ -186,7 +186,7 @@ DEV9SettingsWidget::DEV9SettingsWidget(SettingsWindow* settings_dialog, QWidget*
 	connect(m_ui.hddFile, &QLineEdit::editingFinished, this, &DEV9SettingsWidget::onHddFileEdit);
 	connect(m_ui.hddBrowseFile, &QPushButton::clicked, this, &DEV9SettingsWidget::onHddBrowseFileClicked);
 
-	connect(m_ui.hddSizeSlider, QOverload<int>::of(&QSlider::valueChanged), this, &DEV9SettingsWidget::onHddSizeSlide);
+	connect(m_ui.hddSizeSlider, &QSlider::valueChanged, this, &DEV9SettingsWidget::onHddSizeSlide);
 	SettingWidgetBinder::SettingAccessor<QSpinBox>::connectValueChanged(m_ui.hddSizeSpinBox, [&]() { onHddSizeAccessorSpin(); });
 
 	connect(m_ui.hddCreate, &QPushButton::clicked, this, &DEV9SettingsWidget::onHddCreateClicked);
@@ -792,7 +792,7 @@ void DEV9SettingsWidget::showEvent(QShowEvent* event)
  * hidden, maybe because our table is nested within group & tab widgets
  * We could also listern to out show event, but we also need to listern to the tab
  * changed signal, in the event that another tab is selected when our ui is shown
- * 
+ *
  * Instead, lets use an eventFilter to determine exactly when the host table is shown
  * However, the eventFilter is ran before the widgets event handler, meaning the table
  * is still the wrong size, so we also need to check the show event
@@ -1083,3 +1083,5 @@ void DEV9SettingsWidget::DeleteHostConfig(int index)
 }
 
 DEV9SettingsWidget::~DEV9SettingsWidget() = default;
+
+#include "moc_DEV9SettingsWidget.cpp"

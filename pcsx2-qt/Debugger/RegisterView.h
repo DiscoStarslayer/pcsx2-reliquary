@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -49,8 +49,7 @@ public slots:
 private:
 	Ui::RegisterView ui;
 
-	// Returns true on success
-	bool contextFetchNewValue(u64& out, u64 currentValue, bool segment = false);
+	void fetchNewValue(u64 currentValue, bool segment, std::function<void(u64)> callback);
 
 	// Used for the height offset the tab bar creates
 	// because we share a widget

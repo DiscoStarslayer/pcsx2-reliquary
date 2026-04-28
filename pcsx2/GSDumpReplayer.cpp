@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS.h"
@@ -85,17 +85,17 @@ int GSDumpReplayer::GetLoopCount()
 	return s_dump_loop_count;
 }
 
-bool GSDumpReplayer::Initialize(const char* filename)
+bool GSDumpReplayer::Initialize(const char* filename, Error* error)
 {
 	Common::Timer timer;
 	Console.WriteLn("(GSDumpReplayer) Reading file '%s'...", filename);
 
-	Error error;
-	s_dump_file = GSDumpFile::OpenGSDump(filename, &error);
-	if (!s_dump_file || !s_dump_file->ReadFile(&error))
+	Error dump_error;
+	s_dump_file = GSDumpFile::OpenGSDump(filename, &dump_error);
+	if (!s_dump_file || !s_dump_file->ReadFile(&dump_error))
 	{
-		Host::ReportErrorAsync("GSDumpReplayer", fmt::format("Failed to open or read '{}': {}",
-													 Path::GetFileName(filename), error.GetDescription()));
+		Error::SetStringFmt(error, TRANSLATE_FS("GSDumpReplayer", "Failed to open or read '{}': {}"),
+			Path::GetFileName(filename), dump_error.GetDescription());
 		s_dump_file.reset();
 		return false;
 	}
@@ -213,16 +213,18 @@ static void GSDumpReplayerLoadInitialState()
 		Host::ReportFormattedErrorAsync("GSDumpReplayer", "Failed to load GS state.");
 }
 
-static void GSDumpReplayerSendPacketToMTGS(GIF_PATH path, const u8* data, u32 length)
+static void GSDumpReplayerSendPacketToMTGS(GIF_PATH path, const u8* data, size_t length)
 {
-	pxAssert((length % 16) == 0);
+	pxAssert((length % 16) == 0 && length < UINT32_MAX);
+
+	const u32 truncated_length = static_cast<u32>(length);
 
 	Gif_Path& gifPath = gifUnit.gifPath[path];
-	gifPath.CopyGSPacketData(const_cast<u8*>(data), length);
+	gifPath.CopyGSPacketData(const_cast<u8*>(data), truncated_length);
 
 	GS_Packet gsPack;
 	gsPack.offset = gifPath.curOffset;
-	gsPack.size = length;
+	gsPack.size = truncated_length;
 	gifPath.curOffset += length;
 	Gif_AddCompletedGSPacket(gsPack, path);
 }
@@ -248,7 +250,7 @@ static void GSDumpReplayerFrameLimit()
 	const s64 ms = GetTickFrequency() / 1000;
 	const s64 sleep = s_next_frame_time - now - ms;
 	if (sleep > ms)
-		Threading::Sleep(sleep / ms);
+		Threading::Sleep(static_cast<s32>(sleep / ms));
 	while ((now = GetCPUTicks()) < s_next_frame_time)
 		ShortSpin();
 	s_next_frame_time = std::max(now, s_next_frame_time + s_frame_ticks);
@@ -284,8 +286,13 @@ void GSDumpReplayerCpuStep()
 			{
 				case GSDumpTypes::GSTransferPath::Path1Old:
 				{
+					if(packet.length > 16384)
+					{
+						Console.Error("GSDumpReplayer: Path1Old transfer exceeds 16KB buffer. Skipping transfer");
+						break;
+					}
 					std::unique_ptr<u8[]> data(new u8[16384]);
-					const s32 addr = 16384 - packet.length;
+					const size_t addr = 16384 - packet.length;
 					std::memcpy(data.get(), packet.data + addr, packet.length);
 					GSDumpReplayerSendPacketToMTGS(GIF_PATH_1, data.get(), packet.length);
 				}
@@ -332,7 +339,7 @@ void GSDumpReplayerCpuStep()
 
 		case GSDumpTypes::GSType::Registers:
 		{
-			std::memcpy(PS2MEM_GS, packet.data, std::min<s32>(packet.length, Ps2MemSize::GSregs));
+			std::memcpy(PS2MEM_GS, packet.data, std::min<s32>(static_cast<u32>(packet.length), Ps2MemSize::GSregs));
 		}
 		break;
 	}
@@ -366,7 +373,7 @@ void GSDumpReplayer::RenderUI()
 {
 	const float scale = ImGuiManager::GetGlobalScale();
 	const float shadow_offset = std::ceil(1.0f * scale);
-	const float margin = std::ceil(10.0f * scale);
+	const float margin = std::ceil(GSConfig.OsdMargin * scale);
 	const float spacing = std::ceil(5.0f * scale);
 	float position_y = margin;
 

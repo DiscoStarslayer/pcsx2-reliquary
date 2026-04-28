@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "videodev.h"
@@ -83,7 +83,7 @@ namespace usb_eyetoy
 			int InitializeDevice(const std::wstring& selectedDevice);
 
 		private:
-			wil::unique_couninitialize_call dshowCoInitialize;
+			wil::unique_couninitialize_call dshowCoInitialize{false};
 			ICaptureGraphBuilder2* pGraphBuilder;
 			IFilterGraph2* pGraph;
 			IMediaControl* pControl;

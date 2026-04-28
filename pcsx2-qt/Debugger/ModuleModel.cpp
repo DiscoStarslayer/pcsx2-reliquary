@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "ModuleModel.h"
@@ -101,7 +101,7 @@ QVariant ModuleModel::headerData(int section, Qt::Orientation orientation, int r
 				//: Warning: short space limit. Abbreviate if needed.
 				return tr("NAME");
 			case ModuleColumns::VERSION:
-				//: Warning: short space limit. Abbreviate if needed. 
+				//: Warning: short space limit. Abbreviate if needed.
 				return tr("VERSION");
 			case ModuleColumns::ENTRY:
 				//: Warning: short space limit. Abbreviate if needed. // Entrypoint of the executable
@@ -131,3 +131,5 @@ void ModuleModel::refreshData()
 	m_modules = m_cpu.GetModuleList();
 	endResetModel();
 }
+
+#include "moc_ModuleModel.cpp"

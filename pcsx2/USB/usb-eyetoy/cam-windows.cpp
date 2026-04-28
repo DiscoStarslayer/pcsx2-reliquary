@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "common/Console.h"
+#include "common/Error.h"
 #include "common/StringUtil.h"
 
 #include "videodev.h"
@@ -373,11 +374,10 @@ namespace usb_eyetoy
 
 		void store_mpeg_frame(const unsigned char* data, const unsigned int len)
 		{
-			mpeg_mutex.lock();
+			std::lock_guard lock(mpeg_mutex);
 			if (len > 0)
 				memcpy(mpeg_buffer.start, data, len);
 			mpeg_buffer.length = len;
-			mpeg_mutex.unlock();
 		}
 
 		void dshow_callback(unsigned char* data, int len, int bitsperpixel)
@@ -527,7 +527,13 @@ namespace usb_eyetoy
 
 		int DirectShow::Open(int width, int height, FrameFormat format, int mirror)
 		{
-			dshowCoInitialize = wil::CoInitializeEx_failfast(COINIT_MULTITHREADED);
+			const HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+			if (FAILED(hr))
+			{
+				Console.ErrorFmt("CoInitializeEx failed: {}", Error::CreateHResult(hr).GetDescription());
+				return -1;
+			}
+			wil::unique_couninitialize_call uninit;
 
 			frame_width = width;
 			frame_height = height;
@@ -545,7 +551,7 @@ namespace usb_eyetoy
 			int ret = InitializeDevice(StringUtil::UTF8StringToWideString(mHostDevice));
 			if (ret < 0)
 			{
-				Console.Warning("Camera: cannot find '%s'", mHostDevice.c_str());
+				Console.WarningFmt("Camera: cannot find '{}'", mHostDevice);
 				return -1;
 			}
 
@@ -559,6 +565,7 @@ namespace usb_eyetoy
 				return -1;
 			}
 
+			dshowCoInitialize = std::move(uninit);
 			return 0;
 		};
 
@@ -585,13 +592,12 @@ namespace usb_eyetoy
 
 		int DirectShow::GetImage(uint8_t* buf, size_t len)
 		{
-			mpeg_mutex.lock();
+			std::lock_guard lock(mpeg_mutex);
 			int len2 = mpeg_buffer.length;
 			if (static_cast<size_t>(len) < mpeg_buffer.length)
 				len2 = len;
 			memcpy(buf, mpeg_buffer.start, len2);
 			mpeg_buffer.length = 0;
-			mpeg_mutex.unlock();
 			return len2;
 		};
 

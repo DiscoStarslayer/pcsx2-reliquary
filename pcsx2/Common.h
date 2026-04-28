@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -7,7 +7,7 @@
 
 static const u32 BIAS = 2;				// Bus is half of the actual ps2 speed
 static const u32 PS2CLK = 294912000;	//hz	/* 294.912 mhz */
-extern s64 PSXCLK;	/* 36.864 Mhz */
+extern u32 PSXCLK;	/* 36.864 Mhz */
 
 
 #include "Memory.h"

@@ -1,8 +1,8 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "usb-pad.h"
-#include "IconsFontAwesome6.h"
+#include "IconsFontAwesome.h"
 #include "IconsPromptFont.h"
 #include "USB/qemu-usb/USBinternal.h"
 #include "USB/usb-pad/usb-pad-sdl-ff.h"

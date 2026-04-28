@@ -71,19 +71,43 @@
           </property>
          </widget>
         </item>
-        <item row="4" column="0">
+		<item row="4" column="0">
+		  <widget class="QCheckBox" name="saveDrawStats">
+		   <property name="text">
+		    <string>Save Draw Stats</string>
+		   </property>
+		  </widget>
+		</item>
+		<item row="4" column="1">
+		  <widget class="QCheckBox" name="saveFrameStats">
+		    <property name="text">
+		      <string>Save Frame Stats</string>
+		    </property>
+		  </widget>
+		</item>
+        <item row="5" column="0">
          <widget class="QCheckBox" name="saveTransferImages">
           <property name="text">
            <string>Save Transfer Image Data</string>
           </property>
          </widget>
         </item>
+		<item row="5" column="1">
+		  <widget class="QCheckBox" name="saveHWConfig">
+	        <property name="text">
+			  <string>Save HW Config</string>
+			</property>
+		  </widget>
+		</item>
        </layout>
       </item>
       <item row="1" column="0">
        <widget class="QLabel" name="label_1">
         <property name="text">
          <string>Save Draw Start:</string>
+        </property>
+        <property name="buddy">
+         <cstring>saveDrawStart</cstring>
         </property>
        </widget>
       </item>
@@ -98,6 +122,9 @@
        <widget class="QLabel" name="label_2">
         <property name="text">
          <string>Save Draw Count:</string>
+        </property>
+        <property name="buddy">
+         <cstring>saveDrawCount</cstring>
         </property>
        </widget>
       </item>
@@ -116,6 +143,9 @@
         <property name="text">
          <string>Save Frame Start:</string>
         </property>
+        <property name="buddy">
+         <cstring>saveFrameStart</cstring>
+        </property>
        </widget>
       </item>
       <item row="3" column="1">
@@ -129,6 +159,9 @@
        <widget class="QLabel" name="label_4">
         <property name="text">
          <string>Save Frame Count:</string>
+        </property>
+        <property name="buddy">
+         <cstring>saveFrameCount</cstring>
         </property>
        </widget>
       </item>
@@ -147,12 +180,18 @@
         <property name="text">
          <string>Hardware Dump Directory:</string>
         </property>
+        <property name="buddy">
+         <cstring>hwDumpDirectory</cstring>
+        </property>
        </widget>
       </item>
       <item row="6" column="0">
        <widget class="QLabel" name="label_6">
         <property name="text">
          <string>Software Dump Directory:</string>
+        </property>
+        <property name="buddy">
+         <cstring>swDumpDirectory</cstring>
         </property>
        </widget>
       </item>
@@ -204,7 +243,7 @@
    <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
-      <enum>Qt::Vertical</enum>
+      <enum>Qt::Orientation::Vertical</enum>
      </property>
      <property name="sizeHint" stdset="0">
       <size>
@@ -216,6 +255,26 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>dumpGSData</tabstop>
+  <tabstop>saveFrame</tabstop>
+  <tabstop>saveRT</tabstop>
+  <tabstop>saveDepth</tabstop>
+  <tabstop>saveTexture</tabstop>
+  <tabstop>saveAlpha</tabstop>
+  <tabstop>saveInfo</tabstop>
+  <tabstop>saveTransferImages</tabstop>
+  <tabstop>saveDrawStart</tabstop>
+  <tabstop>saveDrawCount</tabstop>
+  <tabstop>saveFrameStart</tabstop>
+  <tabstop>saveFrameCount</tabstop>
+  <tabstop>hwDumpDirectory</tabstop>
+  <tabstop>hwDumpBrowse</tabstop>
+  <tabstop>hwDumpOpen</tabstop>
+  <tabstop>swDumpDirectory</tabstop>
+  <tabstop>swDumpBrowse</tabstop>
+  <tabstop>swDumpOpen</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

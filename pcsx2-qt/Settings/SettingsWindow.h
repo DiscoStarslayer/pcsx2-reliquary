@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -31,6 +31,7 @@ class GameCheatSettingsWidget;
 class GameFixSettingsWidget;
 class GamePatchSettingsWidget;
 class GraphicsSettingsWidget;
+class OSDSettingsWidget;
 class AudioSettingsWidget;
 class MemoryCardSettingsWidget;
 class FolderSettingsWidget;
@@ -66,6 +67,7 @@ public:
 	__fi GameFixSettingsWidget* getGameFixSettingsWidget() const { return m_game_fix_settings_widget; }
 	__fi GamePatchSettingsWidget* getGamePatchSettingsWidget() const { return m_game_patch_settings_widget; }
 	__fi GraphicsSettingsWidget* getGraphicsSettingsWidget() const { return m_graphics_settings; }
+	__fi OSDSettingsWidget* getOSDSettingsWidget() const { return m_osd_settings; }
 	__fi AudioSettingsWidget* getAudioSettingsWidget() const { return m_audio_settings; }
 	__fi MemoryCardSettingsWidget* getMemoryCardSettingsWidget() const { return m_memory_card_settings; }
 	__fi FolderSettingsWidget* getFolderSettingsWidget() const { return m_folder_settings; }
@@ -140,6 +142,7 @@ private:
 	GameFixSettingsWidget* m_game_fix_settings_widget = nullptr;
 	GamePatchSettingsWidget* m_game_patch_settings_widget = nullptr;
 	GraphicsSettingsWidget* m_graphics_settings = nullptr;
+	OSDSettingsWidget* m_osd_settings = nullptr;
 	AudioSettingsWidget* m_audio_settings = nullptr;
 	MemoryCardSettingsWidget* m_memory_card_settings = nullptr;
 	FolderSettingsWidget* m_folder_settings = nullptr;

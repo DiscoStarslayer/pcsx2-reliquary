@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/Renderers/Vulkan/GSDeviceVK.h"
@@ -366,11 +366,25 @@ bool VKSwapChain::CreateSwapChain()
 
 	// Store the old/current swap chain when recreating for resize
 	// Old swap chain is destroyed regardless of whether the create call succeeds
-	VkSwapchainKHR old_swap_chain = m_swap_chain;
+	VkSwapchainKHR old_swap_chain;
+	// RDNA4 experences a 2s delay in the following 2-3 vkAcquireNextImageKHR calls if we pass the old swapchain to the new one.
+	// Instead, pass null. This requires us to have freed the old image, which we already do with the swapchain maintenance extension.
+	if (GSDeviceVK::GetInstance()->IsDeviceAMD() && GSDeviceVK::GetInstance()->GetOptionalExtensions().vk_swapchain_maintenance1)
+	{
+		vkDestroySwapchainKHR(GSDeviceVK::GetInstance()->GetDevice(), m_swap_chain, nullptr);
+		old_swap_chain = VK_NULL_HANDLE;
+	}
+	else
+		old_swap_chain = m_swap_chain;
+
 	m_swap_chain = VK_NULL_HANDLE;
 
+	// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
+	const VkSwapchainPresentModesCreateInfoKHR modes_info{VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_MODES_CREATE_INFO_KHR, nullptr, 1u, &m_present_mode};
+
 	// Now we can actually create the swap chain
-	VkSwapchainCreateInfoKHR swap_chain_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, nullptr, 0, m_surface,
+	VkSwapchainCreateInfoKHR swap_chain_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR, 
+		GSDeviceVK::GetInstance()->GetOptionalExtensions().vk_swapchain_maintenance1 ? &modes_info : nullptr, 0, m_surface,
 		image_count, surface_format->format, surface_format->colorSpace, size, 1u, image_usage,
 		VK_SHARING_MODE_EXCLUSIVE, 0, nullptr, transform, alpha, m_present_mode, VK_TRUE, old_swap_chain};
 	std::array<uint32_t, 2> indices = {{
@@ -549,17 +563,23 @@ void VKSwapChain::ReleaseCurrentImage()
 		return;
 
 	if ((m_image_acquire_result.value() == VK_SUCCESS || m_image_acquire_result.value() == VK_SUBOPTIMAL_KHR) &&
-		GSDeviceVK::GetInstance()->GetOptionalExtensions().vk_ext_swapchain_maintenance1)
+		GSDeviceVK::GetInstance()->GetOptionalExtensions().vk_swapchain_maintenance1)
 	{
 		GSDeviceVK::GetInstance()->WaitForGPUIdle();
 
-		const VkReleaseSwapchainImagesInfoEXT info = {.sType = VK_STRUCTURE_TYPE_RELEASE_SWAPCHAIN_IMAGES_INFO_EXT,
+		// VK_EXT_swapchain_maintenance1 types/enums are aliases of VK_KHR_swapchain_maintenance1 types/enums.
+		const VkReleaseSwapchainImagesInfoKHR info = {.sType = VK_STRUCTURE_TYPE_RELEASE_SWAPCHAIN_IMAGES_INFO_KHR,
 			.swapchain = m_swap_chain,
 			.imageIndexCount = 1,
 			.pImageIndices = &m_current_image};
-		VkResult res = vkReleaseSwapchainImagesEXT(GSDeviceVK::GetInstance()->GetDevice(), &info);
+
+		VkResult res;
+		if (GSDeviceVK::GetInstance()->GetOptionalExtensions().vk_swapchain_maintenance1_is_khr)
+			res = vkReleaseSwapchainImagesKHR(GSDeviceVK::GetInstance()->GetDevice(), &info);
+		else
+			res = vkReleaseSwapchainImagesEXT(GSDeviceVK::GetInstance()->GetDevice(), &info);
 		if (res != VK_SUCCESS)
-			LOG_VULKAN_ERROR(res, "vkReleaseSwapchainImagesEXT() failed: ");
+			LOG_VULKAN_ERROR(res, "vkReleaseSwapchainImages() failed: ");
 	}
 
 	m_image_acquire_result.reset();

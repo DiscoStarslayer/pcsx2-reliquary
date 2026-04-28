@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DropIndicators.h"
 
+#include "QtHost.h"
 #include "QtUtils.h"
 #include "Debugger/Docking/DockViews.h"
 
@@ -21,7 +22,7 @@ static std::pair<QColor, QColor> pickNiceColours(const QPalette& palette, bool h
 	QColor fill = palette.highlight().color();
 	QColor outline = palette.highlight().color();
 
-	if (QtUtils::IsLightTheme(palette))
+	if (!QtHost::IsDarkApplicationTheme())
 	{
 		fill = fill.darker(200);
 		outline = outline.darker(200);
@@ -197,7 +198,7 @@ static const constexpr int INDICATOR_MARGIN = 10;
 static bool isWayland()
 {
 	return KDDockWidgets::Core::Platform::instance()->displayType() ==
-		   KDDockWidgets::Core::Platform::DisplayType::Wayland;
+	       KDDockWidgets::Core::Platform::DisplayType::Wayland;
 }
 
 static QWidget* parentForIndicatorWindow(KDDockWidgets::Core::ClassicDropIndicatorOverlay* classic_indicators)
@@ -570,3 +571,5 @@ void DockSegmentedDropIndicatorOverlay::drawMinimalistic()
 		painter.drawRect(segment->second.boundingRect());
 	}
 }
+
+#include "moc_DropIndicators.cpp"

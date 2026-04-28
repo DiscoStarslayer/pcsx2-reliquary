@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -40,14 +40,15 @@ struct PipelineSelectorExtrasMTL
 			GSDevice::BlendFactor dst_factor_alpha : 4;
 			GSDevice::BlendOp     blend_op : 2;
 			bool blend_enable : 1;
-			bool has_depth : 1;
-			bool has_stencil : 1;
+			bool has_depth    : 1;
+			bool has_stencil  : 1;
+			bool has_rt1      : 1;
 		};
 		u32 fullkey;
 	};
 
 	PipelineSelectorExtrasMTL(): fullkey(0) {}
-	PipelineSelectorExtrasMTL(GSHWDrawConfig::BlendState blend, GSTexture* rt, GSHWDrawConfig::ColorMaskSelector cms, bool has_depth, bool has_stencil)
+	PipelineSelectorExtrasMTL(GSHWDrawConfig::BlendState blend, GSTexture* rt, GSHWDrawConfig::ColorMaskSelector cms, bool has_depth, bool has_stencil, bool has_rt1)
 		: fullkey(0)
 	{
 		this->rt = rt ? rt->GetFormat() : GSTexture::Format::Invalid;
@@ -65,6 +66,7 @@ struct PipelineSelectorExtrasMTL
 		this->blend_enable = blend.enable;
 		this->has_depth   = has_depth;
 		this->has_stencil = has_stencil;
+		this->has_rt1     = has_rt1;
 	}
 };
 struct PipelineSelectorMTL
@@ -202,7 +204,7 @@ public:
 				bool iip        : 1;
 				bool fst        : 1;
 				bool point_size : 1;
-				GSMTLExpandType expand : 2;
+				GSShader::VSExpand expand : 3;
 			};
 			u8 key;
 		};
@@ -263,11 +265,11 @@ public:
 	MRCOwned<id<MTLRenderPipelineState>> m_shadeboost_pipeline;
 	MRCOwned<id<MTLRenderPipelineState>> m_imgui_pipeline;
 
-	MRCOwned<id<MTLFunction>> m_hw_vs[1 << 5];
+	MRCOwned<id<MTLFunction>> m_hw_vs[6 << 3];
 	std::unordered_map<PSSelector, MRCOwned<id<MTLFunction>>> m_hw_ps;
 	std::unordered_map<PipelineSelectorMTL, MRCOwned<id<MTLRenderPipelineState>>> m_hw_pipeline;
 
-	MRCOwned<MTLRenderPassDescriptor*> m_render_pass_desc[8];
+	MRCOwned<MTLRenderPassDescriptor*> m_render_pass_desc[16];
 
 	MRCOwned<id<MTLSamplerState>> m_sampler_hw[1 << 8];
 
@@ -287,8 +289,9 @@ public:
 		GSTexture* color_target = nullptr;
 		GSTexture* depth_target = nullptr;
 		GSTexture* stencil_target = nullptr;
-		GSTexture* tex[8] = {};
-		void* vertex_buffer = nullptr;
+		GSTexture* tex[GSMTLTextureIndexCount] = {};
+		id<MTLBuffer> vertex_buffer = nullptr;
+		id<MTLBuffer> vs_index_buffer = nullptr;
 		void* name = nullptr;
 		struct Has
 		{
@@ -298,6 +301,7 @@ public:
 			bool blend_color  : 1;
 			bool pipeline_sel : 1;
 			bool sampler      : 1;
+			bool rt1_depth    : 1;
 		} has = {};
 		DepthStencilSelector depth_sel = DepthStencilSelector::NoDepth();
 		// Clear line (Things below here are tracked by `has` and don't need to be cleared to reset)
@@ -315,6 +319,8 @@ public:
 	MRCOwned<id<MTLBlitCommandEncoder>> m_late_texture_upload_encoder;
 	MRCOwned<id<MTLCommandBuffer>> m_vertex_upload_cmdbuf;
 	MRCOwned<id<MTLBlitCommandEncoder>> m_vertex_upload_encoder;
+	id<MTLTexture> m_ds_as_rt_texture = nil;
+	GSTexture* m_ds_as_rt_gstexture = nullptr;
 
 	struct DebugEntry
 	{
@@ -347,6 +353,8 @@ public:
 	id<MTLCommandBuffer> GetRenderCmdBufWithoutCreate();
 	/// Get the spin fence if spinning is enabled.
 	id<MTLFence> GetSpinFence();
+	/// Get the texture to use as RT1 depth for the given depth texture
+	id<MTLTexture> GetRT1DepthTexture(GSTextureMTL* depth);
 	/// Called by command buffers when they finish
 	void DrawCommandBufferFinished(u64 draw, id<MTLCommandBuffer> buffer);
 	/// Flush pending operations from all encoders to the GPU
@@ -356,7 +364,7 @@ public:
 	/// End current render pass without flushing
 	void EndRenderPass();
 	/// Begin a new render pass (may reuse existing)
-	void BeginRenderPass(NSString* name, GSTexture* color, MTLLoadAction color_load, GSTexture* depth, MTLLoadAction depth_load, GSTexture* stencil = nullptr, MTLLoadAction stencil_load = MTLLoadActionDontCare);
+	void BeginRenderPass(NSString* name, GSTexture* color, MTLLoadAction color_load, GSTexture* depth, MTLLoadAction depth_load, GSTexture* stencil = nullptr, MTLLoadAction stencil_load = MTLLoadActionDontCare, bool rt1 = false);
 	/// Call at the end of each frame
 	void FrameCompleted();
 
@@ -385,7 +393,7 @@ public:
 	bool SupportsExclusiveFullscreen() const override;
 	std::string GetDriverInfo() const override;
 
-	void ResizeWindow(s32 new_window_width, s32 new_window_height, float new_window_scale) override;
+	void ResizeWindow(u32 new_window_width, u32 new_window_height, float new_window_scale) override;
 
 	void UpdateTexture(id<MTLTexture> texture, u32 x, u32 y, u32 width, u32 height, const void* data, u32 data_stride);
 
@@ -407,13 +415,12 @@ public:
 	void DrawStretchRect(const GSVector4& sRect, const GSVector4& dRect, const GSVector2& ds);
 	/// Copy from a position in sTex to the same position in the currently active render encoder using the given fs pipeline and rect
 	void RenderCopy(GSTexture* sTex, id<MTLRenderPipelineState> pipeline, const GSVector4i& rect);
-	void StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, ShaderConvert shader = ShaderConvert::COPY, bool linear = true) override;
-	void StretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, bool red, bool green, bool blue, bool alpha, ShaderConvert shader = ShaderConvert::COPY) override;
 	void PresentRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect, PresentShader shader, float shaderTime, bool linear) override;
 	void DrawMultiStretchRects(const MultiStretchRect* rects, u32 num_rects, GSTexture* dTex, ShaderConvert shader) override;
 	void UpdateCLUTTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, GSTexture* dTex, u32 dOffset, u32 dSize) override;
 	void ConvertToIndexedTexture(GSTexture* sTex, float sScale, u32 offsetX, u32 offsetY, u32 SBW, u32 SPSM, GSTexture* dTex, u32 DBW, u32 DPSM) override;
 	void FilteredDownsampleTexture(GSTexture* sTex, GSTexture* dTex, u32 downsample_factor, const GSVector2i& clamp_min, const GSVector4& dRect) override;
+	void BeginDSAsRT(GSTexture* ds, const GSVector4i& drawarea) override;
 
 	void FlushClears(GSTexture* tex);
 
@@ -424,6 +431,7 @@ public:
 	void MRESetSampler(SamplerSelector sel);
 	void MRESetTexture(GSTexture* tex, int pos);
 	void MRESetVertices(id<MTLBuffer> buffer, size_t offset);
+	void MRESetVSIndices(id<MTLBuffer> buffer, size_t offset);
 	void MRESetScissor(const GSVector4i& scissor);
 	void MREClearScissor();
 	void MRESetCB(const GSHWDrawConfig::VSConstantBuffer& cb_vs);
@@ -452,6 +460,10 @@ public:
 
 	void RenderImGui(ImDrawData* data);
 	u32 FrameNo() const { return m_frame; }
+
+protected:
+	virtual void DoStretchRect(GSTexture* sTex, const GSVector4& sRect, GSTexture* dTex, const GSVector4& dRect,
+		GSHWDrawConfig::ColorMaskSelector cms, ShaderConvert shader, bool linear) override;
 };
 
 static constexpr bool IsCommandBufferCompleted(MTLCommandBufferStatus status)

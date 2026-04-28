@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "AchievementLoginDialog.h"
@@ -17,7 +17,8 @@ AchievementLoginDialog::AchievementLoginDialog(QWidget* parent, Achievements::Lo
 	, m_reason(reason)
 {
 	m_ui.setupUi(this);
-	QtUtils::SetScalableIcon(m_ui.loginIcon, QIcon::fromTheme(QStringLiteral("login-box-line")), QSize(32, 32));
+	const QString base_path(QtHost::GetResourcesBasePath());
+	QtUtils::SetScalableIcon(m_ui.loginIcon, QIcon(QStringLiteral("%1/icons/ra-icon.svg").arg(base_path)), QSize(50, 50));
 	setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
 
 	// Adjust text if needed based on reason.
@@ -51,12 +52,14 @@ void AchievementLoginDialog::loginClicked()
 		const bool result = Achievements::Login(username.c_str(), password.c_str(), &error);
 		const QString message = QString::fromStdString(error.GetDescription());
 
-		QtHost::RunOnUIThread([dialog, result, message = std::move(message)]() {
-			if (!dialog)
-				return;
+		QMetaObject::invokeMethod(
+			qApp, [dialog, result, message = std::move(message)]() {
+				if (!dialog)
+					return;
 
-			dialog->processLoginResult(result, message);
-		});
+				dialog->processLoginResult(result, message);
+			},
+			Qt::QueuedConnection);
 	});
 }
 
@@ -127,7 +130,25 @@ void AchievementLoginDialog::processLoginResult(bool result, const QString& mess
 		}
 	}
 
-	done(0);
+	// Show success messagebox
+	const std::string username = Host::GetBaseStringSettingValue("Achievements", "Username");
+	QMessageBox::information(
+		this, tr("Login Successful"),
+		tr("Successfully logged in to RetroAchievements as %1.").arg(QString::fromStdString(username)));
+
+	m_ui.status->setText(tr("Successfully logged in as %1.").arg(QString::fromStdString(username)));
+	m_ui.status->setStyleSheet("color: green; font-weight: bold;");
+
+	disconnect(m_ui.buttonBox, &QDialogButtonBox::accepted, this, &AchievementLoginDialog::loginClicked);
+
+	m_login->setVisible(false);
+	QPushButton* dismissButton = m_ui.buttonBox->addButton(tr("&Dismiss"), QDialogButtonBox::AcceptRole);
+	dismissButton->setDefault(true);
+	dismissButton->setFocus();
+
+	connect(dismissButton, &QPushButton::clicked, this, [this]() { done(0); });
+
+	enableUI(false);
 }
 
 void AchievementLoginDialog::connectUi()
@@ -152,3 +173,5 @@ bool AchievementLoginDialog::canEnableLoginButton() const
 {
 	return !m_ui.userName->text().isEmpty() && !m_ui.password->text().isEmpty();
 }
+
+#include "moc_AchievementLoginDialog.cpp"

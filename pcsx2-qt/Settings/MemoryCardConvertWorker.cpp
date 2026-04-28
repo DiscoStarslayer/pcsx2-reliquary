@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "MemoryCardConvertWorker.h"
@@ -8,7 +8,7 @@
 #include "common/FileSystem.h"
 
 MemoryCardConvertWorker::MemoryCardConvertWorker(QWidget* parent, MemoryCardType type, MemoryCardFileType fileType, const std::string& srcFileName, const std::string& destFileName)
-		: QtAsyncProgressThread(parent)
+	: QtAsyncProgressThread(parent)
 {
 	this->type = type;
 	this->fileType = fileType;

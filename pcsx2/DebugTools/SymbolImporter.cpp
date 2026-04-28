@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SymbolImporter.h"
@@ -163,6 +163,9 @@ void SymbolImporter::Reset()
 
 void SymbolImporter::LoadAndAnalyseElf(Pcsx2Config::DebugAnalysisOptions options)
 {
+	if (!VMManager::HasValidVM())
+		return;
+
 	const std::string& elf_path = VMManager::GetCurrentELF();
 
 	Error error;
@@ -192,6 +195,9 @@ void SymbolImporter::AnalyseElf(
 	Pcsx2Config::DebugAnalysisOptions options,
 	bool wait_until_elf_is_loaded)
 {
+	if (!VMManager::HasValidVM())
+		return;
+
 	// Search for a .sym file to load symbols from.
 	std::string nocash_path;
 	CDVD_SourceType source_type = CDVDsys_GetSourceType();

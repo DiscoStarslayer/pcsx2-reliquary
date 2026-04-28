@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Config.h"
@@ -94,6 +94,10 @@ static constexpr const char* s_sdl_trigger_ps_icons[] = {
 	ICON_PF_LEFT_TRIGGER_L2, // SDL_GAMEPAD_AXIS_LEFT_TRIGGER
 	ICON_PF_RIGHT_TRIGGER_R2, // SDL_GAMEPAD_AXIS_RIGHT_TRIGGER
 };
+static constexpr const char* s_sdl_trigger_nintendo_icons[] = {
+	ICON_PF_LEFT_TRIGGER_ZL, // SDL_GAMEPAD_AXIS_LEFT_TRIGGER
+	ICON_PF_RIGHT_TRIGGER_ZR, // SDL_GAMEPAD_AXIS_RIGHT_TRIGGER
+};
 
 static const char* const* s_sdl_trigger_icons_list[] = {
 	s_sdl_trigger_icons, // SDL_GAMEPAD_TYPE_UNKNOWN
@@ -103,7 +107,7 @@ static const char* const* s_sdl_trigger_icons_list[] = {
 	s_sdl_trigger_ps_icons, // SDL_GAMEPAD_TYPE_PS3
 	s_sdl_trigger_ps_icons, // SDL_GAMEPAD_TYPE_PS4
 	s_sdl_trigger_ps_icons, // SDL_GAMEPAD_TYPE_PS5
-	// Switch
+	s_sdl_trigger_nintendo_icons, // SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO
 };
 
 static constexpr const char* s_sdl_ps3_pressure_icons[] = {
@@ -379,6 +383,23 @@ static constexpr const char* s_sdl_button_ps5_icons[] = {
 	ICON_PF_DUALSENSE_TOUCHPAD, // SDL_GAMEPAD_BUTTON_TOUCHPAD
 };
 
+static constexpr const char* s_sdl_button_nintendo_icons[] = {
+	ICON_PF_BUTTON_B, // SDL_GAMEPAD_BUTTON_SOUTH
+	ICON_PF_BUTTON_A, // SDL_GAMEPAD_BUTTON_EAST
+	ICON_PF_BUTTON_Y, // SDL_GAMEPAD_BUTTON_WEST
+	ICON_PF_BUTTON_X, // SDL_GAMEPAD_BUTTON_NORTH
+	ICON_PF_MINUS, // SDL_GAMEPAD_BUTTON_BACK
+	ICON_PF_HOME_MENU, // SDL_GAMEPAD_BUTTON_GUIDE
+	ICON_PF_PLUS, // SDL_GAMEPAD_BUTTON_START
+	ICON_PF_LEFT_ANALOG_CLICK, // SDL_GAMEPAD_BUTTON_LEFT_STICK
+	ICON_PF_RIGHT_ANALOG_CLICK, // SDL_GAMEPAD_BUTTON_RIGHT_STICK
+	ICON_PF_LEFT_SHOULDER_L, // SDL_GAMEPAD_BUTTON_LEFT_SHOULDER
+	ICON_PF_RIGHT_SHOULDER_R, // SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER
+	ICON_PF_JOYCON_DPAD_UP, // SDL_GAMEPAD_BUTTON_DPAD_UP
+	ICON_PF_JOYCON_DPAD_DOWN, // SDL_GAMEPAD_BUTTON_DPAD_DOWN
+	ICON_PF_JOYCON_DPAD_LEFT, // SDL_GAMEPAD_BUTTON_DPAD_LEFT
+	ICON_PF_JOYCON_DPAD_RIGHT, // SDL_GAMEPAD_BUTTON_DPAD_RIGHT
+};
 static constexpr const char* const* s_sdl_button_icons_list[] = {
 	s_sdl_button_icons, // SDL_GAMEPAD_TYPE_UNKNOWN
 	s_sdl_button_icons, // SDL_GAMEPAD_TYPE_STANDARD
@@ -387,7 +408,7 @@ static constexpr const char* const* s_sdl_button_icons_list[] = {
 	s_sdl_button_ps3_icons, // SDL_GAMEPAD_TYPE_PS3
 	s_sdl_button_ps4_icons, // SDL_GAMEPAD_TYPE_PS4
 	s_sdl_button_ps5_icons, // SDL_GAMEPAD_TYPE_PS5
-	// Switch
+	s_sdl_button_nintendo_icons, // SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO
 };
 static constexpr size_t s_sdl_button_iconsize_list[] = {
 	std::size(s_sdl_button_icons), // SDL_GAMEPAD_TYPE_UNKNOWN
@@ -397,7 +418,7 @@ static constexpr size_t s_sdl_button_iconsize_list[] = {
 	std::size(s_sdl_button_ps3_icons), // SDL_GAMEPAD_TYPE_PS3
 	std::size(s_sdl_button_ps4_icons), // SDL_GAMEPAD_TYPE_PS4
 	std::size(s_sdl_button_ps5_icons), // SDL_GAMEPAD_TYPE_PS5
-	// Switch
+	std::size(s_sdl_button_nintendo_icons), // SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO
 };
 
 static constexpr const GenericInputBinding s_sdl_generic_binding_button_mapping[] = {
@@ -765,9 +786,9 @@ std::optional<InputBindingKey> SDLInputSource::ParseKeyString(const std::string_
 								{
 									shown_prompt = true;
 									Host::ReportInfoAsync(TRANSLATE("SDLInputSource", "SDL3 Migration"),
-										TRANSLATE("SDLInputSource", "As part of our upgrade to SDL3, we've had to migrate your binds\n"
-																	"Your controller did not match the Xbox layout and may need rebinding\n"
-																	"Please verify your controller settings and amend if required"));
+										TRANSLATE("SDLInputSource", "As part of our upgrade to SDL3, we've had to migrate your binds.\n"
+																	"Your controller did not match the Xbox layout and may need rebinding.\n"
+																	"Please verify your controller settings and amend if required."));
 
 									// Also apply BPM setting for legacy binds
 									// We assume this is a Nintendo controller, BPM will check if it is
@@ -870,10 +891,10 @@ std::optional<InputBindingKey> SDLInputSource::ParseKeyString(const std::string_
 		key.data = 0;
 		return key;
 	}
-	else if (binding[0] == '+' || binding[0] == '-')
+	else if (binding[0] == '+' || binding[0] == '-' || binding.starts_with("Full"))
 	{
 		// likely an axis
-		const std::string_view axis_name(binding.substr(1));
+		const std::string_view axis_name(binding.substr(binding[0] == 'F' ? 4 : 1));
 
 		if (axis_name.starts_with("JoyAxis"))
 		{
@@ -882,7 +903,9 @@ std::optional<InputBindingKey> SDLInputSource::ParseKeyString(const std::string_
 			{
 				key.source_subtype = InputSubclass::ControllerAxis;
 				key.data = *value + std::size(s_sdl_axis_setting_names);
-				key.modifier = (binding[0] == '-') ? InputModifier::Negate : InputModifier::None;
+				key.modifier = (binding[0] == 'F') ? InputModifier::FullAxis :
+				               (binding[0] == '-') ? InputModifier::Negate :
+				                                     InputModifier::None;
 				key.invert = (end == "~");
 				return key;
 			}
@@ -894,21 +917,11 @@ std::optional<InputBindingKey> SDLInputSource::ParseKeyString(const std::string_
 				// found an axis!
 				key.source_subtype = InputSubclass::ControllerAxis;
 				key.data = i;
-				key.modifier = (binding[0] == '-') ? InputModifier::Negate : InputModifier::None;
+				key.modifier = (binding[0] == 'F') ? InputModifier::FullAxis :
+				               (binding[0] == '-') ? InputModifier::Negate :
+				                                     InputModifier::None;
 				return key;
 			}
-		}
-	}
-	else if (binding.starts_with("FullJoyAxis"))
-	{
-		std::string_view end;
-		if (auto value = StringUtil::FromChars<u32>(binding.substr(11), 10, &end))
-		{
-			key.source_subtype = InputSubclass::ControllerAxis;
-			key.data = *value + std::size(s_sdl_axis_setting_names);
-			key.modifier = InputModifier::FullAxis;
-			key.invert = (end == "~");
-			return key;
 		}
 	}
 	else if (binding.starts_with("Hat"))
@@ -1090,6 +1103,14 @@ TinyString SDLInputSource::ConvertKeyToIcon(InputBindingKey key)
 		auto it = GetControllerDataForPlayerId(key.source_index);
 		if (it != m_controllers.end())
 			type = SDL_GetRealGamepadType(it->gamepad);
+
+		const InputLayout glyph_preference = InputManager::GetGamepadIconPreference();
+		if (glyph_preference == InputLayout::Xbox)
+			type = SDL_GAMEPAD_TYPE_XBOXONE;
+		else if (glyph_preference == InputLayout::Playstation)
+			type = SDL_GAMEPAD_TYPE_PS5;
+		else if (glyph_preference == InputLayout::Nintendo)
+			type = SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO;
 
 		if (key.source_subtype == InputSubclass::ControllerAxis)
 		{

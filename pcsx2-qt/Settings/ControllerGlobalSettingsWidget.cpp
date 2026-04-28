@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Settings/ControllerGlobalSettingsWidget.h"
@@ -88,7 +88,11 @@ ControllerGlobalSettingsWidget::~ControllerGlobalSettingsWidget() = default;
 void ControllerGlobalSettingsWidget::addDeviceToList(const QString& identifier, const QString& name)
 {
 	QListWidgetItem* item = new QListWidgetItem();
-	item->setText(QStringLiteral("%1: %2").arg(identifier).arg(name));
+	if (identifier.compare(name, Qt::CaseInsensitive) == 0)
+		item->setText(identifier);
+	else
+		item->setText(QStringLiteral("%1: %2").arg(identifier).arg(name));
+
 	item->setData(Qt::UserRole, identifier);
 	m_ui.deviceList->addItem(item);
 }
@@ -209,3 +213,5 @@ ControllerMappingSettingsDialog::ControllerMappingSettingsDialog(ControllerSetti
 	connect(m_ui.buttonBox->button(QDialogButtonBox::Close), &QPushButton::clicked, this, &QDialog::accept);
 }
 ControllerMappingSettingsDialog::~ControllerMappingSettingsDialog() = default;
+
+#include "moc_ControllerGlobalSettingsWidget.cpp"

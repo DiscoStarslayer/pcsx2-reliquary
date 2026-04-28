@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DebugSettingsWidget.h"
@@ -110,6 +110,9 @@ DebugSettingsWidget::DebugSettingsWidget(SettingsWindow* settings_dialog, QWidge
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_gs.saveAlpha, "EmuCore/GS", "SaveAlpha", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_gs.saveInfo, "EmuCore/GS", "SaveInfo", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_gs.saveTransferImages, "EmuCore/GS", "SaveTransferImages", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_gs.saveDrawStats, "EmuCore/GS", "SaveDrawStats", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_gs.saveFrameStats, "EmuCore/GS", "SaveFrameStats", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_gs.saveHWConfig, "EmuCore/GS", "SaveHWConfig", false);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_gs.saveDrawStart, "EmuCore/GS", "SaveDrawStart", 0);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_gs.saveDrawCount, "EmuCore/GS", "SaveDrawCount", 5000);
 	SettingWidgetBinder::BindWidgetToIntSetting(sif, m_gs.saveFrameStart, "EmuCore/GS", "SaveFrameStart", 0);
@@ -215,6 +218,9 @@ void DebugSettingsWidget::onDrawDumpingChanged()
 	m_gs.saveAlpha->setEnabled(enabled);
 	m_gs.saveInfo->setEnabled(enabled);
 	m_gs.saveTransferImages->setEnabled(enabled);
+	m_gs.saveDrawStats->setEnabled(enabled);
+	m_gs.saveFrameStats->setEnabled(enabled);
+	m_gs.saveHWConfig->setEnabled(enabled);
 	m_gs.saveDrawStart->setEnabled(enabled);
 	m_gs.saveDrawCount->setEnabled(enabled);
 	m_gs.saveFrameStart->setEnabled(enabled);
@@ -270,3 +276,5 @@ void DebugSettingsWidget::onLoggingEnableChanged()
 	g_emu_thread->applySettings();
 }
 #endif
+
+#include "moc_DebugSettingsWidget.cpp"

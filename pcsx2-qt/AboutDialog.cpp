@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "pcsx2/SupportURLs.h"
@@ -12,6 +12,7 @@
 #include "common/SmallString.h"
 
 #include <QtCore/QFile>
+#include <QtCore/QFileInfo>
 #include <QtCore/QString>
 #include <QtGui/QDesktopServices>
 #include <QtWidgets/QDialog>
@@ -134,11 +135,15 @@ void AboutDialog::showHTMLDialog(QWidget* parent, const QString& title, const QS
 	tb->setOpenExternalLinks(true);
 
 	QFile file(path);
-	file.open(QIODevice::ReadOnly);
-	if (const QByteArray data = file.readAll(); !data.isEmpty())
-		tb->setText(QString::fromUtf8(data));
-	else
+	QFileInfo fi(path);
+	if (!fi.exists() || !fi.isReadable())
+	{
 		tb->setText(tr("File not found: %1").arg(path));
+	}
+	else
+	{
+		tb->setSource(QUrl::fromLocalFile(path));
+	}
 
 	layout->addWidget(tb, 1);
 
@@ -148,3 +153,5 @@ void AboutDialog::showHTMLDialog(QWidget* parent, const QString& title, const QS
 
 	dialog.exec();
 }
+
+#include "moc_AboutDialog.cpp"

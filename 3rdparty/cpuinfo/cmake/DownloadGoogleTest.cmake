@@ -4,8 +4,8 @@ PROJECT(googletest-download NONE)
 
 INCLUDE(ExternalProject)
 ExternalProject_Add(googletest
-	URL https://github.com/google/googletest/archive/release-1.11.0.zip
-	URL_HASH SHA256=353571c2440176ded91c2de6d6cd88ddd41401d14692ec1f99e35d013feda55a
+	URL https://github.com/google/googletest/archive/release-1.8.0.zip
+	URL_HASH SHA256=f3ed3b58511efd272eb074a3a6d6fb79d7c2e6a0e374323d1e6bcbcc1ef141bf
 	SOURCE_DIR "${CONFU_DEPENDENCIES_SOURCE_DIR}/googletest"
 	BINARY_DIR "${CONFU_DEPENDENCIES_BINARY_DIR}/googletest"
 	CONFIGURE_COMMAND ""

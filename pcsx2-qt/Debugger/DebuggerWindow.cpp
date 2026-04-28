@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DebuggerWindow.h"
 
+#include "AsyncDialogs.h"
 #include "Debugger/DebuggerView.h"
 #include "Debugger/Docking/DockManager.h"
 
@@ -14,8 +15,6 @@
 #include "QtHost.h"
 #include "MainWindow.h"
 #include "AnalysisOptionsDialog.h"
-
-#include <QtWidgets/QMessageBox>
 
 DebuggerWindow* g_debugger_window = nullptr;
 
@@ -70,19 +69,21 @@ DebuggerWindow::DebuggerWindow(QWidget* parent)
 	});
 
 	connect(m_ui.actionResetAllLayouts, &QAction::triggered, this, [this]() {
-		QString text = tr("Are you sure you want to reset all layouts?");
-		if (QMessageBox::question(g_debugger_window, tr("Confirmation"), text) != QMessageBox::Yes)
-			return;
+		const QString title = tr("Confirmation");
+		const QString text = tr("Are you sure you want to reset all layouts?");
 
-		m_dock_manager->resetAllLayouts();
+		AsyncDialogs::question(this, title, text, [this]() {
+			m_dock_manager->resetAllLayouts();
+		});
 	});
 
 	connect(m_ui.actionResetDefaultLayouts, &QAction::triggered, this, [this]() {
-		QString text = tr("Are you sure you want to reset the default layouts?");
-		if (QMessageBox::question(g_debugger_window, tr("Confirmation"), text) != QMessageBox::Yes)
-			return;
+		const QString title = tr("Confirmation");
+		const QString text = tr("Are you sure you want to reset the default layouts?");
 
-		m_dock_manager->resetDefaultLayouts();
+		AsyncDialogs::question(this, title, text, [this]() {
+			m_dock_manager->resetDefaultLayouts();
+		});
 	});
 
 	connect(g_emu_thread, &EmuThread::onVMPaused, this, []() {
@@ -238,6 +239,12 @@ int DebuggerWindow::fontSize()
 
 void DebuggerWindow::updateTheme()
 {
+	// Detect recursive StyleChange events caused by updating the stylesheet.
+	if (m_is_updating_theme)
+		return;
+
+	m_is_updating_theme = true;
+
 	// TODO: Migrate away from stylesheets to improve performance.
 	setStyleSheet(QString("font-size: %1pt;").arg(m_font_size));
 
@@ -248,6 +255,8 @@ void DebuggerWindow::updateTheme()
 		setStyleSheet(QString());
 
 	dockManager().updateTheme();
+
+	m_is_updating_theme = false;
 }
 
 void DebuggerWindow::saveWindowGeometry()
@@ -535,6 +544,12 @@ void DebuggerWindow::onStepOut()
 	this->repaint();
 }
 
+void DebuggerWindow::changeEvent(QEvent* event)
+{
+	if (event->type() == QEvent::PaletteChange || event->type() == QEvent::StyleChange)
+		updateTheme();
+}
+
 void DebuggerWindow::closeEvent(QCloseEvent* event)
 {
 	dockManager().saveCurrentLayout();
@@ -558,3 +573,5 @@ DebugInterface* DebuggerWindow::currentCPU()
 
 	return &DebugInterface::get(*maybe_cpu);
 }
+
+#include "moc_DebuggerWindow.cpp"

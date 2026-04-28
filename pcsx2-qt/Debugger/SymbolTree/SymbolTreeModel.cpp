@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SymbolTreeModel.h"
@@ -528,3 +528,5 @@ bool SymbolTreeModel::nodeHasChildren(const ccc::ast::Node& logical_type, const 
 
 	return result;
 }
+
+#include "moc_SymbolTreeModel.cpp"

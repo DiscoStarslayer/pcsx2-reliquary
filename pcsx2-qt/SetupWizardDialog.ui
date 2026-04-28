@@ -92,6 +92,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QLabel" name="labelRetroAchievements">
+         <property name="text">
+          <string>RetroAchievements</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QLabel" name="labelComplete">
          <property name="text">
           <string>Complete</string>
@@ -103,7 +110,7 @@
      <item>
       <spacer name="verticalSpacer">
        <property name="orientation">
-        <enum>Qt::Vertical</enum>
+        <enum>Qt::Orientation::Vertical</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>
@@ -118,12 +125,12 @@
    <item row="0" column="1">
     <widget class="QStackedWidget" name="pages">
      <property name="currentIndex">
-      <number>3</number>
+      <number>4</number>
      </property>
      <widget class="QWidget" name="page">
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <property name="spacing">
-        <number>10</number>
+        <number>4</number>
        </property>
        <property name="leftMargin">
         <number>0</number>
@@ -143,7 +150,7 @@
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Welcome to PCSX2!&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;This wizard will help guide you through the configuration steps required to use the application. It is recommended if this is your first time installing PCSX2 that you view the setup guide &lt;a href=&quot;https://pcsx2.net/docs/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;By default, PCSX2 will connect to the server at &lt;a href=&quot;https://pcsx2.net/&quot;&gt;pcsx2.net&lt;/a&gt; to check for updates, and if available and confirmed, download update packages from &lt;a href=&quot;https://github.com/&quot;&gt;github.com&lt;/a&gt;. If you do not wish for PCSX2 to make any network connections on startup, you should uncheck the Automatic Updates option now. The Automatic Update setting can be changed later at any time in Interface Settings.&lt;/p&gt;&lt;p&gt;Please choose a language and theme to begin.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="alignment">
-          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -152,16 +159,19 @@
           <bool>true</bool>
          </property>
          <property name="textInteractionFlags">
-          <set>Qt::TextBrowserInteraction</set>
+          <set>Qt::TextInteractionFlag::TextBrowserInteraction</set>
          </property>
         </widget>
        </item>
        <item>
         <layout class="QFormLayout" name="formLayout_3">
          <item row="0" column="0">
-          <widget class="QLabel" name="label_3">
+          <widget class="QLabel" name="languageLabel">
            <property name="text">
             <string>Language:</string>
+           </property>
+           <property name="buddy">
+            <cstring>language</cstring>
            </property>
           </widget>
          </item>
@@ -176,9 +186,12 @@
           </widget>
          </item>
          <item row="1" column="0">
-          <widget class="QLabel" name="label_5">
+          <widget class="QLabel" name="themeLabel">
            <property name="text">
             <string>Theme:</string>
+           </property>
+           <property name="buddy">
+            <cstring>theme</cstring>
            </property>
           </widget>
          </item>
@@ -188,7 +201,7 @@
          <item row="3" column="1">
           <spacer name="verticalSpacer_3">
            <property name="orientation">
-            <enum>Qt::Vertical</enum>
+            <enum>Qt::Orientation::Vertical</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -229,7 +242,7 @@
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PCSX2 requires a PS2 BIOS in order to run.&lt;/p&gt;&lt;p&gt;For legal reasons, you must obtain a BIOS &lt;strong&gt;from an actual PS2 unit that you own&lt;/strong&gt; (borrowing doesn't count).&lt;/p&gt;&lt;p&gt;Once dumped, this BIOS image should be placed in the bios folder within the data directory shown below, or you can instruct PCSX2 to scan an alternative directory.&lt;/p&gt;&lt;p&gt;A guide for dumping your BIOS can be found &lt;a href=&quot;https://pcsx2.net/docs/setup/bios/&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="alignment">
-          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -238,16 +251,19 @@
           <bool>true</bool>
          </property>
          <property name="textInteractionFlags">
-          <set>Qt::TextBrowserInteraction</set>
+          <set>Qt::TextInteractionFlag::TextBrowserInteraction</set>
          </property>
         </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
-          <widget class="QLabel" name="label_10">
+          <widget class="QLabel" name="biosSearchDirectoryLabel">
            <property name="text">
             <string>BIOS Directory:</string>
+           </property>
+           <property name="buddy">
+            <cstring>biosSearchDirectory</cstring>
            </property>
           </widget>
          </item>
@@ -298,7 +314,7 @@
          <item>
           <spacer name="horizontalSpacer_4">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -346,7 +362,7 @@
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;PCSX2 will automatically scan and identify games from the selected directories below, and populate the game list.&lt;br&gt;These games should be dumped from discs you own. Guides for dumping discs can be found &lt;a href=&quot;https://pcsx2.net/docs/setup/dumping&quot;&gt;here&lt;/a&gt;.&lt;/p&gt;&lt;p&gt;Supported formats for dumps include:&lt;/p&gt;&lt;p&gt;&lt;ul&gt;&lt;li&gt;.bin/.iso (ISO Disc Images)&lt;/li&gt;&lt;li&gt;.mdf (Media Descriptor File)&lt;/li&gt;&lt;li&gt;.chd (Compressed Hunks of Data)&lt;/li&gt;&lt;li&gt;.cso (Compressed ISO)&lt;/li&gt;&lt;li&gt;.zso (Compressed ISO)&lt;/li&gt;&lt;li&gt;.gz (Gzip Compressed ISO)&lt;/li&gt;&lt;/ul&gt;&lt;/p&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="alignment">
-          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -355,23 +371,26 @@
           <bool>true</bool>
          </property>
          <property name="textInteractionFlags">
-          <set>Qt::TextBrowserInteraction</set>
+          <set>Qt::TextInteractionFlag::TextBrowserInteraction</set>
          </property>
         </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_4">
          <item>
-          <widget class="QLabel" name="label_7">
+          <widget class="QLabel" name="searchDirectoryListLabel">
            <property name="text">
             <string>Search Directories (will be scanned for games)</string>
+           </property>
+           <property name="buddy">
+            <cstring>searchDirectoryList</cstring>
            </property>
           </widget>
          </item>
          <item>
           <spacer name="horizontalSpacer_5">
            <property name="orientation">
-            <enum>Qt::Horizontal</enum>
+            <enum>Qt::Orientation::Horizontal</enum>
            </property>
            <property name="sizeHint" stdset="0">
             <size>
@@ -393,11 +412,10 @@
             <string>Add...</string>
            </property>
            <property name="icon">
-            <iconset theme="folder-add-line">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="folder-add-line"/>
            </property>
            <property name="toolButtonStyle">
-            <enum>Qt::ToolButtonTextBesideIcon</enum>
+            <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
            </property>
           </widget>
          </item>
@@ -413,11 +431,10 @@
             <string>Remove</string>
            </property>
            <property name="icon">
-            <iconset theme="folder-reduce-line">
-             <normaloff>.</normaloff>.</iconset>
+            <iconset theme="folder-reduce-line"/>
            </property>
            <property name="toolButtonStyle">
-            <enum>Qt::ToolButtonTextBesideIcon</enum>
+            <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
            </property>
           </widget>
          </item>
@@ -490,6 +507,9 @@
             <property name="text">
              <string>Controller Type:</string>
             </property>
+            <property name="buddy">
+             <cstring>controller1Type</cstring>
+            </property>
            </widget>
           </item>
           <item row="1" column="1">
@@ -504,7 +524,7 @@
             <item>
              <spacer name="horizontalSpacer_6">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Orientation::Horizontal</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -524,7 +544,7 @@
                 <normaloff>Settings</normaloff>Settings</iconset>
               </property>
               <property name="toolButtonStyle">
-               <enum>Qt::ToolButtonTextBesideIcon</enum>
+               <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
               </property>
              </widget>
             </item>
@@ -543,6 +563,9 @@
            <widget class="QLabel" name="label_13">
             <property name="text">
              <string>Controller Type:</string>
+            </property>
+            <property name="buddy">
+             <cstring>controller2Type</cstring>
             </property>
            </widget>
           </item>
@@ -568,7 +591,7 @@
             <item>
              <spacer name="horizontalSpacer_8">
               <property name="orientation">
-               <enum>Qt::Horizontal</enum>
+               <enum>Qt::Orientation::Horizontal</enum>
               </property>
               <property name="sizeHint" stdset="0">
                <size>
@@ -588,7 +611,7 @@
                 <normaloff>Settings</normaloff>Settings</iconset>
               </property>
               <property name="toolButtonStyle">
-               <enum>Qt::ToolButtonTextBesideIcon</enum>
+               <enum>Qt::ToolButtonStyle::ToolButtonTextBesideIcon</enum>
               </property>
              </widget>
             </item>
@@ -600,12 +623,262 @@
        <item>
         <spacer name="verticalSpacer_4">
          <property name="orientation">
-          <enum>Qt::Vertical</enum>
+          <enum>Qt::Orientation::Vertical</enum>
          </property>
          <property name="sizeHint" stdset="0">
           <size>
            <width>20</width>
            <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="pageRetroAchievements">
+      <layout class="QVBoxLayout" name="verticalLayout_8">
+       <property name="spacing">
+        <number>4</number>
+       </property>
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_12">
+         <item>
+          <widget class="QLabel" name="raLogo">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>56</width>
+             <height>56</height>
+            </size>
+           </property>
+           <property name="maximumSize">
+            <size>
+             <width>56</width>
+             <height>56</height>
+            </size>
+           </property>
+           <property name="text">
+            <string/>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignmentFlag::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="raSectionLabel">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="font">
+            <font>
+             <pointsize>14</pointsize>
+             <bold>true</bold>
+            </font>
+           </property>
+           <property name="text">
+            <string>RetroAchievements</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="horizontalSpacer_11">
+           <property name="orientation">
+            <enum>Qt::Orientation::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="raIntroLabel">
+         <property name="text">
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;justify&quot;&gt;PCSX2 supports RetroAchievements, a service that adds achievements, leaderboards, and extra challenges to classic games.&lt;/p&gt;&lt;p align=&quot;justify&quot;&gt;Sign in below to link your account and start earning achievements in supported titles, or create a free account at &lt;a href=&quot;https://retroachievements.org/createaccount.php&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#27bf73;&quot;&gt;retroachievements.org/createaccount.php&lt;/span&gt;&lt;/a&gt;.&lt;/p&gt;&lt;p align=&quot;justify&quot;&gt;Using RetroAchievements is completely optional and not required to use PCSX2.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::TextFormat::RichText</enum>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="margin">
+          <number>2</number>
+         </property>
+         <property name="openExternalLinks">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="raIntegrationLabel">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <property name="text">
+          <string>RAIntegration is being used, built-in RetroAchievements support is disabled.</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="raContentWidget" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_9">
+          <property name="spacing">
+           <number>4</number>
+          </property>
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <widget class="QGroupBox" name="raSettingsBox">
+            <property name="title">
+             <string/>
+            </property>
+            <layout class="QHBoxLayout" name="horizontalLayout_11">
+             <item>
+              <widget class="QCheckBox" name="raEnableAchievements">
+               <property name="text">
+                <string>Enable Achievements</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="raHardcoreMode">
+               <property name="text">
+                <string>Enable Hardcore Mode</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_10">
+               <property name="orientation">
+                <enum>Qt::Orientation::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="raAccountBox">
+            <property name="title">
+             <string>Account</string>
+            </property>
+            <layout class="QHBoxLayout" name="horizontalLayout_7" stretch="1,0,0,0">
+             <item>
+              <widget class="QLabel" name="raLoginStatus">
+               <property name="text">
+                <string>Not Logged In.</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+               </property>
+               <property name="textInteractionFlags">
+                <set>Qt::TextInteractionFlag::TextBrowserInteraction</set>
+               </property>
+               <property name="buddy">
+                <cstring>raViewProfileButton</cstring>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="horizontalSpacer_9">
+               <property name="orientation">
+                <enum>Qt::Orientation::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>40</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item>
+              <widget class="QPushButton" name="raViewProfileButton">
+               <property name="text">
+                <string>View Profile...</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="raLoginButton">
+               <property name="text">
+                <string>Login...</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="raFooterLabel">
+            <property name="text">
+             <string>You can customize additional RetroAchievements options later in Settings &gt; Achievements.</string>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer_5">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>0</height>
           </size>
          </property>
         </spacer>
@@ -632,7 +905,7 @@
           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;h1 style=&quot; margin-top:18px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;&quot;&gt;&lt;span style=&quot; font-size:xx-large; font-weight:700;&quot;&gt;Setup Complete!&lt;/span&gt;&lt;/h1&gt;&lt;p&gt;You are now ready to run games.&lt;/p&gt;&lt;p&gt;&lt;span style=&quot; font-weight:700;&quot;&gt;Warning: Do not run untrusted programs in PCSX2. It is not a sandbox and cannot protect your computer from malicious software.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;Further options are available under the settings menu. You can also use the Big Picture UI for navigation entirely with a gamepad.&lt;/p&gt;&lt;p&gt;We hope you enjoy using PCSX2.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="alignment">
-          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -651,7 +924,7 @@
      <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
-        <enum>Qt::Horizontal</enum>
+        <enum>Qt::Orientation::Horizontal</enum>
        </property>
        <property name="sizeHint" stdset="0">
         <size>

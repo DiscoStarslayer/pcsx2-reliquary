@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SymbolTreeDelegates.h"
 
+#include "AsyncDialogs.h"
 #include "Debugger/SymbolTree/SymbolTreeModel.h"
 #include "Debugger/SymbolTree/TypeString.h"
 
@@ -10,7 +11,6 @@
 #include <QtWidgets/QComboBox>
 #include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QLineEdit>
-#include <QtWidgets/QMessageBox>
 
 SymbolTreeValueDelegate::SymbolTreeValueDelegate(
 	DebugInterface& cpu,
@@ -114,12 +114,30 @@ QWidget* SymbolTreeValueDelegate::createEditor(QWidget* parent, const QStyleOpti
 				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 
 				QComboBox* combo_box = new QComboBox(parent);
-				for (s32 i = 0; i < (s32)enumeration.constants.size(); i++)
+				bool named = false;
+
+				for (size_t i = 0; i < enumeration.constants.size(); i++)
 				{
-					combo_box->addItem(QString::fromStdString(enumeration.constants[i].second));
+					QString text = QString::fromStdString(enumeration.constants[i].second);
+					combo_box->addItem(text, enumeration.constants[i].first);
 					if (enumeration.constants[i].first == value.toInt())
-						combo_box->setCurrentIndex(i);
+					{
+						combo_box->setCurrentIndex(static_cast<int>(i));
+						named = true;
+					}
 				}
+
+				if (!named)
+				{
+					// The value isn't equal to any of the named constants, so
+					// add an extra item to the combo box representing the
+					// current value so that the first named constant isn't
+					// written back to VM memory accidentally.
+					QString text = display_options.signedIntegerToString(value.toInt(), 32);
+					combo_box->insertItem(0, text, value.toInt());
+					combo_box->setCurrentIndex(0);
+				}
+
 				connect(combo_box, &QComboBox::currentIndexChanged, this, &SymbolTreeValueDelegate::onComboBoxIndexChanged);
 				result = combo_box;
 
@@ -245,15 +263,10 @@ void SymbolTreeValueDelegate::setModelData(QWidget* editor, QAbstractItemModel* 
 			}
 			case ccc::ast::ENUM:
 			{
-				const ccc::ast::Enum& enumeration = type.as<ccc::ast::Enum>();
 				QComboBox* combo_box = qobject_cast<QComboBox*>(editor);
 				Q_ASSERT(combo_box);
 
-				s32 comboIndex = combo_box->currentIndex();
-				if (comboIndex < 0 || comboIndex >= (s32)enumeration.constants.size())
-					break;
-
-				value = enumeration.constants[comboIndex].first;
+				value = combo_box->currentData().toInt();
 
 				break;
 			}
@@ -482,7 +495,7 @@ void SymbolTreeTypeDelegate::setModelData(QWidget* editor, QAbstractItemModel* m
 		symbol_tree_model->resetChildren(index);
 	}
 	else
-		QMessageBox::warning(editor, tr("Cannot Change Type"), error_message);
+		AsyncDialogs::warning(editor, tr("Cannot Change Type"), error_message);
 }
 
 // *****************************************************************************
@@ -514,3 +527,5 @@ void SymbolTreeIntegerLineEdit::setSignedValue(s64 value)
 {
 	setText(m_display_options.signedIntegerToString(value, m_size_bits));
 }
+
+#include "moc_SymbolTreeDelegates.cpp"

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "GS/GSGL.h"
@@ -114,7 +114,7 @@ std::unique_ptr<GSTextureVK> GSTextureVK::Create(Type type, Format format, int w
 				VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
 				VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
 				(GSDeviceVK::GetInstance()->UseFeedbackLoopLayout() ? VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT
-				                                                    : 0);
+				                                                    : VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT);
 			vci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		}
 		break;
@@ -198,7 +198,7 @@ void GSTextureVK::Destroy(bool defer)
 
 	if (m_type == Type::RenderTarget || m_type == Type::DepthStencil)
 	{
-		for (const auto& [other_tex, fb, feedback] : m_framebuffers)
+		for (const auto& [other_tex, fb, feedback_color, feedback_depth] : m_framebuffers)
 		{
 			if (other_tex)
 			{
@@ -349,8 +349,18 @@ bool GSTextureVK::Update(const GSVector4i& r, const void* data, int pitch, int l
 		VKStreamBuffer& sbuffer = GSDeviceVK::GetInstance()->GetTextureUploadBuffer();
 		if (!sbuffer.ReserveMemory(required_size, GSDeviceVK::GetInstance()->GetBufferCopyOffsetAlignment()))
 		{
-			GSDeviceVK::GetInstance()->ExecuteCommandBuffer(
-				false, "While waiting for %u bytes in texture upload buffer", required_size);
+			GSDeviceVK* dev = GSDeviceVK::GetInstance();
+			if (!dev->IsPresenting())
+			{
+				dev->ExecuteCommandBuffer(
+					false, "While waiting for %u bytes in texture upload buffer", required_size);
+			}
+			else
+			{
+				dev->ExecuteCommandBufferAndRestartPresent(
+					false, "While waiting for %u bytes in texture upload buffer", required_size);
+			}
+
 			if (!sbuffer.ReserveMemory(required_size, GSDeviceVK::GetInstance()->GetBufferCopyOffsetAlignment()))
 			{
 				Console.Error("Failed to reserve texture upload memory (%u bytes).", required_size);
@@ -410,8 +420,18 @@ bool GSTextureVK::Map(GSMap& m, const GSVector4i* r, int layer)
 
 	if (!buffer.ReserveMemory(required_size, GSDeviceVK::GetInstance()->GetBufferCopyOffsetAlignment()))
 	{
-		GSDeviceVK::GetInstance()->ExecuteCommandBuffer(
-			false, "While waiting for %u bytes in texture upload buffer", required_size);
+		GSDeviceVK* dev = GSDeviceVK::GetInstance();
+		if (!dev->IsPresenting())
+		{
+			dev->ExecuteCommandBuffer(
+				false, "While waiting for %u bytes in texture upload buffer", required_size);
+		}
+		else
+		{
+			dev->ExecuteCommandBufferAndRestartPresent(
+				false, "While waiting for %u bytes in texture upload buffer", required_size);
+		}
+
 		if (!buffer.ReserveMemory(required_size, GSDeviceVK::GetInstance()->GetBufferCopyOffsetAlignment()))
 			pxFailRel("Failed to reserve texture upload memory");
 	}
@@ -639,7 +659,7 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 		case Layout::FeedbackLoop:
 			barrier.srcAccessMask = (aspect == VK_IMAGE_ASPECT_COLOR_BIT)
 			                      ? (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | GetFeedbackLoopInputAccessBits())
-			                      : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
+			                      : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | GetFeedbackLoopInputAccessBits());
 			srcStageMask = (aspect == VK_IMAGE_ASPECT_COLOR_BIT)
 			             ? (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 			             : (VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -712,7 +732,7 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 		case Layout::FeedbackLoop:
 			barrier.dstAccessMask = (aspect == VK_IMAGE_ASPECT_COLOR_BIT)
 			                      ? (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | GetFeedbackLoopInputAccessBits())
-			                      : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT);
+			                      : (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | GetFeedbackLoopInputAccessBits());
 			dstStageMask = (aspect == VK_IMAGE_ASPECT_COLOR_BIT)
 			             ? (VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT)
 			             : (VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -738,16 +758,16 @@ void GSTextureVK::TransitionSubresourcesToLayout(
 
 VkFramebuffer GSTextureVK::GetFramebuffer(bool feedback_loop)
 {
-	return GetLinkedFramebuffer(nullptr, feedback_loop);
+	return GetLinkedFramebuffer(nullptr, feedback_loop, false);
 }
 
-VkFramebuffer GSTextureVK::GetLinkedFramebuffer(GSTextureVK* depth_texture, bool feedback_loop)
+VkFramebuffer GSTextureVK::GetLinkedFramebuffer(GSTextureVK* depth_texture, bool feedback_loop_color, bool feedback_loop_depth)
 {
 	pxAssertRel(m_type != Type::Texture, "Texture is a render target");
 
-	for (const auto& [other_tex, fb, other_feedback_loop] : m_framebuffers)
+	for (const auto& [other_tex, fb, other_feedback_loop_color, other_feedback_loop_depth] : m_framebuffers)
 	{
-		if (other_tex == depth_texture && other_feedback_loop == feedback_loop)
+		if (other_tex == depth_texture && other_feedback_loop_color == feedback_loop_color && other_feedback_loop_depth == feedback_loop_depth)
 			return fb;
 	}
 
@@ -756,7 +776,7 @@ VkFramebuffer GSTextureVK::GetLinkedFramebuffer(GSTextureVK* depth_texture, bool
 		(m_type != GSTexture::Type::DepthStencil) ? (depth_texture ? depth_texture->m_vk_format : VK_FORMAT_UNDEFINED) :
 													m_vk_format,
 		VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_LOAD,
-		VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, feedback_loop);
+		VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_LOAD_OP_DONT_CARE, VK_ATTACHMENT_STORE_OP_DONT_CARE, feedback_loop_color, feedback_loop_depth);
 	if (!rp)
 		return VK_NULL_HANDLE;
 
@@ -771,9 +791,9 @@ VkFramebuffer GSTextureVK::GetLinkedFramebuffer(GSTextureVK* depth_texture, bool
 	if (!fb)
 		return VK_NULL_HANDLE;
 
-	m_framebuffers.emplace_back(depth_texture, fb, feedback_loop);
+	m_framebuffers.emplace_back(depth_texture, fb, feedback_loop_color, feedback_loop_depth);
 	if (depth_texture)
-		depth_texture->m_framebuffers.emplace_back(this, fb, feedback_loop);
+		depth_texture->m_framebuffers.emplace_back(this, fb, feedback_loop_color, feedback_loop_depth);
 	return fb;
 }
 

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Settings/HotkeySettingsWidget.h"
@@ -93,3 +93,5 @@ void HotkeySettingsWidget::createButtons()
 	// Fill remaining space.
 	m_layout->addStretch(1);
 }
+
+#include "moc_HotkeySettingsWidget.cpp"

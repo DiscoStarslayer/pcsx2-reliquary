@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DockViews.h"
 
+#include "AsyncDialogs.h"
 #include "QtUtils.h"
 #include "Debugger/DebuggerView.h"
 #include "Debugger/DebuggerWindow.h"
@@ -17,8 +18,6 @@
 
 #include <QtGui/QActionGroup>
 #include <QtGui/QPalette>
-#include <QtWidgets/QInputDialog>
-#include <QtWidgets/QMessageBox>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QStyleFactory>
 
@@ -145,15 +144,8 @@ DockTabBar::DockTabBar(KDDockWidgets::Core::TabBar* controller, QWidget* parent)
 	setContextMenuPolicy(Qt::CustomContextMenu);
 	connect(this, &DockTabBar::customContextMenuRequested, this, &DockTabBar::openContextMenu);
 
-	// The constructor of KDDockWidgets::QtWidgets::TabBar makes a QProxyStyle
-	// that ends up taking ownerhsip of the style for the entire application!
 	if (QProxyStyle* proxy_style = qobject_cast<QProxyStyle*>(style()))
-	{
-		if (proxy_style->baseStyle() == qApp->style())
-			proxy_style->baseStyle()->setParent(qApp);
-
 		proxy_style->setBaseStyle(QStyleFactory::create(qApp->style()->name()));
-	}
 }
 
 void DockTabBar::openContextMenu(QPoint pos)
@@ -183,19 +175,22 @@ void DockTabBar::openContextMenu(QPoint pos)
 		if (!widget)
 			return;
 
-		bool ok;
-		QString new_name = QInputDialog::getText(
-			this, tr("Rename Window"), tr("New name:"), QLineEdit::Normal, widget->displayNameWithoutSuffix(), &ok);
-		if (!ok)
-			return;
+		const QString title = tr("Rename Window");
+		const QString label = tr("New name:");
+		const QString text = widget->displayNameWithoutSuffix();
 
-		if (!widget->setCustomDisplayName(new_name))
-		{
-			QMessageBox::warning(this, tr("Invalid Name"), tr("The specified name is too long."));
-			return;
-		}
+		AsyncDialogs::getText(this, title, label, text, [this, widget = QPointer(widget)](QString name) {
+			if (!widget || !g_debugger_window)
+				return;
 
-		g_debugger_window->dockManager().updateDockWidgetTitles();
+			if (!widget->setCustomDisplayName(name))
+			{
+				AsyncDialogs::warning(this, tr("Invalid Name"), tr("The specified name is too long."));
+				return;
+			}
+
+			g_debugger_window->dockManager().updateDockWidgetTitles();
+		});
 	});
 
 	QAction* reset_name_action = menu->addAction(tr("Reset Name"));
@@ -312,3 +307,5 @@ void DockTabBar::mouseDoubleClickEvent(QMouseEvent* event)
 	else
 		event->ignore();
 }
+
+#include "moc_DockViews.cpp"

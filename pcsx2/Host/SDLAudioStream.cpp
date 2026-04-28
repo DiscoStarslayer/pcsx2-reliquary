@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Host/AudioStream.h"
@@ -107,7 +107,7 @@ bool SDLAudioStream::OpenDevice(bool stretch_enabled, Error* error)
 
 	SDL_SetHint(SDL_HINT_AUDIO_DEVICE_SAMPLE_FRAMES, fmt::format("{}", samples).c_str());
 
-	const SDL_AudioSpec spec = {SDL_AUDIO_S16LE, m_output_channels, static_cast<int>(m_sample_rate)};
+	const SDL_AudioSpec spec = {SDL_AUDIO_F32, m_output_channels, static_cast<int>(m_sample_rate)};
 	m_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, AudioCallback, static_cast<void*>(this));
 
 	SDL_AudioSpec obtained_spec = {};

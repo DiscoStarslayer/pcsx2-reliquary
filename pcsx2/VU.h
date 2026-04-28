@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -81,7 +81,7 @@ struct fdivPipe
 {
 	int enable;
 	REG_VI reg;
-	u32 sCycle;
+	u64 sCycle;
 	u32 Cycle;
 	u32 statusflag;
 };
@@ -90,7 +90,7 @@ struct efuPipe
 {
 	int enable;
 	REG_VI reg;
-	u32 sCycle;
+	u64 sCycle;
 	u32 Cycle;
 };
 
@@ -101,7 +101,7 @@ struct fmacPipe
 	int flagreg;
 	u32 xyzwupper;
 	u32 xyzwlower;
-	u32 sCycle;
+	u64 sCycle;
 	u32 Cycle;
 	u32 macflag;
 	u32 statusflag;
@@ -111,7 +111,7 @@ struct fmacPipe
 struct ialuPipe
 {
 	int reg;
-	u32 sCycle;
+	u64 sCycle;
 	u32 Cycle;
 };
 
@@ -128,7 +128,7 @@ struct alignas(16) VURegs
 
 	// flags/cycle are needed by VIF dma code, so they have to be here (for now)
 	// We may replace these by accessors in the future, if merited.
-	u32 cycle;
+	u64 cycle;
 	u32 flags;
 
 	// Current opcode being interpreted or recompiled (this var is used by Interps
@@ -156,7 +156,7 @@ struct alignas(16) VURegs
 	u32 statusflag;
 	u32 clipflag;
 
-	s32 nextBlockCycles;
+	s64 nextBlockCycles;
 
 	u8* Mem;
 	u8* Micro;
@@ -164,7 +164,7 @@ struct alignas(16) VURegs
 	u32 xgkickaddr;
 	u32 xgkickdiff;
 	u32 xgkicksizeremaining;
-	u32 xgkicklastcycle;
+	u64 xgkicklastcycle;
 	u32 xgkickcyclecount;
 	u32 xgkickenable;
 	u32 xgkickendpacket;

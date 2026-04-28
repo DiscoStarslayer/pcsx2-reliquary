@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -23,7 +23,7 @@ public:
 		CLONE_LAYOUT,
 	};
 
-	// Bundles together a creation mode and inital state.
+	// Bundles together a creation mode and a default dock layout index.
 	using InitialState = std::pair<CreationMode, size_t>;
 
 	// Create a "New Layout" dialog.

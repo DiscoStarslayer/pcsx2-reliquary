@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <QtCore/QDir>
@@ -50,7 +50,7 @@ ControllerBindingWidget::ControllerBindingWidget(QWidget* parent, ControllerSett
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileString(m_dialog->getProfileSettingsInterface(),
 		m_ui.controllerType, m_config_section, "Type", Pad::GetControllerInfo(Pad::GetDefaultPadType(port))->name);
 
-	connect(m_ui.controllerType, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &ControllerBindingWidget::onTypeChanged);
+	connect(m_ui.controllerType, &QComboBox::currentIndexChanged, this, &ControllerBindingWidget::onTypeChanged);
 	connect(m_ui.bindings, &QPushButton::clicked, this, &ControllerBindingWidget::onBindingsClicked);
 	connect(m_ui.settings, &QPushButton::clicked, this, &ControllerBindingWidget::onSettingsClicked);
 	connect(m_ui.macros, &QPushButton::clicked, this, &ControllerBindingWidget::onMacrosClicked);
@@ -203,7 +203,11 @@ void ControllerBindingWidget::onAutomaticBindingClicked()
 	for (const QPair<QString, QString>& dev : m_dialog->getDeviceList())
 	{
 		// we set it as data, because the device list could get invalidated while the menu is up
-		QAction* action = menu.addAction(QStringLiteral("%1 (%2)").arg(dev.first).arg(dev.second));
+		QAction* action;
+		if (dev.first.compare(dev.second, Qt::CaseInsensitive) == 0)
+			action = menu.addAction(dev.first);
+		else
+			action = menu.addAction(QStringLiteral("%1: %2").arg(dev.first).arg(dev.second));
 		action->setData(dev.first);
 		connect(action, &QAction::triggered, this, [this, action]() { doDeviceAutomaticBinding(action->data().toString()); });
 		added = true;
@@ -999,8 +1003,8 @@ USBDeviceWidget::USBDeviceWidget(QWidget* parent, ControllerSettingsWindow* dial
 	ControllerSettingWidgetBinder::BindWidgetToInputProfileString(
 		m_dialog->getProfileSettingsInterface(), m_ui.deviceType, m_config_section, "Type", "None");
 
-	connect(m_ui.deviceType, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &USBDeviceWidget::onTypeChanged);
-	connect(m_ui.deviceSubtype, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &USBDeviceWidget::onSubTypeChanged);
+	connect(m_ui.deviceType, &QComboBox::currentIndexChanged, this, &USBDeviceWidget::onTypeChanged);
+	connect(m_ui.deviceSubtype, &QComboBox::currentIndexChanged, this, &USBDeviceWidget::onSubTypeChanged);
 	connect(m_ui.bindings, &QPushButton::clicked, this, &USBDeviceWidget::onBindingsClicked);
 	connect(m_ui.settings, &QPushButton::clicked, this, &USBDeviceWidget::onSettingsClicked);
 	connect(m_ui.automaticBinding, &QPushButton::clicked, this, &USBDeviceWidget::onAutomaticBindingClicked);
@@ -1154,7 +1158,11 @@ void USBDeviceWidget::onAutomaticBindingClicked()
 	for (const QPair<QString, QString>& dev : m_dialog->getDeviceList())
 	{
 		// we set it as data, because the device list could get invalidated while the menu is up
-		QAction* action = menu.addAction(QStringLiteral("%1 (%2)").arg(dev.first).arg(dev.second));
+		QAction* action;
+		if (dev.first.compare(dev.second, Qt::CaseInsensitive) == 0)
+			action = menu.addAction(dev.first);
+		else
+			action = menu.addAction(QStringLiteral("%1: %2").arg(dev.first).arg(dev.second));
 		action->setData(dev.first);
 		connect(action, &QAction::triggered, this, [this, action]() { doDeviceAutomaticBinding(action->data().toString()); });
 		added = true;
@@ -1448,3 +1456,5 @@ USBBindingWidget* USBBindingWidget::createInstance(
 
 	return widget;
 }
+
+#include "moc_ControllerBindingWidget.cpp"

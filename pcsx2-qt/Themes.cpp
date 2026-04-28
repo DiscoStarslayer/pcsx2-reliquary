@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "QtHost.h"
@@ -11,6 +11,7 @@
 #include <QtCore/QFile>
 #include <QtGui/QPalette>
 #include <QtGui/QPixmapCache>
+#include <QtGui/QStyleHints>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QStyle>
 #include <QtWidgets/QStyleFactory>
@@ -18,11 +19,18 @@
 namespace QtHost
 {
 	static void SetStyleFromSettings();
+	static void SetColorScheme(Qt::ColorScheme color_scheme);
 } // namespace QtHost
 
 static QString s_unthemed_style_name;
 static QPalette s_unthemed_palette;
 static bool s_unthemed_style_name_set;
+
+// This is different than the result of qApp->styleHints()->colorScheme() since
+// if we set that to Qt::ColorScheme::Unknown it would return what the Qt
+// platform code thinks is the correct color scheme instead (it can still return
+// Qt::ColorScheme::Unknown if it doesn't know).
+static Qt::ColorScheme s_color_scheme = Qt::ColorScheme::Unknown;
 
 const char* QtHost::GetDefaultThemeName()
 {
@@ -54,8 +62,18 @@ void QtHost::UpdateApplicationTheme()
 
 bool QtHost::IsDarkApplicationTheme()
 {
+	// If the current theme uses a fixed color scheme just return that.
+	if (s_color_scheme != Qt::ColorScheme::Unknown)
+		return s_color_scheme == Qt::ColorScheme::Dark;
+
+	// Otherwise, fallback to using the palette heuristic. We don't bother
+	// asking the Qt platform code because it sometimes returns the wrong
+	// result. In particular, if the Windows Classic (windowsvista) theme is
+	// applied, and dark mode is enabled in the OS, it will return
+	// Qt::ColorScheme::Dark even though it's a light theme. We also can't treat
+	// it as a fixed color theme because of high contrast mode.
 	QPalette palette = qApp->palette();
-	return (palette.windowText().color().value() > palette.window().color().value());
+	return palette.windowText().color().value() > palette.window().color().value();
 }
 
 void QtHost::SetIconThemeFromStyle()
@@ -73,6 +91,7 @@ void QtHost::SetStyleFromSettings()
 		qApp->setStyle(QStyleFactory::create("Fusion"));
 		qApp->setPalette(s_unthemed_palette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Unknown);
 	}
 #ifdef _WIN32
 	else if (theme == "windowsvista")
@@ -80,6 +99,10 @@ void QtHost::SetStyleFromSettings()
 		qApp->setStyle(QStyleFactory::create("windowsvista"));
 		qApp->setPalette(s_unthemed_palette);
 		qApp->setStyleSheet(QString());
+
+		// We can't set this to Qt::ColorScheme::Light because that breaks high
+		// contrast themes on Windows.
+		SetColorScheme(Qt::ColorScheme::Unknown);
 	}
 #endif
 	else if (theme == "darkfusion")
@@ -116,6 +139,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(darkPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "darkfusionblue")
 	{
@@ -151,6 +175,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(darkBluePalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "GreyMatter")
 	{
@@ -187,6 +212,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(greyMatterPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "UntouchedLagoon")
 	{
@@ -222,6 +248,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(untouchedLagoonPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Light);
 	}
 	else if (theme == "BabyPastel")
 	{
@@ -259,6 +286,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(babyPastelPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Light);
 	}
 	else if (theme == "PizzaBrown")
 	{
@@ -296,6 +324,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(pizzaPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Light);
 	}
 	else if (theme == "PCSX2Blue")
 	{
@@ -331,6 +360,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(pcsx2BluePalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Light);
 	}
 	else if (theme == "ScarletDevilRed")
 	{
@@ -364,6 +394,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(scarletDevilPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "VioletAngelPurple")
 	{
@@ -397,6 +428,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(violetAngelPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "CobaltSky")
 	{
@@ -405,26 +437,26 @@ void QtHost::SetStyleFromSettings()
 		// Alternative dark theme.
 		qApp->setStyle(QStyleFactory::create("Fusion"));
 
-		const QColor gray(150, 150, 150);
-		const QColor royalBlue(29, 41, 81);
-		const QColor darkishBlue(17, 30, 108);
+		const QColor abyssBlue(39, 58, 114);
+		const QColor darkishBlue(29, 41, 81);
 		const QColor lighterBlue(25, 32, 130);
-		const QColor highlight(36, 93, 218);
-		const QColor link(0, 202, 255);
+		const QColor blue(198, 238, 255);
+		const QColor gray(150, 150, 150);
 
 		QPalette cobaltSkyPalette;
-		cobaltSkyPalette.setColor(QPalette::Window, royalBlue);
+		cobaltSkyPalette.setColor(QPalette::Window, abyssBlue);
 		cobaltSkyPalette.setColor(QPalette::WindowText, Qt::white);
-		cobaltSkyPalette.setColor(QPalette::Base, royalBlue.lighter());
-		cobaltSkyPalette.setColor(QPalette::AlternateBase, darkishBlue);
+		cobaltSkyPalette.setColor(QPalette::Base, darkishBlue);
+		cobaltSkyPalette.setColor(QPalette::AlternateBase, darkishBlue.darker());
 		cobaltSkyPalette.setColor(QPalette::ToolTipBase, darkishBlue);
 		cobaltSkyPalette.setColor(QPalette::ToolTipText, Qt::white);
 		cobaltSkyPalette.setColor(QPalette::Text, Qt::white);
 		cobaltSkyPalette.setColor(QPalette::Button, lighterBlue);
 		cobaltSkyPalette.setColor(QPalette::ButtonText, Qt::white);
-		cobaltSkyPalette.setColor(QPalette::Link, link);
-		cobaltSkyPalette.setColor(QPalette::Highlight, highlight);
+		cobaltSkyPalette.setColor(QPalette::Link, blue);
+		cobaltSkyPalette.setColor(QPalette::Highlight, abyssBlue.lighter());
 		cobaltSkyPalette.setColor(QPalette::HighlightedText, Qt::white);
+		cobaltSkyPalette.setColor(QPalette::PlaceholderText, gray);
 
 		cobaltSkyPalette.setColor(QPalette::Active, QPalette::Button, lighterBlue);
 		cobaltSkyPalette.setColor(QPalette::Disabled, QPalette::ButtonText, gray);
@@ -434,6 +466,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(cobaltSkyPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "AMOLED")
 	{
@@ -442,9 +475,9 @@ void QtHost::SetStyleFromSettings()
 		// OLED screens.
 		qApp->setStyle(QStyleFactory::create("Fusion"));
 
-		const QColor black(0, 0, 0);
-		const QColor gray(25, 25, 25);
-		const QColor lighterGray(75, 75, 75);
+		const QColor black(5, 5, 5);
+		const QColor gray(22, 22, 29);
+		const QColor lighterGray(65, 79, 98);
 		const QColor blue(198, 238, 255);
 
 		QPalette AMOLEDPalette;
@@ -470,6 +503,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(AMOLEDPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "Ruby")
 	{
@@ -485,7 +519,7 @@ void QtHost::SetStyleFromSettings()
 		rubyPalette.setColor(QPalette::Window, slate);
 		rubyPalette.setColor(QPalette::WindowText, Qt::white);
 		rubyPalette.setColor(QPalette::Base, slate.lighter());
-		rubyPalette.setColor(QPalette::AlternateBase, slate.lighter());
+		rubyPalette.setColor(QPalette::AlternateBase, slate.darker());
 		rubyPalette.setColor(QPalette::ToolTipBase, slate);
 		rubyPalette.setColor(QPalette::ToolTipText, Qt::white);
 		rubyPalette.setColor(QPalette::Text, Qt::white);
@@ -503,6 +537,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(rubyPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "Sapphire")
 	{
@@ -518,7 +553,7 @@ void QtHost::SetStyleFromSettings()
 		sapphirePalette.setColor(QPalette::Window, slate);
 		sapphirePalette.setColor(QPalette::WindowText, Qt::white);
 		sapphirePalette.setColor(QPalette::Base, slate.lighter());
-		sapphirePalette.setColor(QPalette::AlternateBase, slate.lighter());
+		sapphirePalette.setColor(QPalette::AlternateBase, slate.darker());
 		sapphirePalette.setColor(QPalette::ToolTipBase, slate);
 		sapphirePalette.setColor(QPalette::ToolTipText, Qt::white);
 		sapphirePalette.setColor(QPalette::Text, Qt::white);
@@ -536,6 +571,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(sapphirePalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "Emerald")
 	{
@@ -551,7 +587,7 @@ void QtHost::SetStyleFromSettings()
 		emeraldPalette.setColor(QPalette::Window, slate);
 		emeraldPalette.setColor(QPalette::WindowText, Qt::white);
 		emeraldPalette.setColor(QPalette::Base, slate.lighter());
-		emeraldPalette.setColor(QPalette::AlternateBase, slate.lighter());
+		emeraldPalette.setColor(QPalette::AlternateBase, slate.darker());
 		emeraldPalette.setColor(QPalette::ToolTipBase, slate);
 		emeraldPalette.setColor(QPalette::ToolTipText, Qt::white);
 		emeraldPalette.setColor(QPalette::Text, Qt::white);
@@ -569,6 +605,7 @@ void QtHost::SetStyleFromSettings()
 
 		qApp->setPalette(emeraldPalette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Dark);
 	}
 	else if (theme == "Custom")
 	{
@@ -587,11 +624,20 @@ void QtHost::SetStyleFromSettings()
 		{
 			qApp->setStyle(QStyleFactory::create("Fusion"));
 		}
+
+		SetColorScheme(Qt::ColorScheme::Unknown);
 	}
 	else
 	{
 		qApp->setStyle(s_unthemed_style_name);
 		qApp->setPalette(s_unthemed_palette);
 		qApp->setStyleSheet(QString());
+		SetColorScheme(Qt::ColorScheme::Unknown);
 	}
+}
+
+static void QtHost::SetColorScheme(Qt::ColorScheme color_scheme)
+{
+	s_color_scheme = color_scheme;
+	qApp->styleHints()->setColorScheme(color_scheme);
 }

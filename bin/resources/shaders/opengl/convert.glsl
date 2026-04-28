@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for editor detection
@@ -43,6 +43,8 @@ layout(binding = 0) uniform sampler2D TextureSampler;
 // Give a different name so I remember there is a special case!
 #if defined(ps_convert_rgba8_16bits) || defined(ps_convert_float32_32bits)
 layout(location = 0) out uint SV_Target1;
+#elif defined(ps_convert_float32_depth_to_color)
+layout(location = 0) out float SV_Target0;
 #else
 layout(location = 0) out vec4 SV_Target0;
 #endif
@@ -70,6 +72,7 @@ void ps_depth_copy()
 uniform ivec2 ClampMin;
 uniform int DownsampleFactor;
 uniform float Weight;
+uniform float StepMultiplier;
 
 void ps_downsample_copy()
 {
@@ -78,7 +81,7 @@ void ps_downsample_copy()
 	for (int yoff = 0; yoff < DownsampleFactor; yoff++)
 	{
 		for (int xoff = 0; xoff < DownsampleFactor; xoff++)
-			result += texelFetch(TextureSampler, coord + ivec2(xoff, yoff), 0);
+			result += texelFetch(TextureSampler, coord + ivec2(xoff * StepMultiplier, yoff * StepMultiplier), 0);
 	}
 	SV_Target0 = result / Weight;
 }
@@ -143,6 +146,20 @@ float rgb5a1_to_depth16(vec4 unorm)
 	uvec4 c = uvec4(unorm * vec4(255.5f));
 	return float(((c.r & 0xF8u) >> 3) | ((c.g & 0xF8u) << 2) | ((c.b & 0xF8u) << 7) | ((c.a & 0x80u) << 8)) * exp2(-32.0f);
 }
+
+#ifdef ps_convert_float32_depth_to_color
+void ps_convert_float32_depth_to_color()
+{
+	SV_Target0 = sample_c().r;
+}
+#endif
+
+#ifdef ps_convert_float32_color_to_depth
+void ps_convert_float32_color_to_depth()
+{
+	gl_FragDepth = sample_c().r;
+}
+#endif
 
 #ifdef ps_convert_float32_float24
 void ps_convert_float32_float24()
@@ -254,7 +271,7 @@ void ps_convert_rgb5a1_8i()
 	// 1: 16 R5G2
 	// 2: 16 G2B5A1
 	// 3: 16 G2B5A1
-	
+
 	uvec2 pos = uvec2(gl_FragCoord.xy);
 
 	// Collapse separate R G B A areas into their base pixel
@@ -262,7 +279,7 @@ void ps_convert_rgb5a1_8i()
 	uvec2 subcolumn = (pos & uvec2(0u, 1u));
 	column.x -= (column.x / 128u) * 64u;
 	column.y += (column.y / 32u) * 32u;
-	
+
 	// Deal with swizzling differences
 	if ((PSM & 0x8u) != 0u) // PSMCT16S
 	{
@@ -271,18 +288,18 @@ void ps_convert_rgb5a1_8i()
 			column.y += 32u; // 4 columns high times 4 to get bottom 4 blocks
 			column.x &= ~32u;
 		}
-		
+
 		if ((pos.x & 64u) != 0u)
 		{
 			column.x -= 32u;
 		}
-		
+
 		if (((pos.x & 16u) != 0u) != ((pos.y & 16u) != 0u))
 		{
-			column.x ^= 16u; 
+			column.x ^= 16u;
 			column.y ^= 8u;
 		}
-		
+
 		if ((PSM & 0x30u) != 0u) // PSMZ16S - Untested but hopefully ok if anything uses it.
 		{
 			column.x ^= 32u;
@@ -296,20 +313,20 @@ void ps_convert_rgb5a1_8i()
 			column.y -= 16u;
 			column.x += 32u;
 		}
-		
+
 		if ((pos.x & 96u) != 0u)
 		{
 			uint multi = (pos.x & 96u) / 32u;
 			column.y += 16u * multi; // 4 columns high times 4 to get bottom 4 blocks
 			column.x -= (pos.x & 96u);
 		}
-		
+
 		if (((pos.x & 16u) != 0u) != ((pos.y & 16u) != 0u))
 		{
-			column.x ^= 16u; 
+			column.x ^= 16u;
 			column.y ^= 8u;
 		}
-		
+
 		if ((PSM & 0x30u) != 0u) // PSMZ16 - Untested but hopefully ok if anything uses it.
 		{
 			column.x ^= 32u;
@@ -317,7 +334,7 @@ void ps_convert_rgb5a1_8i()
 		}
 	}
 	uvec2 coord = column | subcolumn;
-	
+
 	// Compensate for potentially differing page pitch.
 	uvec2 block_xy = coord / uvec2(64u, 64u);
 	uint block_num = (block_xy.y * (DBW / 128u)) + block_xy.x;
@@ -336,13 +353,13 @@ void ps_convert_rgb5a1_8i()
 		coord *= uvec2(ScaleFactor);
 
 	vec4 pixel = texelFetch(TextureSampler, ivec2(coord), 0);
-	
+
 	uvec4 denorm_c = uvec4(pixel * 255.5f);
 	if ((pos.y & 2u) == 0u)
 	{
 		uint red = (denorm_c.r >> 3) & 0x1Fu;
 		uint green = (denorm_c.g >> 3) & 0x1Fu;
-		
+
 		SV_Target0 = vec4(float(((green << 5) | red) & 0xFFu) / 255.0f);
 	}
 	else

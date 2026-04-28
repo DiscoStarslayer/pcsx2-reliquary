@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -24,15 +24,16 @@ public:
 		PRIORITY,
 		STATE,
 		WAIT_TYPE,
+		WAIT_ID,
 		COLUMN_COUNT
 	};
 
-	static constexpr QHeaderView::ResizeMode HeaderResizeModes[ThreadColumns::COLUMN_COUNT] =
-	{
+	static constexpr QHeaderView::ResizeMode HeaderResizeModes[ThreadColumns::COLUMN_COUNT] = {
 		QHeaderView::ResizeMode::ResizeToContents,
 		QHeaderView::ResizeMode::ResizeToContents,
 		QHeaderView::ResizeMode::ResizeToContents,
 		QHeaderView::ResizeMode::ResizeToContents,
+		QHeaderView::ResizeMode::Stretch,
 		QHeaderView::ResizeMode::Stretch,
 		QHeaderView::ResizeMode::Stretch,
 	};

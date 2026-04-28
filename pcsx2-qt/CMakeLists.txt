@@ -10,6 +10,8 @@ target_sources(pcsx2-qt PRIVATE
 	AboutDialog.cpp
 	AboutDialog.h
 	AboutDialog.ui
+	AsyncDialogs.cpp
+	AsyncDialogs.h
 	AutoUpdaterDialog.cpp
 	AutoUpdaterDialog.h
 	AutoUpdaterDialog.ui
@@ -119,7 +121,6 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/GraphicsHardwareFixesSettingsTab.ui
 	Settings/GraphicsHardwareRenderingSettingsTab.ui
 	Settings/GraphicsMediaCaptureSettingsTab.ui
-	Settings/GraphicsOnScreenDisplaySettingsTab.ui
 	Settings/GraphicsPostProcessingSettingsTab.ui
 	Settings/GraphicsSettingsHeader.ui
 	Settings/GraphicsSettingsWidget.cpp
@@ -148,6 +149,12 @@ target_sources(pcsx2-qt PRIVATE
 	Settings/MemoryCardSettingsWidget.cpp
 	Settings/MemoryCardSettingsWidget.h
 	Settings/MemoryCardSettingsWidget.ui
+	Settings/OSDSettingsWidget.cpp
+	Settings/OSDSettingsWidget.h
+	Settings/OSDSettingsWidget.ui
+	Settings/OsdFontPickerDialog.cpp
+	Settings/OsdFontPickerDialog.h
+	Settings/OsdFontPickerDialog.ui
 	Settings/DEV9DnsHostDialog.cpp
 	Settings/DEV9DnsHostDialog.h
 	Settings/DEV9DnsHostDialog.ui
@@ -267,7 +274,15 @@ target_sources(pcsx2-qt PRIVATE
 	resources/resources.qrc
 )
 
-file(GLOB TS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Translations/*.ts)
+if (NOT APPLE)
+    target_sources(pcsx2-qt PRIVATE
+        ShortcutCreationDialog.cpp
+        ShortcutCreationDialog.h
+        ShortcutCreationDialog.ui
+    )
+endif()
+
+file(GLOB TS_FILES ${CMAKE_CURRENT_SOURCE_DIR}/Translations/pcsx2-qt_*-*.ts)
 
 target_precompile_headers(pcsx2-qt PRIVATE PrecompiledHeader.h)
 set_source_files_properties(PrecompiledHeader.cpp PROPERTIES HEADER_FILE_ONLY TRUE)
@@ -284,10 +299,17 @@ target_link_libraries(pcsx2-qt PRIVATE
 	PCSX2
 	Qt6::Core
 	Qt6::Gui
-	Qt6::GuiPrivate
 	Qt6::Widgets
 	KDAB::kddockwidgets
 )
+
+if(NOT WIN32 AND NOT APPLE)
+	target_link_libraries(pcsx2-qt PRIVATE Qt6::GuiPrivate)
+endif()
+
+if(UNIX AND NOT APPLE)
+	target_link_libraries(pcsx2-qt PRIVATE Fontconfig::Fontconfig)
+endif()
 
 # Our Qt builds may have exceptions on, so force them off.
 target_compile_definitions(pcsx2-qt PRIVATE QT_NO_EXCEPTIONS)
@@ -316,6 +338,7 @@ elseif(APPLE)
 		set_source_files_properties(${QM_FILE} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/translations/)
 	endforeach()
 	copy_base_translations(pcsx2-qt)
+	extract_translation_from_ts(Translations/pcsx2-qt_en.ts source PermissionsDialogCamera PCSX2_CAMERA_USAGE_DESCRIPTION)
 	extract_translation_from_ts(Translations/pcsx2-qt_en.ts source PermissionsDialogMicrophone PCSX2_MICROPHONE_USAGE_DESCRIPTION)
 else()
 	qt_add_lrelease(pcsx2-qt TS_FILES ${TS_FILES} QM_FILES_OUTPUT_VARIABLE QM_FILES)

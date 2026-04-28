@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "SmallString.h"
@@ -392,7 +392,8 @@ void SmallStringBase::vsprintf(const char* format, va_list ap)
 
 void SmallStringBase::assign(const SmallStringBase& copy)
 {
-	assign(copy.c_str(), copy.length());
+	if (this != &copy)
+		assign(copy.c_str(), copy.length());
 }
 
 void SmallStringBase::assign(const char* str)

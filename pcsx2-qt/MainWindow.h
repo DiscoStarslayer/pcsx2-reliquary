@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -20,7 +20,7 @@
 class QProgressBar;
 
 class AutoUpdaterDialog;
-class DisplayWidget;
+class DisplaySurface;
 class DisplayContainer;
 class GameListWidget;
 class ControllerSettingsWindow;
@@ -65,12 +65,14 @@ public:
 		void cancelResume();
 
 	private:
-		VMLock(QWidget* dialog_parent, bool was_paused, bool was_exclusive_fullscreen);
+		VMLock(QWidget* dialog_parent, bool was_paused, bool was_exclusive_fullscreen, bool owns_parent);
 		friend MainWindow;
 
 		QWidget* m_dialog_parent;
+		bool m_has_lock;
 		bool m_was_paused;
 		bool m_was_fullscreen;
+		bool m_owns_dialog_parent;
 	};
 
 	/// Default filter for opening a file.
@@ -113,12 +115,15 @@ public:
 	void checkMousePosition(int x, int y);
 public Q_SLOTS:
 	void checkForUpdates(bool display_message, bool force_check);
-	void refreshGameList(bool invalidate_cache);
+	void refreshGameList(bool invalidate_cache, bool popup_on_error);
 	void cancelGameListRefresh();
+	void updateGameListBackground();
 	void reportInfo(const QString& title, const QString& message);
 	void reportError(const QString& title, const QString& message);
 	bool confirmMessage(const QString& title, const QString& message);
 	void onStatusMessage(const QString& message);
+	void reportStateLoadError(const QString& message, std::optional<s32> slot, bool backup);
+	void reportStateSaveError(const QString& message, std::optional<s32> slot);
 
 	void runOnUIThread(const std::function<void()>& func);
 	void requestReset();
@@ -133,8 +138,8 @@ private Q_SLOTS:
 	std::optional<WindowInfo> acquireRenderWindow(bool recreate_window, bool fullscreen, bool render_to_main, bool surfaceless);
 	void displayResizeRequested(qint32 width, qint32 height);
 	void mouseModeRequested(bool relative_mode, bool hide_cursor);
+	void mouseLockRequested(bool state);
 	void releaseRenderWindow();
-	void focusDisplayWidget();
 	void setupMouseMoveHandler();
 	void onGameListRefreshComplete();
 	void onGameListRefreshProgress(const QString& status, int current, int total);
@@ -170,6 +175,9 @@ private Q_SLOTS:
 	void onAboutActionTriggered();
 	void onToolsOpenDataDirectoryTriggered();
 	void onToolsCoverDownloaderTriggered();
+#if !defined(__APPLE__)
+	void onCreateGameShortcutTriggered();
+#endif
 	void onToolsEditCheatsPatchesTriggered(bool cheats);
 	void onCreateMemoryCardOpenRequested();
 	void updateTheme();
@@ -254,7 +262,6 @@ private:
 	bool shouldAbortForMemcardBusy(const VMLock& lock);
 
 	QWidget* getContentParent();
-	QWidget* getDisplayContainer() const;
 	void saveDisplayWindowGeometryToConfig();
 	void restoreDisplayWindowGeometryFromConfig();
 	void createDisplayWidget(bool fullscreen, bool render_to_main);
@@ -271,11 +278,14 @@ private:
 	QString getDiscDevicePath(const QString& title);
 
 	void startGameListEntry(
-		const GameList::Entry* entry, std::optional<s32> save_slot = std::nullopt, std::optional<bool> fast_boot = std::nullopt, bool load_backup = false);
-	void setGameListEntryCoverImage(const GameList::Entry* entry);
-	void clearGameListEntryPlayTime(const GameList::Entry* entry);
-	void goToWikiPage(const GameList::Entry* entry);
-	void openScreenshotsFolderForGame(const GameList::Entry* entry);
+		const GameList::Entry& entry, std::optional<s32> save_slot = std::nullopt, std::optional<bool> fast_boot = std::nullopt, bool load_backup = false);
+	void setGameListEntryCoverImage(const GameList::Entry& entry);
+	void clearGameListEntryPlayTime(const GameList::Entry& entry, const time_t entry_played_time);
+	void goToWikiPage(const GameList::Entry& entry);
+	void openMemoryCardFolder();
+	void openSnapshotsFolderForGame(const GameList::Entry& entry);
+	void openTextureFolderForGame(const GameList::Entry& entry);
+	void openVideoCaptureFolder(const GameList::Entry& entry);
 
 	std::optional<bool> promptForResumeState(const QString& save_state_path);
 	void loadSaveStateSlot(s32 slot, bool load_backup = false);
@@ -289,8 +299,8 @@ private:
 	Ui::MainWindow m_ui;
 
 	GameListWidget* m_game_list_widget = nullptr;
-	DisplayWidget* m_display_widget = nullptr;
-	DisplayContainer* m_display_container = nullptr;
+	DisplaySurface* m_display_surface = nullptr;
+	QWidget* m_display_container = nullptr;
 
 	SettingsWindow* m_settings_window = nullptr;
 	ControllerSettingsWindow* m_controller_settings_window = nullptr;
@@ -308,6 +318,7 @@ private:
 	QMenu* m_settings_toolbar_menu = nullptr;
 
 	bool m_display_created = false;
+	bool m_display_is_exclusive_fullscreen = false;
 	bool m_relative_mouse_mode = false;
 	bool m_hide_mouse_cursor = false;
 	bool m_was_paused_on_surface_loss = false;

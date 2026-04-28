@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -20,7 +20,7 @@ class GamePatchDetailsWidget : public QWidget
 	Q_OBJECT
 
 public:
-	GamePatchDetailsWidget(std::string name, const std::string& author, const std::string& description, bool tristate, Qt::CheckState checkState,
+	GamePatchDetailsWidget(const Patch::PatchInfo& info, bool tristate, Qt::CheckState checkState,
 		SettingsWindow* dialog, QWidget* parent);
 	~GamePatchDetailsWidget();
 

@@ -2,22 +2,43 @@
 setlocal enabledelayedexpansion
 
 echo Setting environment...
-if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat" (
-  call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-) else if exist "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat" (
-  call "%ProgramFiles%\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+rem Favour VS2022 over VS2026 for now.
+if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" (
+  for /f "usebackq tokens=*" %%i in (`call "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -version "[17, 18)" -latest -property installationPath`) do set "VSINSTPATH=%%i"
+  if defined VSINSTPATH (
+    echo VSINSTPATH=!VSINSTPATH!
+    call "!VSINSTPATH!\VC\Auxiliary\Build\vcvars64.bat" || goto error
+  ) else (
+    for /f "usebackq tokens=*" %%i in (`call "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -version "[18, 19)" -latest -property installationPath`) do set "VSINSTPATH=%%i"
+    if defined VSINSTPATH (
+      echo VSINSTPATH=!VSINSTPATH!
+      call "!VSINSTPATH!\VC\Auxiliary\Build\vcvars64.bat" || goto error
+    ) else (
+      echo Visual Studio not found.
+      goto error
+    )
+  )
 ) else (
-  echo Visual Studio 2022 not found.
+  echo Visual Studio not found.
   goto error
 )
 
 set SEVENZIP="C:\Program Files\7-Zip\7z.exe"
 set PATCH="C:\Program Files\Git\usr\bin\patch.exe"
+set BASH="C:\Program Files\Git\usr\bin\bash.exe"
+
+set "UNIX_TOOLS=C:\Program Files\Git\usr\bin\"
 
 if defined DEBUG (
   echo DEBUG=%DEBUG%
 ) else (
   set DEBUG=1
+)
+
+if defined BUILD_FFMPEG (
+  echo BUILD_FFMPEG=%BUILD_FFMPEG%
+) else (
+  set BUILD_FFMPEG=0
 )
 
 pushd %~dp0
@@ -40,56 +61,82 @@ set "PATH=%PATH%;%INSTALLDIR%\bin"
 
 cd "%BUILDDIR%"
 
-set FREETYPE=2.14.1
-set HARFBUZZ=12.0.0
-set LIBJPEGTURBO=3.1.2
-set LIBPNG=1650
-set SDL=SDL3-3.2.24
-set LIBPNGLONG=1.6.50
-set QT=6.10.0
-set QTMINOR=6.10
+set QT=6.11.0
+set QTMINOR=6.11
 set QTAPNG=1.3.0
+
+set FFMPEG=8.1
+set MESON=1.10.2
+set PKGCONF=2.5.1
+set AMF=1.5.0
+set LIBVPL=2.16.0
+set NVENC=13.0.19.0
+set LIBOPUS=1.6.1
+set LIBSVTAV1=4.0.1
+set LIBX264=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
+
+set FREETYPE=2.14.3
+set HARFBUZZ=14.0.0
+set SDL=SDL3-3.4.4
+set LIBJPEGTURBO=3.1.4.1
+set LIBPNG=1656
+set LIBPNGLONG=1.6.56
 set LZ4=1.10.0
 set WEBP=1.6.0
 set LIBUSB=1.0.26
-set ZLIB=1.3.1
-set ZLIBSHORT=131
+set ZLIB=1.3.2
+set ZLIBSHORT=132
 set ZSTD=1.5.7
-set KDDOCKWIDGETS=2.3.0
-set PLUTOVG=1.3.1
+set KDDOCKWIDGETS=2.4.0
+set PLUTOVG=1.3.2
 set PLUTOSVG=0.0.7
+set RAPIDYAML=0.11.1
 
-set SHADERC=2025.3
-set SHADERC_GLSLANG=efd24d75bcbc55620e759f6bf42c45a32abac5f8
-set SHADERC_SPIRVHEADERS=2a611a970fdbc41ac2e3e328802aed9985352dca
-set SHADERC_SPIRVTOOLS=33e02568181e3312f49a3cf33df470bf96ef293a
+set SHADERC=2026.1
+set SHADERC_GLSLANG=f0bd0257c308b9a26562c1a30c4748a0219cc951
+set SHADERC_SPIRVHEADERS=04f10f650d514df88b76d25e83db360142c7b174
+set SHADERC_SPIRVTOOLS=fbe4f3ad913c44fe8700545f8ffe35d1382b7093
 
-call :downloadfile "freetype-%FREETYPE%.tar.gz" https://sourceforge.net/projects/freetype/files/freetype2/%FREETYPE%/freetype-%FREETYPE%.tar.gz/download 174d9e53402e1bf9ec7277e22ec199ba3e55a6be2c0740cb18c0ee9850fc8c34 || goto error
-call :downloadfile "harfbuzz-%HARFBUZZ%.zip" https://github.com/harfbuzz/harfbuzz/archive/refs/tags/%HARFBUZZ%.zip 0f3e036294974736982d8ec00f0bed763cd9f75ab9eacf8effe413af5d78ef06 || goto error
-call :downloadfile "lpng%LIBPNG%.zip" https://download.sourceforge.net/libpng/lpng1650.zip 4be6938313b08d5921f9dede13f2789b653c96f4f8595d92ff3f09c9320e51c7 || goto error
-call :downloadfile "lpng%LIBPNG%-apng.patch.gz" https://download.sourceforge.net/libpng-apng/libpng-%LIBPNGLONG%-apng.patch.gz 687ddc0c7cb128a3ea58e159b5129252537c27ede0c32a93f11f03127f0c0165 || goto error
-call :downloadfile "libjpeg-turbo-%LIBJPEGTURBO%.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/%LIBJPEGTURBO%/libjpeg-turbo-%LIBJPEGTURBO%.tar.gz" 8f0012234b464ce50890c490f18194f913a7b1f4e6a03d6644179fa0f867d0cf || goto error
+set AGILITYSDK=1.619.1
+
+call :downloadfile "qtbase-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtbase-everywhere-src-%QT%.zip" 590d5ae246c85fa14d6458a36ff75a11236acfe8987c2475090aab1770acbdf8 || goto error
+call :downloadfile "qtimageformats-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtimageformats-everywhere-src-%QT%.zip" 5dfb3c0cb84d2c935c1716b3b86358ca496fb9216676e7e28fee1357fb4a050e || goto error
+call :downloadfile "qtsvg-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtsvg-everywhere-src-%QT%.zip" c92e1b46170b8671bbd46c783939f0c2dba4986882c5ebd37aaa9eba5b224fbe || goto error
+call :downloadfile "qttools-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttools-everywhere-src-%QT%.zip" ded4420823cb7b1bc49f38c5c56dd43ec27b6577ccbc7f620790abfabcc33b62 || goto error
+call :downloadfile "qttranslations-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttranslations-everywhere-src-%QT%.zip" f9c4fd4fd73dff51e9043d2825b04361b678f63798ed798021ef47f1ff0bfccf || goto error
+call :downloadfile "QtApng-%QTAPNG%.zip" "https://github.com/jurplel/QtApng/archive/refs/tags/%QTAPNG%.zip" 5176082cdd468047a7eb1ec1f106b032f57df207aa318d559b29606b00d159ac || goto error
+
+call :downloadfile "ffmpeg-%FFMPEG%.tar.xz" "https://ffmpeg.org/releases/ffmpeg-%FFMPEG%.tar.xz" b072aed6871998cce9b36e7774033105ca29e33632be5b6347f3206898e0756a || goto error
+call :downloadfile "meson-%MESON%.tar.gz" "https://github.com/mesonbuild/meson/releases/download/%MESON%/meson-%MESON%.tar.gz" 7890287d911dd4ee1ebd0efb61ed0321bfcd87c725df923a837cf90c6508f96b || goto error
+call :downloadfile "pkgconf-pkgconf-%PKGCONF%.zip" "https://github.com/pkgconf/pkgconf/archive/refs/tags/pkgconf-%PKGCONF%.zip" c5b5f88a2ca2324dc5d857e35bb145e24290e326357ea94a86d47b8d7fa15477 || goto error
+call :downloadfile "amf-headers-v%AMF%.tar.gz" "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/releases/download/v%AMF%/AMF-headers-v%AMF%.tar.gz" d569647fa26f289affe81a206259fa92f819d06db1e80cc334559953e82a3f01 || goto error
+call :downloadfile "libvpl-%LIBVPL%.zip" "https://github.com/intel/libvpl/archive/v%LIBVPL%.zip" 0b2ee8da8b9ef07ed4b52bf9ddee05008ec999b7c3c41944d7a9f804631c398e || goto error
+call :downloadfile "nv-codec-headers-%NVENC%.tar.gz" "https://github.com/FFmpeg/nv-codec-headers/releases/download/n%NVENC%/nv-codec-headers-%NVENC%.tar.gz" 13da39edb3a40ed9713ae390ca89faa2f1202c9dda869ef306a8d4383e242bee || goto error
+call :downloadfile "opus-%LIBOPUS%.tar.gz" "https://downloads.xiph.org/releases/opus/opus-%LIBOPUS%.tar.gz" 6ffcb593207be92584df15b32466ed64bbec99109f007c82205f0194572411a1 || goto error
+call :downloadfile "SVT-AV1-v%LIBSVTAV1%.zip" "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v%LIBSVTAV1%/SVT-AV1-v%LIBSVTAV1%.zip" bfafad9af17f87fff75e44ca9b2c10cdd83c576047c3e96229285a8a64c81afc || goto error
+call :downloadfile "x264-%LIBX264%.zip" "https://code.videolan.org/videolan/x264/-/archive/%LIBX264%.zip" d95d059eff81cc565165cd058b66e208f0cc9874106a8fe94a811a66cf8a85a2 || goto error
+
+call :downloadfile "freetype-%FREETYPE%.tar.gz" https://sourceforge.net/projects/freetype/files/freetype2/%FREETYPE%/freetype-%FREETYPE%.tar.gz/download e61b31ab26358b946e767ed7eb7f4bb2e507da1cfefeb7a8861ace7fd5c899a1 || goto error
+call :downloadfile "harfbuzz-%HARFBUZZ%.zip" https://github.com/harfbuzz/harfbuzz/archive/refs/tags/%HARFBUZZ%.zip f4b86f4d107bc4f0b005c97d6cde43e548a125ee2810fa00d41844b46b6fe16a || goto error
+call :downloadfile "lpng%LIBPNG%.zip" https://download.sourceforge.net/libpng/lpng1656.zip 1ccf023c5f4ee1a7b75c5624f53acede5066f79b2fb14ddffaa28369adf9baac || goto error
+call :downloadfile "lpng%LIBPNG%-apng.patch.gz" https://download.sourceforge.net/libpng-apng/libpng-%LIBPNGLONG%-apng.patch.gz 9ce32d4a2763a2ac5f258726ba2f49e9011327c1ee8c30862a32d0f30889fbe8 || goto error
+call :downloadfile "libjpeg-turbo-%LIBJPEGTURBO%.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/%LIBJPEGTURBO%/libjpeg-turbo-%LIBJPEGTURBO%.tar.gz" ecae8008e2cc9ade2f2c1bb9d5e6d4fb73e7c433866a056bd82980741571a022 || goto error
 call :downloadfile "libusb-%LIBUSB%.tar.bz2" "https://github.com/libusb/libusb/releases/download/v%LIBUSB%/libusb-%LIBUSB%.tar.bz2" 12ce7a61fc9854d1d2a1ffe095f7b5fac19ddba095c259e6067a46500381b5a5 || goto error
 call :downloadfile "libwebp-%WEBP%.tar.gz" "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-%WEBP%.tar.gz" e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564 || goto error
-call :downloadfile "%SDL%.zip" "https://libsdl.org/release/%SDL%.zip" ca7fe2ca54a97e047f5eff236e62ae87546e862f509f0a62fc6e564ded3c6a95 || goto error
-call :downloadfile "SDL-7914bdb7ea14ee5109d50df857c8dfc69a28a62d.patch" https://github.com/libsdl-org/SDL/commit/7914bdb7ea14ee5109d50df857c8dfc69a28a62d.patch 5c09a29a9cac87a85ec3b8f5a68ff0e5c6c47229f3e2282241b9c32166f26977 || goto error
-call :downloadfile "qtbase-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtbase-everywhere-src-%QT%.zip" d3b5379edcace266273d789249b6d68ae9495ec1b0b562ba6d039034cd315d8e || goto error
-call :downloadfile "qtimageformats-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtimageformats-everywhere-src-%QT%.zip" ac2fe34a9f1c1451b6785474e9b1b64eb59edef6553be3d630240f16a730456d || goto error
-call :downloadfile "qtsvg-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtsvg-everywhere-src-%QT%.zip" c12f8bfb617e4a03da104be36f6966ba7f64bee331f0095da1a649a1149796d2 || goto error
-call :downloadfile "qttools-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttools-everywhere-src-%QT%.zip" c6d0f0a512304ad87b20f5ff604442dd8d55769d659576ecfe5462fcd7bb9b7d || goto error
-call :downloadfile "qttranslations-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttranslations-everywhere-src-%QT%.zip" e6cc1ebf62cf37d81f3b86990086108518037bb383e75da327f297cc4fc1ae36 || goto error
-call :downloadfile "QtApng-%QTAPNG%.zip" "https://github.com/jurplel/QtApng/archive/refs/tags/%QTAPNG%.zip" 5176082cdd468047a7eb1ec1f106b032f57df207aa318d559b29606b00d159ac || goto error
+call :downloadfile "%SDL%.zip" "https://libsdl.org/release/%SDL%.zip" 6bd4fbb665f77899a488b381c5b6e9681fc57c60b669738f985fea714f3456c5 || goto error
 call :downloadfile "lz4-%LZ4%.zip" "https://github.com/lz4/lz4/archive/refs/tags/v%LZ4%.zip" 3224b4c80f351f194984526ef396f6079bd6332dd9825c72ac0d7a37b3cdc565 || goto error
-call :downloadfile "zlib%ZLIBSHORT%.zip" "https://zlib.net/zlib%ZLIBSHORT%.zip" 72af66d44fcc14c22013b46b814d5d2514673dda3d115e64b690c1ad636e7b17 || goto error
+call :downloadfile "zlib%ZLIBSHORT%.zip" "https://github.com/madler/zlib/releases/download/v%ZLIB%/zlib%ZLIBSHORT%.zip" e8bf55f3017aa181690990cb58a994e77885da140609fc8f94abe9b65d2cae28 || goto error
 call :downloadfile "zstd-%ZSTD%.zip" "https://github.com/facebook/zstd/archive/refs/tags/v%ZSTD%.zip" 7897bc5d620580d9b7cd3539c44b59d78f3657d33663fe97a145e07b4ebd69a4 || goto error
-call :downloadfile "KDDockWidgets-%KDDOCKWIDGETS%.zip" "https://github.com/KDAB/KDDockWidgets/archive/v%KDDOCKWIDGETS%.zip" d2b9592ebe5d053ac97a0213ea35139866d8d5e0a1d84b7d3fb581db7f0b01c6 || goto error
-call :downloadfile "plutovg-%PLUTOVG%.zip" "https://github.com/sammycage/plutovg/archive/v%PLUTOVG%.zip" 615184f756d91ce416f2cf883bb67fd4262651417c2e40c4d681c8641a48263e || goto error
+call :downloadfile "KDDockWidgets-%KDDOCKWIDGETS%.zip" "https://github.com/KDAB/KDDockWidgets/archive/v%KDDOCKWIDGETS%.zip" 47ddb48197872055f0adf8e90a7235f8a3b795ca1ee3a28ac2c504c673ae3806 || goto error
+call :downloadfile "plutovg-%PLUTOVG%.zip" "https://github.com/sammycage/plutovg/archive/v%PLUTOVG%.zip" 4fe4e48f28aa80171b2166d45c0976ab0f21eecedb52cd4c3ef73b5afb48fac9 || goto error
 call :downloadfile "plutosvg-%PLUTOSVG%.zip" "https://github.com/sammycage/plutosvg/archive/v%PLUTOSVG%.zip" 82dee2c57ad712bdd6d6d81d3e76249d89caa4b5a4214353660fd5adff12201a || goto error
+call :downloadfile "agility-sdk-%AGILITYSDK%.nupkg" "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/%AGILITYSDK%" 9073a264301e93183844026239c9081717d52d13fb71aae68a0555c576b8de44 || goto error
+call :downloadfile "rapidyaml-%RAPIDYAML%-src.zip" "https://github.com/biojppm/rapidyaml/releases/download/v%RAPIDYAML%/rapidyaml-%RAPIDYAML%-src.zip" 30054b74abdf0ba35bf2cb435b6e49fcb6d62a8e78a240a018c36aa60dba765f || goto error
 
-call :downloadfile "shaderc-%SHADERC%.zip" "https://github.com/google/shaderc/archive/refs/tags/v%SHADERC%.zip" 77d2425458bca62c16b1ed49ed02de4c4114a113781bd94c1961b273bdca00fb || goto error
-call :downloadfile "shaderc-glslang-%SHADERC_GLSLANG%.zip" "https://github.com/KhronosGroup/glslang/archive/%SHADERC_GLSLANG%.zip" ebd389bf79c17d79d999b3e9756359945020bbef799537aa96d8900464c373c5 || goto error
-call :downloadfile "shaderc-spirv-headers-%SHADERC_SPIRVHEADERS%.zip" "https://github.com/KhronosGroup/SPIRV-Headers/archive/%SHADERC_SPIRVHEADERS%.zip" 6b954cb358a43915a54b6ca7a27db11b15c4f6e9ec547ab4cad71857354692bc || goto error
-call :downloadfile "shaderc-spirv-tools-%SHADERC_SPIRVTOOLS%.zip" "https://github.com/KhronosGroup/SPIRV-Tools/archive/%SHADERC_SPIRVTOOLS%.zip" 00c4fa1a26de21c7c8db6947e06094a338e7d4edf972bc70d30afea9315373f2 || goto error
+call :downloadfile "shaderc-%SHADERC%.zip" "https://github.com/google/shaderc/archive/refs/tags/v%SHADERC%.zip" 3ac59c8216d367ab7858684d39c8faf872a64150aeb139335f4e083c5f79dde0 || goto error
+call :downloadfile "shaderc-glslang-%SHADERC_GLSLANG%.zip" "https://github.com/KhronosGroup/glslang/archive/%SHADERC_GLSLANG%.zip" 42a30acca4a35955370ed8ff6e54b823b4d4a5a86571baec1203d3fce87da447 || goto error
+call :downloadfile "shaderc-spirv-headers-%SHADERC_SPIRVHEADERS%.zip" "https://github.com/KhronosGroup/SPIRV-Headers/archive/%SHADERC_SPIRVHEADERS%.zip" 00ecd73dcaaa956cf2221ce899ce096e9535ba20695483c5277adede462d1bde || goto error
+call :downloadfile "shaderc-spirv-tools-%SHADERC_SPIRVTOOLS%.zip" "https://github.com/KhronosGroup/SPIRV-Tools/archive/%SHADERC_SPIRVTOOLS%.zip" 65b23ace0ff0c64daf51f7741ebb6448899fa4aceefc72403e56f5b95607ca8e || goto error
 
 if %DEBUG%==1 (
   echo Building debug and release libraries...
@@ -97,7 +144,140 @@ if %DEBUG%==1 (
   echo Building release libraries...
 )
 
-set FORCEPDB=-DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/DEBUG" -DCMAKE_MODULE_LINKER_FLAGS_RELEASE="/DEBUG"
+set FORCEPDB=-DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/DEBUG" -DCMAKE_MODULE_LINKER_FLAGS_RELEASE="/DEBUG" -DCMAKE_SHARED_LINKER_FLAGS_MINSIZEREL="/DEBUG" -DCMAKE_MODULE_LINKER_FLAGS_MINSIZEREL="/DEBUG"
+
+if %BUILD_FFMPEG%==1 (
+  if not "%INSTALLDIR%"=="%INSTALLDIR: =%" (
+    echo FFmpeg does not support building in paths with spaces.
+    goto error
+  )
+
+  where nasm /q
+  set FOUND_NASM=0
+  if !ERRORLEVEL!==0 (
+    set FOUND_NASM=1
+  )
+
+  echo "Installing AMF headers"
+  rmdir /S /Q "amf-headers-v%AMF%"
+  tar -xf "amf-headers-v%AMF%.tar.gz" || goto error
+  xcopy "%BUILDDIR%\amf-headers-v%AMF%\AMF" "%INSTALLDIR%\include\AMF\" /y /s || goto error
+  echo.
+
+  echo "Installing libvpl"
+  rmdir /S /Q "libvpl-%LIBVPL%"
+  %SEVENZIP% x "libvpl-%LIBVPL%.zip" || goto error
+  cd "libvpl-%LIBVPL%" || goto error
+  cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DINSTALL_EXAMPLES=OFF -DINSTALL_LIB=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja || goto error
+  cmake --build build --parallel || goto error
+  ninja -C build install || goto error
+  cd .. || goto error
+
+  echo "Installing libopus"
+  rmdir /S /Q "opus-%LIBOPUS%"
+  tar -xf "opus-%LIBOPUS%.tar.gz" || goto error
+  cd "opus-%LIBOPUS%" || goto error
+  cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja || goto error
+  cmake --build build --parallel || goto error
+  ninja -C build install || goto error
+  cd .. || goto error
+
+  echo "Installing libsvtav1"
+  rmdir /S /Q "SVT-AV1-v%LIBSVTAV1%"
+  tar -xf "SVT-AV1-v%LIBSVTAV1%.zip" || goto error
+  cd "SVT-AV1-v%LIBSVTAV1%" || goto error
+  if !FOUND_NASM!==0 (
+    set LIBSTVAV1_NASM=-DCOMPILE_C_ONLY=ON
+  )
+  cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_APPS=OFF -DSVT_AV1_LTO=ON !LIBSTVAV1_NASM! -B build -G Ninja || goto error
+  cmake --build build --parallel || goto error
+  ninja -C build install || goto error
+  cd .. || goto error
+
+  echo "Extracting meson"
+  rmdir /S /Q "meson-%MESON%"
+  tar xf "meson-%MESON%.tar.gz" || goto error
+  set MASON_PY=python "%BUILDDIR%\meson-%MESON%\meson.py"
+  !MASON_PY! -v || goto error
+  echo.
+
+  rem Alternatively we could grab pkg-config-lite from chocolatey or WinGet.
+  echo "Installing pkgconf"
+  rmdir /S /Q "pkgconf-pkgconf-%PKGCONF%"
+  %SEVENZIP% x "pkgconf-pkgconf-%PKGCONF%.zip" || goto error
+  cd "pkgconf-pkgconf-%PKGCONF%" || goto error
+  !MASON_PY! setup --buildtype=release --prefix="%INSTALLDIR%" -Dtests=disabled build --backend=ninja || goto error
+  !MASON_PY! compile -C build || goto error
+  ninja -C build install || goto error
+  set PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
+  set PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
+  Set "PKG_CONFIG_PATH=%INSTALLDIR%\lib\pkgconfig"
+  cd .. || goto error
+
+  set "OLD_PATH=%PATH%"
+  set "PATH=%PATH%;%UNIX_TOOLS%"
+
+  echo "Installing nvenc headers..."
+  rmdir /S /Q "nv-codec-headers-%NVENC%"
+  tar xf "nv-codec-headers-%NVENC%.tar.gz" || goto error
+  make -C "nv-codec-headers-%NVENC%" PREFIX="%INSTALLDIR%" install || goto error
+  echo.
+
+  set CC=cl
+  set CXX=cl
+
+  echo "Installing libx264"
+  rmdir /S /Q "x264-%LIBX264%"
+  %SEVENZIP% x "x264-%LIBX264%.zip" || goto error
+  cd "x264-%LIBX264%" || goto error
+  if !FOUND_NASM!==0 (
+    set LIBX264_NASM=--disable-asm
+  )
+  %BASH% configure --prefix="%INSTALLDIR%" --disable-cli --enable-static --extra-cflags="-MD -w -Os -GL" !LIBX264_NASM! || goto error
+  make -j%NUMBER_OF_PROCESSORS% || goto error
+  make install || goto error
+  cd .. || goto error
+  echo.
+
+  echo "Installing FFmpeg..."
+  rmdir /S /Q "ffmpeg-%FFMPEG%"
+  tar xf "ffmpeg-%FFMPEG%.tar.xz" || goto error
+  cd "ffmpeg-%FFMPEG%"
+  %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-configure-escape.patch" || goto error
+  if not !FOUND_NASM!==1 (
+    rem MSVC LTO gives linker errors when building without nasm.
+    rem The following patches fixes that issue.
+    %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-no-nasm-fix-avc-air.patch" || goto error
+    %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-no-nasm-fix-swc-air.patch" || goto error
+    set FFMPEG_NASM=--disable-x86asm
+  )
+  rem FFmpeg's build seems to choke when extra-cflags contain `\`, so use `/` as the path separator.
+  set VULKAN_INCLUDE=%INSTALLDIR:\=/%/../3rdparty/vulkan/include
+  rem libvpl needs to have advapi32.lib & ole32.lib added as extra libs.
+  rem For some reason QSV requires the hevc parser on windows.
+  rem --enable-small removes the display names of codecs, so instead we specify optflag for minsize
+  %BASH% configure --prefix="%INSTALLDIR%" --disable-all --disable-autodetect --disable-static --enable-shared --disable-debug ^
+    --toolchain=msvc --extra-ldflags="-LTCG" --extra-libs="advapi32.lib ole32.lib" !FFMPEG_NASM! --pkg-config="%INSTALLDIR%\bin\pkgconf.exe" ^
+    --extra-cflags="-MD -GL -I!VULKAN_INCLUDE!" --extra-cxxflags="-MD -GL -I!VULKAN_INCLUDE!" --optflags="-O1" ^
+    --enable-avcodec --enable-avformat --enable-avutil --enable-swresample --enable-swscale ^
+    --enable-gpl --enable-libx264 --enable-libsvtav1 --enable-libopus --enable-vulkan --enable-ffnvcodec --enable-nvenc --enable-libvpl --enable-amf ^
+    --enable-d3d11va --enable-mediafoundation ^
+    --enable-encoder=ffv1,qtrle,libx264*,libsvtav1,aac,flac,libopus,pcm_s16be,pcm_s16le ^
+    --enable-encoder=h264_qsv,hevc_qsv,av1_qsv ^
+    --enable-encoder=h264_nvenc,hevc_nvenc,av1_nvenc ^
+    --enable-encoder=h264_amf,hevc_amf,av1_amf ^
+    --enable-encoder=h264_vulkan,hevc_vulkan,av1_vulkan ^
+    --enable-encoder=h264_mf,hevc_mf,av1_mf ^
+    --enable-parser=hevc ^
+    --enable-muxer=avi,matroska,mov,mp3,mp4,wav ^
+    --enable-protocol=file || goto error
+  make -j%NUMBER_OF_PROCESSORS% || goto error
+  make install || goto error
+  cd ..
+  echo.
+
+  set "PATH=!OLD_PATH!"
+)
 
 echo Building Zlib...
 rmdir /S /Q "zlib-%ZLIB%"
@@ -166,7 +346,7 @@ echo Building HarfBuzz...
 rmdir /S /Q "harfbuzz-%HARFBUZZ%"
 %SEVENZIP% x "-x^!harfbuzz-%HARFBUZZ%\README" "harfbuzz-%HARFBUZZ%.zip" || goto error
 cd "harfbuzz-%HARFBUZZ%" || goto error
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -DHB_BUILD_UTILS=OFF -B build -G Ninja || goto error
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -DHB_BUILD_UTILS=OFF -DHB_BUILD_GPU=OFF -B build -G Ninja || goto error
 cmake --build build --parallel || goto error
 ninja -C build install || goto error
 cd .. || goto error
@@ -202,8 +382,7 @@ echo Building SDL...
 rmdir /S /Q "%SDL%"
 %SEVENZIP% x "%SDL%.zip" || goto error
 cd "%SDL%" || goto error
-%PATCH% -p1 < "..\SDL-7914bdb7ea14ee5109d50df857c8dfc69a28a62d.patch" || goto error
-cmake -B build -DCMAKE_BUILD_TYPE=Release %FORCEPDB% -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -DSDL_SHARED=ON -DSDL_STATIC=OFF -G Ninja || goto error
+cmake -B build -DCMAKE_BUILD_TYPE=Release %FORCEPDB% -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_VIDEO=OFF -DSDL_POWER=OFF -DSDL_SENSOR=OFF -DSDL_DIALOG=OFF -DSDL_TRAY=OFF -DSDL_TEST_LIBRARY=OFF -G Ninja || goto error
 cmake --build build --parallel || goto error
 ninja -C build install || goto error
 copy build\SDL3.pdb "%INSTALLDIR%\bin" || goto error
@@ -212,18 +391,14 @@ cd .. || goto error
 if %DEBUG%==1 (
   set QTBUILDSPEC=-DCMAKE_CONFIGURATION_TYPES="Release;Debug" -G "Ninja Multi-Config"
 ) else (
-  set QTBUILDSPEC=-DCMAKE_BUILD_TYPE=Release -G Ninja
+  set QTBUILDSPEC=-DCMAKE_BUILD_TYPE=MinSizeRel -G Ninja
 )
 
 echo Building Qt base...
 rmdir /S /Q "qtbase-everywhere-src-%QT%"
 %SEVENZIP% x "qtbase-everywhere-src-%QT%.zip" || goto error
 cd "qtbase-everywhere-src-%QT%" || goto error
-
-rem Disable the PCRE2 JIT, it doesn't properly verify AVX2 support.
-%PATCH% -p1 < "%SCRIPTDIR%\qtbase-disable-pcre2-jit.patch" || goto error
-
-cmake -B build -DFEATURE_sql=OFF -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" %FORCEPDB% -DINPUT_gui=yes -DINPUT_widgets=yes -DINPUT_ssl=yes -DINPUT_openssl=no -DINPUT_schannel=yes -DFEATURE_system_png=ON -DFEATURE_system_jpeg=ON -DFEATURE_system_zlib=ON -DFEATURE_system_freetype=ON -DFEATURE_system_harfbuzz=ON %QTBUILDSPEC% || goto error
+cmake -B build -DFEATURE_sql=OFF -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" %FORCEPDB% -DINPUT_gui=yes -DINPUT_widgets=yes -DINPUT_ssl=yes -DINPUT_openssl=no -DINPUT_schannel=yes -DFEATURE_system_png=ON -DFEATURE_system_jpeg=ON -DFEATURE_system_zlib=ON -DFEATURE_system_freetype=ON -DFEATURE_system_harfbuzz=ON -DQT_FEATURE_windows_ioring=OFF %QTBUILDSPEC% || goto error
 cmake --build build --parallel || goto error
 ninja -C build install || goto error
 cd .. || goto error
@@ -322,6 +497,29 @@ cd "plutosvg-%PLUTOSVG%" || goto error
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -DPLUTOSVG_ENABLE_FREETYPE=ON -DPLUTOSVG_BUILD_EXAMPLES=OFF -B build -G Ninja || goto error
 cmake --build build --parallel || goto error
 ninja -C build install || goto error
+cd .. || goto error
+
+echo "Building RapidYAML..."
+rmdir /S /Q "rapidyaml-%RAPIDYAML%-src"
+%SEVENZIP% x "rapidyaml-%RAPIDYAML%-src.zip" || goto error
+cd "rapidyaml-%RAPIDYAML%-src" || goto error
+cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=ON -B build -G Ninja || goto error
+cmake --build build --parallel || goto error
+ninja -C build install || goto error
+cd .. || goto error
+
+echo Unpacking Agility SDK
+rmdir /S /Q "agility-sdk-%AGILITYSDK%"
+%SEVENZIP% x -o"agility-sdk-%AGILITYSDK%" "agility-sdk-%AGILITYSDK%.nupkg" || goto error
+cd "agility-sdk-%AGILITYSDK%" || goto error
+if not exist "%INSTALLDIR%\bin\D3D12" (
+  mkdir "%INSTALLDIR%\bin\D3D12" || goto error
+)
+rem the pdbs aren't in the list of distributable files, so only copy the dlls.
+copy "build\native\bin\x64\D3D12Core.dll" "%INSTALLDIR%\bin\D3D12\D3D12Core.dll" || goto error
+if %DEBUG%==1 (
+  copy "build\native\bin\x64\d3d12SDKLayers.dll" "%INSTALLDIR%\bin\D3D12\d3d12SDKLayers.dll" || goto error
+)
 cd .. || goto error
 
 echo Building shaderc...

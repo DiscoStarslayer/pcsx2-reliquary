@@ -1,15 +1,15 @@
 {
   "app-id": "net.pcsx2.PCSX2",
   "runtime": "org.kde.Platform",
-  "runtime-version": "6.9",
+  "runtime-version": "6.10",
   "sdk": "org.kde.Sdk",
   "sdk-extensions": [
-    "org.freedesktop.Sdk.Extension.llvm18"
+    "org.freedesktop.Sdk.Extension.llvm20"
   ],
   "add-extensions": {
     "org.freedesktop.Platform.ffmpeg-full": {
       "directory": "lib/ffmpeg",
-      "version": "24.08",
+      "version": "25.08",
       "add-ld-path": ".",
       "autodownload": true
     }
@@ -22,7 +22,8 @@
     "--socket=wayland",
     "--socket=fallback-x11",
     "--socket=pulseaudio",
-    "--talk-name=org.freedesktop.ScreenSaver"
+    "--talk-name=org.freedesktop.ScreenSaver",
+    "--filesystem=xdg-run/gamescope-0:ro"
   ],
   "modules": [
     "modules/10-libpcap.json",
@@ -34,6 +35,7 @@
     "modules/25-plutosvg.json",
     "modules/26-libpng.json",
     "modules/27-qtapng.json",
+    "modules/28-rapidyaml.json",
     "modules/30-libusb.json",
     {
       "name": "pcsx2",
@@ -51,8 +53,8 @@
           "-DCMAKE_PREFIX_PATH=\"${FLATPAK_DEST}\"",
           "-DCMAKE_BUILD_TYPE=Release",
           "-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON",
-          "-DCMAKE_C_COMPILER=/usr/lib/sdk/llvm18/bin/clang",
-          "-DCMAKE_CXX_COMPILER=/usr/lib/sdk/llvm18/bin/clang++",
+          "-DCMAKE_C_COMPILER=/usr/lib/sdk/llvm20/bin/clang",
+          "-DCMAKE_CXX_COMPILER=/usr/lib/sdk/llvm20/bin/clang++",
           "-DCMAKE_EXE_LINKER_FLAGS_INIT=-fuse-ld=lld",
           "-DCMAKE_MODULE_LINKER_FLAGS_INIT=-fuse-ld=lld",
           "-DCMAKE_SHARED_LINKER_FLAGS_INIT=-fuse-ld=lld",
@@ -79,4 +81,3 @@
     }
   ]
 }
-

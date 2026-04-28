@@ -1,16 +1,18 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
+#include "pcsx2/Achievements.h"
 #include "pcsx2/SIO/Pad/Pad.h"
 #include "QtHost.h"
 #include "QtUtils.h"
 #include "SettingWidgetBinder.h"
+#include "Settings/AchievementLoginDialog.h"
 #include "Settings/BIOSSettingsWidget.h"
 #include "Settings/ControllerSettingWidgetBinder.h"
 #include "Settings/InterfaceSettingsWidget.h"
 #include "SetupWizardDialog.h"
 
-#include <QtWidgets/QMessageBox>
+#include "common/StringUtil.h"
 
 SetupWizardDialog::SetupWizardDialog()
 {
@@ -108,6 +110,10 @@ void SetupWizardDialog::pageChangedTo(int page)
 			resizeDirectoryListColumns();
 			break;
 
+		case Page_RetroAchievements:
+			refreshRetroAchievementsLoginState();
+			break;
+
 		default:
 			break;
 	}
@@ -159,6 +165,7 @@ void SetupWizardDialog::setupUi()
 	m_page_labels[Page_BIOS] = m_ui.labelBIOS;
 	m_page_labels[Page_GameList] = m_ui.labelGameList;
 	m_page_labels[Page_Controller] = m_ui.labelController;
+	m_page_labels[Page_RetroAchievements] = m_ui.labelRetroAchievements;
 	m_page_labels[Page_Complete] = m_ui.labelComplete;
 
 	connect(m_ui.back, &QPushButton::clicked, this, &SetupWizardDialog::previousPage);
@@ -169,20 +176,27 @@ void SetupWizardDialog::setupUi()
 	setupBIOSPage();
 	setupGameListPage();
 	setupControllerPage();
+	setupRetroAchievementsPage();
 }
 
 void SetupWizardDialog::setupLanguagePage()
 {
 	SettingWidgetBinder::BindWidgetToEnumSetting(nullptr, m_ui.theme, "UI", "Theme",
 		InterfaceSettingsWidget::THEME_NAMES, InterfaceSettingsWidget::THEME_VALUES, QtHost::GetDefaultThemeName(), "InterfaceSettingsWidget");
-	connect(m_ui.theme, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SetupWizardDialog::themeChanged);
+	connect(m_ui.theme, &QComboBox::currentIndexChanged, this, &SetupWizardDialog::themeChanged);
 
 	for (const std::pair<QString, QString>& it : QtHost::GetAvailableLanguageList())
-		m_ui.language->addItem(it.first, it.second);
+	{
+		QIcon flag_icon = QtUtils::GetFlagIconForLanguage(it.second);
+		if (!flag_icon.isNull())
+			m_ui.language->addItem(flag_icon, it.first, it.second);
+		else
+			m_ui.language->addItem(it.first, it.second);
+	}
 	SettingWidgetBinder::BindWidgetToStringSetting(
 		nullptr, m_ui.language, "UI", "Language", QtHost::GetDefaultLanguage());
 	connect(
-		m_ui.language, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SetupWizardDialog::languageChanged);
+		m_ui.language, &QComboBox::currentIndexChanged, this, &SetupWizardDialog::languageChanged);
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(
 		nullptr, m_ui.autoUpdateEnabled, "AutoUpdater", "CheckAtStartup", true);
@@ -254,8 +268,10 @@ void SetupWizardDialog::onDirectoryListContextMenuRequested(const QPoint& point)
 	const int row = selection[0].row();
 
 	QMenu menu;
+	//: Part of the right-click menu for game directory entries
 	menu.addAction(tr("Remove"), [this]() { onRemoveSearchDirectoryButtonClicked(); });
 	menu.addSeparator();
+	//: Part of the right-click menu for game directory entries
 	menu.addAction(tr("Open Directory..."),
 		[this, row]() { QtUtils::OpenURL(this, QUrl::fromLocalFile(m_ui.searchDirectoryList->item(row, 0)->text())); });
 	menu.exec(m_ui.searchDirectoryList->mapToGlobal(point));
@@ -398,6 +414,91 @@ void SetupWizardDialog::setupControllerPage()
 	g_emu_thread->enumerateInputDevices();
 }
 
+void SetupWizardDialog::setupRetroAchievementsPage()
+{
+	const QString base_path(QtHost::GetResourcesBasePath());
+	QtUtils::SetScalableIcon(m_ui.raLogo, QIcon(QStringLiteral("%1/icons/ra-icon.svg").arg(base_path)), QSize(56, 56));
+
+	if (Achievements::IsUsingRAIntegration())
+	{
+		m_ui.raIntegrationLabel->setVisible(true);
+		m_ui.raContentWidget->setVisible(false);
+		return;
+	}
+
+	SettingWidgetBinder::BindWidgetToBoolSetting(
+		nullptr, m_ui.raEnableAchievements, "Achievements", "Enabled", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(
+		nullptr, m_ui.raHardcoreMode, "Achievements", "ChallengeMode", false);
+	connect(m_ui.raLoginButton, &QPushButton::clicked, this, &SetupWizardDialog::onRetroAchievementsLoginLogoutPressed);
+	connect(m_ui.raViewProfileButton, &QPushButton::clicked, this, &SetupWizardDialog::onRetroAchievementsViewProfilePressed);
+	refreshRetroAchievementsLoginState();
+}
+
+void SetupWizardDialog::refreshRetroAchievementsLoginState()
+{
+	const std::string username(Host::GetBaseStringSettingValue("Achievements", "Username"));
+	const bool logged_in = !username.empty();
+
+	if (logged_in)
+	{
+		const u64 login_unix_timestamp =
+			StringUtil::FromChars<u64>(Host::GetBaseStringSettingValue("Achievements", "LoginTimestamp", "0")).value_or(0);
+		const QDateTime login_timestamp(QDateTime::fromSecsSinceEpoch(static_cast<qint64>(login_unix_timestamp)));
+		m_ui.raLoginStatus->setText(tr("Username: %1\nLogin token generated on %2.")
+				.arg(QString::fromStdString(username))
+				.arg(login_timestamp.toString(Qt::TextDate)));
+		m_ui.raLoginButton->setText(tr("Logout"));
+	}
+	else
+	{
+		m_ui.raLoginStatus->setText(tr("Not Logged In."));
+		m_ui.raLoginButton->setText(tr("Login..."));
+	}
+
+	m_ui.raViewProfileButton->setEnabled(logged_in);
+}
+
+void SetupWizardDialog::onRetroAchievementsLoginLogoutPressed()
+{
+	if (!Host::GetBaseStringSettingValue("Achievements", "Username").empty())
+	{
+		Host::RunOnCPUThread([]() { Achievements::Logout(); }, true);
+		refreshRetroAchievementsLoginState();
+		return;
+	}
+
+	AchievementLoginDialog login(this, Achievements::LoginRequestReason::UserInitiated);
+	if (login.exec() != 0)
+		return;
+
+	refreshRetroAchievementsLoginState();
+
+	// Login can enable achievements, keep the checkbox state in sync.
+	if (!m_ui.raEnableAchievements->isChecked() &&
+		Host::GetBaseBoolSettingValue("Achievements", "Enabled", false))
+	{
+		QSignalBlocker sb(m_ui.raEnableAchievements);
+		m_ui.raEnableAchievements->setChecked(true);
+	}
+	if (!m_ui.raHardcoreMode->isChecked() &&
+		Host::GetBaseBoolSettingValue("Achievements", "ChallengeMode", false))
+	{
+		QSignalBlocker sb(m_ui.raHardcoreMode);
+		m_ui.raHardcoreMode->setChecked(true);
+	}
+}
+
+void SetupWizardDialog::onRetroAchievementsViewProfilePressed()
+{
+	const std::string username(Host::GetBaseStringSettingValue("Achievements", "Username"));
+	if (username.empty())
+		return;
+
+	const QByteArray encoded_username(QUrl::toPercentEncoding(QString::fromStdString(username)));
+	QtUtils::OpenURL(this, QUrl(QStringLiteral("https://retroachievements.org/user/%1").arg(QString::fromUtf8(encoded_username))));
+}
+
 void SetupWizardDialog::openAutomaticMappingMenu(u32 port, QLabel* update_label)
 {
 	QMenu menu(this);
@@ -470,3 +571,5 @@ void SetupWizardDialog::onInputDeviceDisconnected(const QString& identifier)
 		}
 	}
 }
+
+#include "moc_SetupWizardDialog.cpp"

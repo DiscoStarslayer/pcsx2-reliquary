@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "ImGui/FullscreenUI.h"
@@ -22,7 +22,7 @@
 #include "common/Timer.h"
 
 #include "fmt/format.h"
-#include "IconsFontAwesome6.h"
+#include "IconsFontAwesome.h"
 
 #include <algorithm>
 #include <array>
@@ -94,8 +94,8 @@ bool GSRenderer::Merge(int field)
 	}
 
 	// Need to do this here, if the user has Anti-Blur enabled, these offsets can get wiped out/changed.
-	const bool game_deinterlacing = (m_regs->DISP[0].DISPFB.DBY != PCRTCDisplays.PCRTCDisplays[0].prevFramebufferReg.DBY) !=
-									(m_regs->DISP[1].DISPFB.DBY != PCRTCDisplays.PCRTCDisplays[1].prevFramebufferReg.DBY);
+	const bool game_deinterlacing = (PCRTCDisplays.PCRTCDisplays[0].prevFramebufferOffsets.y != PCRTCDisplays.PCRTCDisplays[0].framebufferOffsets.y) !=
+	                                (PCRTCDisplays.PCRTCDisplays[1].prevFramebufferOffsets.y != PCRTCDisplays.PCRTCDisplays[1].framebufferOffsets.y);
 
 	// Only need to check the right/bottom on software renderer, hardware always gets the full texture then cuts a bit out later.
 	if (PCRTCDisplays.FrameRectMatch() && !PCRTCDisplays.FrameWrap() && !feedback_merge)
@@ -112,12 +112,20 @@ bool GSRenderer::Merge(int field)
 				(!(m_regs->PMODE.MMOD == 1 && m_regs->PMODE.ALP == 0) || // Blend RC1 with non-zero alpha.
 				(m_regs->PMODE.AMOD == 0) ||                             // Use alpha of RC1.
 				(feedback_merge && m_regs->EXTBUF.FBIN == 0));           // Use RC1 for feedback merge.
+
+		// The following two flags determine if RC1 output completely overwrites RC2 output
+		// due to the alpha used for blending and the respective rectangles of the outputs.
+		const bool rc1_contains_rc2 =
+			PCRTCDisplays.PCRTCDisplays[0].displayRect.rcontains(PCRTCDisplays.PCRTCDisplays[1].displayRect);
+
+		const bool rc1_overwrites_rc2 = use_rc1 && rc1_contains_rc2 && m_regs->PMODE.MMOD == 1 && m_regs->PMODE.ALP == 255;
+
 		const bool use_rc2 =
-			PCRTCDisplays.PCRTCDisplays[1].enabled &&          // RC2 enabled.
-				// Blending RC2 and not overwriting completely with RC1.
-				((m_regs->PMODE.SLBG == 0 && !(use_rc1 && m_regs->PMODE.MMOD == 1 && m_regs->PMODE.ALP == 255)) || 
-				(m_regs->PMODE.AMOD == 1) ||                   // Use alpha of RC2.
-				(feedback_merge && m_regs->EXTBUF.FBIN == 1)); // Use RC2 for feedback merge.
+			PCRTCDisplays.PCRTCDisplays[1].enabled &&                // RC2 enabled.
+				((m_regs->PMODE.SLBG == 0 && !rc1_overwrites_rc2) || // Blending RC2 and not overwritten by RC1.
+				(m_regs->PMODE.AMOD == 1) ||                         // Use alpha of RC2.
+				(feedback_merge && m_regs->EXTBUF.FBIN == 1));       // Use RC2 for feedback merge.
+
 		if (use_rc1)
 			tex[0] = GetOutput(0, tex_scale[0], y_offset[0]);
 		if (use_rc2)
@@ -156,19 +164,10 @@ bool GSRenderer::Merge(int field)
 	bool is_bob = GSConfig.InterlaceMode == GSInterlaceMode::BobTFF || GSConfig.InterlaceMode == GSInterlaceMode::BobBFF;
 
 	// FFMD (half frames) requires blend deinterlacing, so automatically use that. Same when SCANMSK is used but not blended in the merge circuit (Alpine Racer 3).
-	if (GSConfig.InterlaceMode != GSInterlaceMode::Automatic || (!m_regs->SMODE2.FFMD && !scanmask_frame))
+	if (GSConfig.InterlaceMode != GSInterlaceMode::Automatic || (!game_deinterlacing && !m_regs->SMODE2.FFMD && !scanmask_frame))
 	{
-		// If the game is offsetting each frame itself and we're using full height buffers, we can offset this with Bob.
-		if (game_deinterlacing && !scanmask_frame && GSConfig.InterlaceMode == GSInterlaceMode::Automatic)
-		{
-			mode = 1; // Bob.
-			is_bob = true;
-		}
-		else
-		{
-			field2 = ((static_cast<int>(GSConfig.InterlaceMode) - 2) & 1);
-			mode = ((static_cast<int>(GSConfig.InterlaceMode) - 2) >> 1);
-		}
+		field2 = ((static_cast<int>(GSConfig.InterlaceMode) - 2) & 1);
+		mode = ((static_cast<int>(GSConfig.InterlaceMode) - 2) >> 1);
 	}
 
 	for (int i = 0; i < 2; i++)
@@ -185,7 +184,7 @@ bool GSRenderer::Merge(int field)
 
 		// src_gs_read is the size which we're really reading from GS memory.
 		src_gs_read[i] = ((GSVector4(curCircuit.framebufferRect) + GSVector4(0, y_offset[i], 0, y_offset[i])) * scale) / GSVector4(tex[i]->GetSize()).xyxy();
-		
+
 		float interlace_offset = 0.0f;
 		if (isReallyInterlaced() && m_regs->SMODE2.FFMD && !is_bob && !GSConfig.DisableInterlaceOffset && GSConfig.InterlaceMode != GSInterlaceMode::Off)
 		{
@@ -195,7 +194,7 @@ bool GSRenderer::Merge(int field)
 		if (m_scanmask_used)
 		{
 			int displayIntOffset = PCRTCDisplays.PCRTCDisplays[i].displayRect.y - PCRTCDisplays.PCRTCDisplays[1 - i].displayRect.y;
-			
+
 			if (displayIntOffset > 0)
 			{
 				displayIntOffset &= 1;
@@ -584,13 +583,20 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 	{
 		if (GSConfig.SaveInfo)
 		{
-			DumpGSPrivRegs(*m_regs, GetDrawDumpPath("%05d_f%05lld_vsync_gs_reg.txt", s_n, g_perfmon.GetFrame()));
+			DumpGSPrivRegs(*m_regs, GetDrawDumpPath("%05lld_f%05lld_vsync_gs_reg.txt", s_n, g_perfmon.GetFrame()));
 
 			DumpDrawInfo(false, false, true);
 		}
 
 		if (GSConfig.SaveTransferImages)
 			DumpTransferImages();
+
+		if (GSConfig.SaveFrameStats)
+		{
+			m_perfmon_frame = g_perfmon - m_perfmon_frame;
+			m_perfmon_frame.Dump(GetDrawDumpPath("%05lld_f%05lld_frame_stats.txt", s_n, g_perfmon.GetFrame()), GSIsHardwareRenderer());
+			m_perfmon_frame = g_perfmon;
+		}
 	}
 
 	const int fb_sprite_blits = g_perfmon.GetDisplayFramebufferSpriteBlits();
@@ -694,7 +700,7 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 
 			EndPresentFrame();
 
-			if (GSConfig.OsdShowGPU)
+			if (GSConfig.OsdShowGPU || GSDumpReplayer::IsReplayingDump())
 				PerformanceMetrics::OnGPUPresent(g_gs_device->GetAndResetAccumulatedGPUTime());
 		}
 
@@ -706,6 +712,15 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 	{
 		u32 screenshot_width, screenshot_height;
 		std::vector<u32> screenshot_pixels;
+
+		if (GSConfig.LinearPresent == GSPostBilinearMode::BilinearSharp)
+		{
+			const GSTexture* current = g_gs_device->GetCurrent();
+			const GSVector2i internal_res = GetInternalResolution();
+
+			if (current->GetWidth() > internal_res.x || current->GetHeight() > internal_res.y)
+				g_gs_device->Resize(internal_res.x, internal_res.y);
+		}
 
 		if (!m_dump && m_dump_frames > 0)
 		{
@@ -825,22 +840,21 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 			}
 		}
 	}
+
+	if (GSConfig.ShouldDump(s_n, g_perfmon.GetFrame()) && GSConfig.SaveTransferImages)
+		DumpTransferImages();
 }
 
-void GSRenderer::QueueSnapshot(const std::string& path, u32 gsdump_frames)
+void GSRenderer::QueueSnapshot(const std::string& path, const u32 gsdump_frames)
 {
 	if (!m_snapshot.empty())
 		return;
 
 	// Allows for providing a complete path
 	if (path.size() > 4 && StringUtil::EndsWithNoCase(path, ".png"))
-	{
 		m_snapshot = path.substr(0, path.size() - 4);
-	}
 	else
-	{
 		m_snapshot = GSGetBaseSnapshotFilename();
-	}
 
 	// this is really gross, but wx we get the snapshot request after shift...
 	m_dump_frames = gsdump_frames;
@@ -894,35 +908,42 @@ static std::string GSGetBaseFilename()
 
 std::string GSGetBaseSnapshotFilename()
 {
-	// prepend snapshots directory
-	std::string base_path = EmuFolders::Snapshots;
-
-	// If organize by game is enabled, create a game-specific folder
-	if (GSConfig.OrganizeScreenshotsByGame)
+	// If organize by game is enabled, use or create a game-specific folder.
+	if (GSConfig.OrganizeSnapshotsByGame)
 	{
-		std::string game_name = VMManager::GetTitle(true);
+		const bool prefer_english = Host::GetBaseBoolSettingValue("UI", "PreferEnglishGameList", false);
+		std::string game_name = VMManager::GetTitle(prefer_english);
 		if (!game_name.empty())
 		{
 			Path::SanitizeFileName(&game_name);
-			if (game_name.length() > 219)
-			{
-				game_name.resize(219);
-			}
-			const std::string game_dir = Path::Combine(base_path, game_name);
-			if (!FileSystem::DirectoryExists(game_dir.c_str()))
-			{
-				FileSystem::CreateDirectoryPath(game_dir.c_str(), false);
-			}
+			const std::string game_dir = Path::Combine(EmuFolders::Snapshots, game_name);
 
-			base_path = game_dir;
+			// Make sure the per-game directory exists or that we can successfully create it.
+			if (FileSystem::DirectoryExists(game_dir.c_str()) || FileSystem::CreateDirectoryPath(game_dir.c_str(), false))
+				return Path::Combine(game_dir, GSGetBaseFilename());
 		}
 	}
 
-	return Path::Combine(base_path, GSGetBaseFilename());
+	return Path::Combine(EmuFolders::Snapshots, GSGetBaseFilename());
 }
 
 std::string GSGetBaseVideoFilename()
 {
+	// If organize by game is enabled, use or create a game-specific folder.
+	if (GSConfig.OrganizeVideoCaptureByGame)
+	{
+		const bool prefer_english = Host::GetBaseBoolSettingValue("UI", "PreferEnglishGameList", false);
+		std::string game_name = VMManager::GetTitle(prefer_english);
+		if (!game_name.empty())
+		{
+			Path::SanitizeFileName(&game_name);
+			const std::string game_dir = Path::Combine(EmuFolders::Videos, game_name);
+
+			// Make sure the per-game directory exists or that we can successfully create it.
+			if (FileSystem::DirectoryExists(game_dir.c_str()) || FileSystem::CreateDirectoryPath(game_dir.c_str(), false))
+				return Path::Combine(game_dir, GSGetBaseFilename());
+		}
+	}
 	// prepend video directory
 	return Path::Combine(EmuFolders::Videos, GSGetBaseFilename());
 }

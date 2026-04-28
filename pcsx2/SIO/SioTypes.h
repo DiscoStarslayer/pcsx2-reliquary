@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -105,7 +105,7 @@ namespace SIO0_CTRL
 	static constexpr u16 PORT = 0x2000;
 } // namespace SIO0_CTRL
 
-namespace Send3
+namespace Sio2Cmd
 {
 	static constexpr u32 PORT = 0x01;
 	static constexpr u16 COMMAND_LENGTH_MASK = 0x3ff;
@@ -121,7 +121,7 @@ namespace Sio2Ctrl
 } // namespace Sio2Ctrl
 
 // TODO: Remove deprecated options once memcards are no longer using them.
-namespace Recv1
+namespace CmdStat
 {
 	// Deprecated
 	static constexpr u32 DISCONNECTED = 0x1d100;
@@ -137,7 +137,7 @@ namespace Recv1
 
 } // namespace Recv1
 
-namespace Recv2
+namespace PortStat
 {
 	static constexpr u32 DEFAULT = 0xf;
 } // namespace Recv2
@@ -147,7 +147,7 @@ namespace Recv2
 // to use them. We're going to try and respect these where it seems like
 // it may make sense to do so, but these are still largely unknown and
 // tests suggest they are not even used at all.
-namespace Recv3
+namespace FifoStat
 {
 	static constexpr u32 DEFAULT = 0x0;
 	// Set when getting memcard specs

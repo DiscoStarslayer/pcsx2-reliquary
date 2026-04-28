@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "DisplayWidget.h"
@@ -13,6 +13,7 @@
 #include "common/Console.h"
 
 #include <QtCore/QDebug>
+#include <QtCore/QTimer>
 #include <QtGui/QGuiApplication>
 #include <QtGui/QKeyEvent>
 #include <QtGui/QResizeEvent>
@@ -25,24 +26,18 @@
 
 #if defined(_WIN32)
 #include "common/RedtapeWindows.h"
-#elif !defined(APPLE)
-#include <qpa/qplatformnativeinterface.h>
 #endif
 
-DisplayWidget::DisplayWidget(QWidget* parent)
-	: QWidget(parent)
+DisplaySurface::DisplaySurface()
+	: QWindow()
 {
-	// We want a native window for both D3D and OpenGL.
-	setAutoFillBackground(false);
-	setAttribute(Qt::WA_NativeWindow, true);
-	setAttribute(Qt::WA_NoSystemBackground, true);
-	setAttribute(Qt::WA_PaintOnScreen, true);
-	setAttribute(Qt::WA_KeyCompression, false);
-	setFocusPolicy(Qt::StrongFocus);
-	setMouseTracking(true);
+	m_resize_debounce_timer = new QTimer(this);
+	m_resize_debounce_timer->setSingleShot(true);
+	m_resize_debounce_timer->setTimerType(Qt::PreciseTimer);
+	connect(m_resize_debounce_timer, &QTimer::timeout, this, &DisplaySurface::onResizeDebounceTimer);
 }
 
-DisplayWidget::~DisplayWidget()
+DisplaySurface::~DisplaySurface()
 {
 #ifdef _WIN32
 	if (m_clip_mouse_enabled)
@@ -50,19 +45,17 @@ DisplayWidget::~DisplayWidget()
 #endif
 }
 
-int DisplayWidget::scaledWindowWidth() const
+QWidget* DisplaySurface::createWindowContainer(QWidget* parent)
 {
-	return std::max(static_cast<int>(std::ceil(static_cast<qreal>(width()) * devicePixelRatioF())), 1);
+	m_container = QWidget::createWindowContainer(this, parent);
+	m_container->installEventFilter(this);
+	m_container->setFocusPolicy(Qt::StrongFocus);
+	return m_container;
 }
 
-int DisplayWidget::scaledWindowHeight() const
+std::optional<WindowInfo> DisplaySurface::getWindowInfo()
 {
-	return std::max(static_cast<int>(std::ceil(static_cast<qreal>(height()) * devicePixelRatioF())), 1);
-}
-
-std::optional<WindowInfo> DisplayWidget::getWindowInfo()
-{
-	std::optional<WindowInfo> ret(QtUtils::GetWindowInfoForWidget(this));
+	std::optional<WindowInfo> ret(QtUtils::GetWindowInfoForWindow(this));
 	if (ret.has_value())
 	{
 		m_last_window_width = ret->surface_width;
@@ -72,7 +65,7 @@ std::optional<WindowInfo> DisplayWidget::getWindowInfo()
 	return ret;
 }
 
-void DisplayWidget::updateRelativeMode(bool enabled)
+void DisplaySurface::updateRelativeMode(bool enabled)
 {
 #ifdef _WIN32
 	// prefer ClipCursor() over warping movement when we're using raw input
@@ -104,17 +97,17 @@ void DisplayWidget::updateRelativeMode(bool enabled)
 #endif
 		m_relative_mouse_start_pos = QCursor::pos();
 		updateCenterPos();
-		grabMouse();
+		setMouseGrabEnabled(true);
 	}
 	else if (m_relative_mouse_enabled)
 	{
 		m_relative_mouse_enabled = false;
 		QCursor::setPos(m_relative_mouse_start_pos);
-		releaseMouse();
+		setMouseGrabEnabled(false);
 	}
 }
 
-void DisplayWidget::updateCursor(bool hidden)
+void DisplaySurface::updateCursor(bool hidden)
 {
 	if (m_cursor_hidden == hidden)
 		return;
@@ -132,13 +125,13 @@ void DisplayWidget::updateCursor(bool hidden)
 	}
 }
 
-void DisplayWidget::handleCloseEvent(QCloseEvent* event)
+void DisplaySurface::handleCloseEvent(QCloseEvent* event)
 {
 	// Closing the separate widget will either cancel the close, or trigger shutdown.
 	// In the latter case, it's going to destroy us, so don't let Qt do it first.
 	// Treat a close event while fullscreen as an exit, that way ALT+F4 closes PCSX2,
 	// rather than just the game.
-	if (QtHost::IsVMValid() && !isActuallyFullscreen())
+	if (QtHost::IsVMValid() && !isFullScreen())
 	{
 		QMetaObject::invokeMethod(g_main_window, "requestShutdown", Q_ARG(bool, true),
 			Q_ARG(bool, true), Q_ARG(bool, false));
@@ -152,28 +145,47 @@ void DisplayWidget::handleCloseEvent(QCloseEvent* event)
 	event->ignore();
 }
 
-void DisplayWidget::destroy()
+bool DisplaySurface::isFullScreen() const
 {
-	m_destroying = true;
-
-#ifdef __APPLE__
-	// See Qt documentation, entire application is in full screen state, and the main
-	// window will get reopened fullscreen instead of windowed if we don't close the
-	// fullscreen window first.
-	if (isActuallyFullscreen())
-		close();
-#endif
-	deleteLater();
+	// DisplaySurface may be in a container
+	return (parent() ? parent()->windowState() : windowState()) & Qt::WindowFullScreen;
 }
 
-bool DisplayWidget::isActuallyFullscreen() const
+void DisplaySurface::setFocus()
 {
-	// I hate you QtWayland... have to check the parent, not ourselves.
-	QWidget* container = qobject_cast<QWidget*>(parent());
-	return container ? container->isFullScreen() : isFullScreen();
+	if (m_container)
+		m_container->setFocus();
+	else
+		requestActivate();
 }
 
-void DisplayWidget::updateCenterPos()
+QByteArray DisplaySurface::saveGeometry() const
+{
+	if (m_container)
+		return m_container->saveGeometry();
+	else
+	{
+		// QWindow lacks saveGeometry, so create a dummy widget and copy geometry across.
+		QWidget dummy = QWidget();
+		dummy.setGeometry(geometry());
+		return dummy.saveGeometry();
+	}
+}
+
+void DisplaySurface::restoreGeometry(const QByteArray& geometry)
+{
+	if (m_container)
+		m_container->restoreGeometry(geometry);
+	else
+	{
+		// QWindow lacks restoreGeometry, so create a dummy widget and copy geometry across.
+		QWidget dummy = QWidget();
+		dummy.restoreGeometry(geometry);
+		setGeometry(dummy.geometry());
+	}
+}
+
+void DisplaySurface::updateCenterPos()
 {
 #ifdef _WIN32
 	if (m_clip_mouse_enabled)
@@ -203,12 +215,14 @@ void DisplayWidget::updateCenterPos()
 #endif
 }
 
-QPaintEngine* DisplayWidget::paintEngine() const
-{
-	return nullptr;
-}
-
-bool DisplayWidget::event(QEvent* event)
+// Keyboard focus and child windows are inconsistant across platforms;
+// Windows: Can programmatically focus the child window, NVidia overlay can defocus it.
+// X11: Can programmatically focus the child window.
+// Wayland: Child window cannot be focused at all on most(?) DE.
+// Mac: Can programmatically focus the child window.
+// Thus for KB inputs we need to sometimes use the event filter.
+// Mouse events are always delivered to the child window, so that seems consistant.
+void DisplaySurface::handleKeyInputEvent(QEvent* event)
 {
 	switch (event->type())
 	{
@@ -229,7 +243,7 @@ bool DisplayWidget::event(QEvent* event)
 			}
 
 			if (key_event->isAutoRepeat())
-				return true;
+				return;
 
 			// For some reason, Windows sends "fake" key events.
 			// Scenario: Press shift, press F1, release shift, release F1.
@@ -246,7 +260,7 @@ bool DisplayWidget::event(QEvent* event)
 			if (it != m_keys_pressed_with_modifiers.end())
 			{
 				if (pressed)
-					return true;
+					return;
 				else
 					m_keys_pressed_with_modifiers.erase(it);
 			}
@@ -259,6 +273,28 @@ bool DisplayWidget::event(QEvent* event)
 				InputManager::InvokeEvents(InputManager::MakeHostKeyboardKey(key), static_cast<float>(pressed));
 			});
 
+			return;
+		}
+
+		default:
+			pxAssert(false);
+			return;
+	}
+}
+
+void DisplaySurface::onResizeDebounceTimer()
+{
+	emit windowResizedEvent(m_pending_window_width, m_pending_window_height, m_pending_window_scale);
+}
+
+bool DisplaySurface::event(QEvent* event)
+{
+	switch (event->type())
+	{
+		case QEvent::KeyPress:
+		case QEvent::KeyRelease:
+		{
+			handleKeyInputEvent(event);
 			return true;
 		}
 
@@ -268,7 +304,7 @@ bool DisplayWidget::event(QEvent* event)
 
 			if (!m_relative_mouse_enabled)
 			{
-				const qreal dpr = devicePixelRatioF();
+				const qreal dpr = devicePixelRatio();
 				const QPoint mouse_pos = mouse_event->pos();
 
 				const float scaled_x = static_cast<float>(static_cast<qreal>(mouse_pos.x()) * dpr);
@@ -352,125 +388,110 @@ bool DisplayWidget::event(QEvent* event)
 		case QEvent::DevicePixelRatioChange:
 		case QEvent::Resize:
 		{
-			QWidget::event(event);
+			QWindow::event(event);
 
-			const float dpr = devicePixelRatioF();
-			const u32 scaled_width = static_cast<u32>(std::max(static_cast<int>(std::ceil(static_cast<qreal>(width()) * dpr)), 1));
-			const u32 scaled_height = static_cast<u32>(std::max(static_cast<int>(std::ceil(static_cast<qreal>(height()) * dpr)), 1));
+			const float dpr = devicePixelRatio();
+			const u32 scaled_width = static_cast<u32>(std::max(static_cast<int>(std::round(static_cast<qreal>(width()) * dpr)), 1));
+			const u32 scaled_height = static_cast<u32>(std::max(static_cast<int>(std::round(static_cast<qreal>(height()) * dpr)), 1));
 
 			// avoid spamming resize events for paint events (sent on move on windows)
 			if (m_last_window_width != scaled_width || m_last_window_height != scaled_height || m_last_window_scale != dpr)
 			{
+				m_pending_window_width = scaled_width;
+				m_pending_window_height = scaled_height;
+				m_pending_window_scale = dpr;
+
 				m_last_window_width = scaled_width;
 				m_last_window_height = scaled_height;
 				m_last_window_scale = dpr;
-				emit windowResizedEvent(scaled_width, scaled_height, dpr);
+				// qt spams resize events, sometimes several time per ms.
+				// since a vulkan resize swap chain event takes between 15 to 25ms this is,
+				// need less to say, unwanted.
+				m_resize_debounce_timer->start(100);
 			}
 
 			updateCenterPos();
 			return true;
 		}
 
+		case QEvent::DragEnter:
+			QWindow::event(event);
+			emit dragEnterEvent(static_cast<QDragEnterEvent*>(event));
+			return event->isAccepted();
+
+		case QEvent::Drop:
+			QWindow::event(event);
+			emit dropEvent(static_cast<QDropEvent*>(event));
+			return event->isAccepted();
+
 		case QEvent::Move:
-		{
 			updateCenterPos();
 			return true;
-		}
 
+		// These events only work on the top level control.
+		// Which is this container when render to seperate or fullscreen is active (Windows).
 		case QEvent::Close:
-		{
-			if (m_destroying)
-				return QWidget::event(event);
-
 			handleCloseEvent(static_cast<QCloseEvent*>(event));
 			return true;
-		}
-
 		case QEvent::WindowStateChange:
-		{
-			QWidget::event(event);
-
 			if (static_cast<QWindowStateChangeEvent*>(event)->oldState() & Qt::WindowMinimized)
 				emit windowRestoredEvent();
-
-			return true;
-		}
+			return false;
 
 		default:
-			return QWidget::event(event);
+			return QWindow::event(event);
 	}
 }
 
-DisplayContainer::DisplayContainer()
-	: QStackedWidget(nullptr)
+bool DisplaySurface::eventFilter(QObject* object, QEvent* event)
 {
-}
-
-DisplayContainer::~DisplayContainer() = default;
-
-bool DisplayContainer::isNeeded(bool fullscreen, bool render_to_main)
-{
-#if defined(_WIN32) || defined(__APPLE__)
-	return false;
-#else
-	if (!isRunningOnWayland())
-		return false;
-
-	// We only need this on Wayland because of client-side decorations...
-	return (fullscreen || !render_to_main);
-#endif
-}
-
-bool DisplayContainer::isRunningOnWayland()
-{
-#if defined(_WIN32) || defined(__APPLE__)
-	return false;
-#else
-	const QString platform_name = QGuiApplication::platformName();
-	return (platform_name == QStringLiteral("wayland"));
-#endif
-}
-
-void DisplayContainer::setDisplayWidget(DisplayWidget* widget)
-{
-	pxAssert(!m_display_widget);
-	m_display_widget = widget;
-	addWidget(widget);
-}
-
-DisplayWidget* DisplayContainer::removeDisplayWidget()
-{
-	DisplayWidget* widget = m_display_widget;
-	pxAssert(widget);
-	m_display_widget = nullptr;
-	removeWidget(widget);
-	return widget;
-}
-
-bool DisplayContainer::event(QEvent* event)
-{
-	if (event->type() == QEvent::Close && m_display_widget)
-	{
-		m_display_widget->handleCloseEvent(static_cast<QCloseEvent*>(event));
-		return true;
-	}
-
-	const bool res = QStackedWidget::event(event);
-	if (!m_display_widget)
-		return res;
-
 	switch (event->type())
 	{
+		case QEvent::KeyPress:
+		case QEvent::KeyRelease:
+#ifdef _WIN32
+			// Nvidia overlay causes the child window to lose focus, but not its parent.
+			// Refocus the child window.
+			requestActivate();
+#endif
+			handleKeyInputEvent(event);
+			return true;
+
+		// These events only work on the top level control.
+		// Which is this container when render to seperate or fullscreen is active (Non-Windows).
+		case QEvent::Close:
+			handleCloseEvent(static_cast<QCloseEvent*>(event));
+			return true;
 		case QEvent::WindowStateChange:
-		{
 			if (static_cast<QWindowStateChangeEvent*>(event)->oldState() & Qt::WindowMinimized)
-				emit m_display_widget->windowRestoredEvent();
-		}
-		break;
+				emit windowRestoredEvent();
+			return false;
 
+		case QEvent::ChildWindowRemoved:
+			if (static_cast<QChildWindowEvent*>(event)->child() == this)
+			{
+				object->removeEventFilter(this);
+				m_container = nullptr;
+			}
+			return false;
+
+		case QEvent::FocusIn:
+			// macOS: When we (the display window) get focus from another window with a toolbar we update to the MainWindow toolbar.
+			// This is because we are a different native window from our MainWindow. So, whenever we get focus, focus our MainWindow.
+			// That way macOS will show the MainWindow toolbar when you click from the debugger / log window to the game.
+
+			// Don't try to steal focus when we're showing a modal dialog
+			// We end up ping ponging focus in a feedback loop
+			if (QApplication::activeModalWidget() != nullptr)
+				return false;
+
+			if (const auto* w = qobject_cast<QWidget*>(object))
+				w->window()->activateWindow();
+
+			return false;
 		default:
-			break;
+			return false;
 	}
-
-	return res;
 }
+
+#include "moc_DisplayWidget.cpp"

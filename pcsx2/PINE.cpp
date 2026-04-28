@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "BuildVersion.h"
@@ -6,8 +6,10 @@
 #include "Host.h"
 #include "Memory.h"
 #include "Elfheader.h"
+#include "SaveState.h"
 #include "PINE.h"
 #include "VMManager.h"
+#include "common/Error.h"
 #include "common/Threading.h"
 
 #include <atomic>
@@ -644,7 +646,11 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 					goto error;
 				if (!SafetyChecks(buf_cnt, 1, ret_cnt, 0, buf_size)) [[unlikely]]
 					goto error;
-				Host::RunOnCPUThread([slot = FromSpan<u8>(buf, buf_cnt)] { VMManager::SaveStateToSlot(slot); });
+				Host::RunOnCPUThread([slot = FromSpan<u8>(buf, buf_cnt)] {
+					VMManager::SaveStateToSlot(slot, true, [slot](const std::string& error) {
+						SaveState_ReportSaveErrorOSD(error, slot);
+					});
+				});
 				buf_cnt += 1;
 				break;
 			}
@@ -654,7 +660,11 @@ PINEServer::IPCBuffer PINEServer::ParseCommand(std::span<u8> buf, std::vector<u8
 					goto error;
 				if (!SafetyChecks(buf_cnt, 1, ret_cnt, 0, buf_size)) [[unlikely]]
 					goto error;
-				Host::RunOnCPUThread([slot = FromSpan<u8>(buf, buf_cnt)] { VMManager::LoadStateFromSlot(slot); });
+				Host::RunOnCPUThread([slot = FromSpan<u8>(buf, buf_cnt)] {
+					Error state_error;
+					if (!VMManager::LoadStateFromSlot(slot, false, &state_error))
+						SaveState_ReportLoadErrorOSD(state_error.GetDescription(), slot, false);
+				});
 				buf_cnt += 1;
 				break;
 			}

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "pcsx2/Achievements.h"
@@ -46,11 +46,6 @@ void Host::ReportErrorAsync(const std::string_view title, const std::string_view
 {
 }
 
-bool Host::ConfirmMessage(const std::string_view title, const std::string_view message)
-{
-	return true;
-}
-
 void Host::OpenURL(const std::string_view url)
 {
 }
@@ -92,6 +87,10 @@ void Host::OnInputDeviceDisconnected(const InputBindingKey key, const std::strin
 }
 
 void Host::SetMouseMode(bool relative_mode, bool hide_cursor)
+{
+}
+
+void Host::SetMouseLock(bool state)
 {
 }
 
@@ -154,6 +153,10 @@ void Host::OnSaveStateSaved(const std::string_view filename)
 }
 
 void Host::RunOnCPUThread(std::function<void()> function, bool block /* = false */)
+{
+}
+
+void Host::RunOnGSThread(std::function<void()> function)
 {
 }
 
@@ -265,6 +268,14 @@ void Host::OpenHostFileSelectorAsync(std::string_view title, bool select_directo
 	FileSelectorFilters filters, std::string_view initial_directory)
 {
 	callback(std::string());
+}
+
+int Host::LocaleSensitiveCompare(std::string_view lhs, std::string_view rhs)
+{
+	int res = std::strncmp(lhs.data(), rhs.data(), std::min(lhs.size(), rhs.size()));
+	if (res != 0)
+		return res;
+	return lhs.size() > rhs.size() ? 1 : lhs.size() < rhs.size() ? -1 : 0;
 }
 
 std::optional<u32> InputManager::ConvertHostKeyboardStringToCode(const std::string_view str)

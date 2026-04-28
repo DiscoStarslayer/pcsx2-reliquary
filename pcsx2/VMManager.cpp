@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
@@ -37,6 +37,7 @@
 #include "SIO/Sio0.h"
 #include "SIO/Sio2.h"
 #include "SPU2/spu2.h"
+#include "SupportURLs.h"
 #include "USB/USB.h"
 #include "Vif_Dynarec.h"
 #include "VMManager.h"
@@ -54,7 +55,7 @@
 #include "common/Timer.h"
 #include "common/emitter/x86emitter.h"
 
-#include "IconsFontAwesome6.h"
+#include "IconsFontAwesome.h"
 #include "IconsPromptFont.h"
 #include "cpuinfo.h"
 #include "discord_rpc.h"
@@ -101,7 +102,7 @@ namespace VMManager
 	static void LogUnsafeSettingsToConsole(const std::string& messages);
 	static void WarnAboutUnsafeSettings();
 
-	static bool AutoDetectSource(const std::string& filename);
+	static bool AutoDetectSource(const std::string& filename, Error* error = nullptr);
 	static void UpdateDiscDetails(bool booting);
 	static void ClearDiscDetails();
 	static void HandleELFChange(bool verbose_patches_if_changed);
@@ -113,19 +114,21 @@ namespace VMManager
 	static void PrecacheCDVDFile();
 
 	static std::string GetCurrentSaveStateFileName(s32 slot, bool backup = false);
-	static bool DoLoadState(const char* filename);
-	static bool DoSaveState(const char* filename, s32 slot_for_message, bool zip_on_thread, bool backup_old_state);
+	static bool DoLoadState(const char* filename, Error* error = nullptr);
+	static void DoSaveState(const char* filename, s32 slot_for_message, bool zip_on_thread, bool backup_old_state, std::function<void(const std::string&)> error_callback);
 	static void ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
-		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, const char* filename,
-		s32 slot_for_message);
+		std::unique_ptr<SaveStateScreenshotData> screenshot, const char* filename,
+		s32 slot_for_message, std::function<void(const std::string&)> error_callback);
 	static void ZipSaveStateOnThread(std::unique_ptr<ArchiveEntryList> elist,
-		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, std::string filename,
-		s32 slot_for_message);
+		std::unique_ptr<SaveStateScreenshotData> screenshot, std::string filename,
+		s32 slot_for_message, std::function<void(const std::string&)> error_callback);
 
 	static void LoadSettings();
 	static void LoadCoreSettings(SettingsInterface& si);
 	static void ApplyCoreSettings();
 	static void LoadInputBindings(SettingsInterface& si, std::unique_lock<std::mutex>& lock);
+	static bool HasAnyBindingsForPad(const SettingsInterface& si, u32 port);
+	static void WarnAboutUnconfiguredController();
 	static void UpdateInhibitScreensaver(bool allow);
 	static void AccumulateSessionPlaytime();
 	static void ResetResumeTimestamp();
@@ -202,6 +205,9 @@ static bool s_screensaver_inhibited = false;
 
 static bool s_discord_presence_active = false;
 static time_t s_discord_presence_time_epoch;
+static const char* s_discord_presence_app_id = "1458595419499139094";
+static const char* s_discord_presence_large_image_key = "4k-pcsx2";
+static const char* s_discord_presence_large_image_text = "PCSX2 PS2 Emulator";
 
 // Making GSDumpReplayer.h dependent on R5900.h is a no-no, since the GS uses it.
 extern R5900cpu GSDumpReplayerCpu;
@@ -210,7 +216,7 @@ bool VMManager::PerformEarlyHardwareChecks(const char** error)
 {
 #define COMMON_DOWNLOAD_MESSAGE "PCSX2 builds can be downloaded from https://pcsx2.net/downloads/"
 
-#if defined(_M_X86)
+#if defined(ARCH_X86)
 	// On Windows, this gets called as a global object constructor, before any of our objects are constructed.
 	// So, we have to put it on the stack instead.
 	cpuinfo_initialize();
@@ -234,7 +240,7 @@ bool VMManager::PerformEarlyHardwareChecks(const char** error)
 		return false;
 	}
 #endif
-#elif defined(_M_ARM64)
+#elif defined(ARCH_ARM64)
 	// Check page size. If it doesn't match, it is a fatal error.
 	const size_t runtime_host_page_size = HostSys::GetRuntimePageSize();
 	if (__pagesize != runtime_host_page_size)
@@ -344,7 +350,7 @@ std::string VMManager::GetTitle(bool prefer_en)
 {
 	std::unique_lock lock(s_info_mutex);
 	std::string out = s_title;
-	if (!s_title_en_search.empty())
+	if (prefer_en && !s_title_en_search.empty())
 	{
 		size_t pos = out.find(s_title_en_search);
 		if (pos != out.npos)
@@ -496,7 +502,7 @@ void VMManager::UpdateLoggingSettings(SettingsInterface& si)
 	if (system_console_enabled != Log::IsConsoleOutputEnabled())
 		Log::SetConsoleOutputLevel(system_console_enabled ? level : LOGLEVEL_NONE);
 
-	// Debug console only exists on Windows.
+		// Debug console only exists on Windows.
 #ifdef _WIN32
 	const bool debug_console_enabled = IsDebuggerPresent() && si.GetBoolValue("Logging", "EnableDebugConsole", false);
 	Log::SetDebugOutputLevel(debug_console_enabled ? level : LOGLEVEL_NONE);
@@ -537,6 +543,7 @@ void VMManager::SetDefaultLoggingSettings(SettingsInterface& si)
 	si.SetBoolValue("Logging", "EnableSystemConsole", false);
 	si.SetBoolValue("Logging", "EnableFileLogging", true);
 	si.SetBoolValue("Logging", "EnableTimestamps", true);
+	si.SetBoolValue("Logging", "EnableEESIOInput", false);
 	si.SetBoolValue("Logging", "EnableVerbose", false);
 	si.SetBoolValue("Logging", "EnableEEConsole", false);
 	si.SetBoolValue("Logging", "EnableIOPConsole", false);
@@ -695,6 +702,36 @@ void VMManager::LoadInputBindings(SettingsInterface& si, std::unique_lock<std::m
 	}
 }
 
+bool VMManager::HasAnyBindingsForPad(const SettingsInterface& si, u32 port)
+{
+	if (port >= Pad::NUM_CONTROLLER_PORTS)
+		return false;
+
+	const std::string section = Pad::GetConfigSection(port);
+	const Pad::ControllerInfo* info = Pad::GetConfigControllerType(si, section.c_str(), port);
+	if (!info || info->type == Pad::ControllerType::NotConnected)
+		return false;
+
+	for (const InputBindingInfo& binding : info->bindings)
+	{
+		if (!si.GetStringList(section.c_str(), binding.name).empty())
+			return true;
+	}
+
+	return false;
+}
+
+void VMManager::WarnAboutUnconfiguredController()
+{
+	std::unique_lock<std::mutex> lock = Host::GetSettingsLock();
+	SettingsInterface* si = Host::GetSettingsInterface();
+	if (!si || HasAnyBindingsForPad(*si, 0))
+		return;
+
+	Host::AddIconOSDMessage("ControllerNotConfigured", ICON_FA_GAMEPAD,
+		TRANSLATE_STR("VMManager", "Controller 1 has no input bindings configured."), Host::OSD_WARNING_DURATION);
+}
+
 void VMManager::ApplyGameFixes()
 {
 	if (!HasBootedELF() && !GSDumpReplayer::IsReplayingDump())
@@ -787,8 +824,8 @@ std::string VMManager::GetGameSettingsPath(const std::string_view game_serial, u
 	std::string sanitized_serial(Path::SanitizeFileName(game_serial));
 
 	return game_serial.empty() ?
-			   Path::Combine(EmuFolders::GameSettings, fmt::format("{:08X}.ini", game_crc)) :
-			   Path::Combine(EmuFolders::GameSettings, fmt::format("{}_{:08X}.ini", sanitized_serial, game_crc));
+	           Path::Combine(EmuFolders::GameSettings, fmt::format("{:08X}.ini", game_crc)) :
+	           Path::Combine(EmuFolders::GameSettings, fmt::format("{}_{:08X}.ini", sanitized_serial, game_crc));
 }
 
 std::string VMManager::GetDiscOverrideFromGameSettings(const std::string& elf_path)
@@ -1212,8 +1249,10 @@ void VMManager::ReportGameChangeToHost()
 {
 	const std::string& disc_path = CDVDsys_GetFile(CDVDsys_GetSourceType());
 	const u32 crc_to_report = HasBootedELF() ? s_current_crc : 0;
-	FullscreenUI::GameChanged(disc_path, s_disc_serial, GetTitle(true), s_disc_crc, crc_to_report);
-	Host::OnGameChanged(s_title, s_elf_override, disc_path, s_disc_serial, s_disc_crc, crc_to_report);
+	const bool prefer_english = Host::GetBaseBoolSettingValue("UI", "PreferEnglishGameList", false);
+	const std::string game_title = GetTitle(prefer_english);
+	FullscreenUI::GameChanged(disc_path, s_disc_serial, game_title, s_disc_crc, crc_to_report);
+	Host::OnGameChanged(game_title, s_elf_override, disc_path, s_disc_serial, s_disc_crc, crc_to_report);
 }
 
 bool VMManager::HasBootedELF()
@@ -1221,20 +1260,20 @@ bool VMManager::HasBootedELF()
 	return s_current_crc != 0 && s_elf_executed;
 }
 
-bool VMManager::AutoDetectSource(const std::string& filename)
+bool VMManager::AutoDetectSource(const std::string& filename, Error* error)
 {
 	if (!filename.empty())
 	{
 		if (!FileSystem::FileExists(filename.c_str()))
 		{
-			Host::ReportErrorAsync("Error", fmt::format("Requested filename '{}' does not exist.", filename));
+			Error::SetStringFmt(error, TRANSLATE_FS("VMManager", "Requested filename '{}' does not exist."), filename);
 			return false;
 		}
 
 		if (IsGSDumpFileName(filename))
 		{
 			CDVDsys_ChangeSource(CDVD_SourceType::NoDisc);
-			return GSDumpReplayer::Initialize(filename.c_str());
+			return GSDumpReplayer::Initialize(filename.c_str(), error);
 		}
 		else if (IsElfFileName(filename))
 		{
@@ -1291,10 +1330,46 @@ void VMManager::PrecacheCDVDFile()
 	}
 }
 
-bool VMManager::Initialize(VMBootParameters boot_params)
+void VMManager::InitializeAsync(
+	const VMBootParameters& boot_params,
+	VMBootHardcoreDisableCallback hardcore_disable_callback,
+	VMBootDoneCallback done_callback)
+{
+	Error error;
+	VMBootResult result = VMManager::Initialize(boot_params, &error);
+
+	if (result == VMBootResult::PromptDisableHardcoreMode)
+	{
+		std::string reason;
+		if (DebugInterface::getPauseOnEntry())
+			reason = TRANSLATE_STR("VMManager", "Boot and Debug");
+		else
+			reason = TRANSLATE_STR("VMManager", "Resuming state");
+
+		hardcore_disable_callback(reason,
+			[boot_params, done_callback = std::move(done_callback)]() {
+				VMBootParameters new_boot_params = std::move(boot_params);
+				new_boot_params.disable_achievements_hardcore_mode = true;
+
+				Error error;
+				VMBootResult result = VMManager::Initialize(new_boot_params, &error);
+				done_callback(result, error);
+			});
+
+		return;
+	}
+
+	done_callback(result, error);
+}
+
+VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* error)
 {
 	const Common::Timer init_timer;
-	pxAssertRel(s_state.load(std::memory_order_acquire) == VMState::Shutdown, "VM is shutdown");
+	if (s_state.load(std::memory_order_acquire) != VMState::Shutdown)
+	{
+		Error::SetString(error, TRANSLATE_STR("VMManager", "The virtual machine is already running."));
+		return VMBootResult::StartupFailure;
+	}
 
 	s_is_python2 = boot_params.is_python2.has_value() && boot_params.is_python2.value();
 	if (s_is_python2)
@@ -1342,26 +1417,33 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 
 	std::string state_to_load;
 
-	s_elf_override = std::move(boot_params.elf_override);
+	s_elf_override = boot_params.elf_override;
 	if (!boot_params.save_state.empty())
-		state_to_load = std::move(boot_params.save_state);
+		state_to_load = boot_params.save_state;
 
 	// if we're loading an indexed save state, we need to get the serial/crc from the disc.
 	if (boot_params.state_index.has_value())
 	{
 		if (boot_params.filename.empty())
 		{
-			Host::ReportErrorAsync("Error", "Cannot load an indexed save state without a boot filename.");
-			return false;
+			Error::SetString(error,
+				TRANSLATE_STR("VMManager", "Cannot load an indexed save state without a boot filename."));
+			return VMBootResult::StartupFailure;
 		}
 
 		state_to_load = GetSaveStateFileName(boot_params.filename.c_str(), boot_params.state_index.value());
 		if (state_to_load.empty())
 		{
-			Host::ReportErrorAsync("Error", "Could not resolve path indexed save state load.");
-			return false;
+			Error::SetString(error,
+				TRANSLATE_STR("VMManager", "Could not resolve path for indexed save state load."));
+			return VMBootResult::StartupFailure;
 		}
 	}
+
+	if (!cdvdLock(error))
+		return VMBootResult::StartupFailure;
+
+	ScopedGuard unlock_cdvd = &cdvdUnlock;
 
 	// resolve source type
 	if (boot_params.source_type.has_value())
@@ -1369,20 +1451,20 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 		if (boot_params.source_type.value() == CDVD_SourceType::Iso &&
 			!FileSystem::FileExists(boot_params.filename.c_str()))
 		{
-			Host::ReportErrorAsync(
-				"Error", fmt::format("Requested filename '{}' does not exist.", boot_params.filename));
-			return false;
+			Error::SetStringFmt(error,
+				TRANSLATE_FS("VMManager", "Requested filename '{}' does not exist."), boot_params.filename);
+			return VMBootResult::StartupFailure;
 		}
 
 		// Use specified source type.
-		CDVDsys_SetFile(boot_params.source_type.value(), std::move(boot_params.filename));
+		CDVDsys_SetFile(boot_params.source_type.value(), boot_params.filename);
 		CDVDsys_ChangeSource(boot_params.source_type.value());
 	}
 	else
 	{
 		// Automatic type detection of boot parameter based on filename.
-		if (!AutoDetectSource(boot_params.filename))
-			return false;
+		if (!AutoDetectSource(boot_params.filename, error))
+			return VMBootResult::StartupFailure;
 	}
 
 	ScopedGuard close_cdvd_files(&CDVDsys_ClearFiles);
@@ -1393,26 +1475,26 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 		Console.WriteLn("Loading BIOS...");
 		if (!LoadBIOS())
 		{
-			Host::ReportErrorAsync(TRANSLATE_SV("VMManager", "Error"),
-				TRANSLATE_SV("VMManager",
-					"PCSX2 requires a PS2 BIOS in order to run.\n\n"
-					"For legal reasons, you *must* obtain a BIOS from an actual PS2 unit that you own (borrowing "
-					"doesn't count).\n\n"
-					"Once dumped, this BIOS image should be placed in the bios folder within the data directory "
-					"(Tools Menu -> Open Data Directory).\n\n"
-					"Please consult the FAQs and Guides for further instructions."));
-			return false;
+			Error::SetStringFmt(error,
+				TRANSLATE_FS("VMManager",
+					"PCSX2 requires a PlayStation 2 BIOS in order to run.\n\n"
+					"For legal reasons, you will need to obtain this BIOS from a PlayStation 2 unit which you own.\n\n"
+					"For step-by-step help with this process, please consult the setup guide at {}.\n\n"
+					"PCSX2 will be able to run once you've placed your BIOS image inside the folder named \"bios\" within the data directory "
+					"(Tools Menu -> Open Data Directory)."),
+				PCSX2_DOCUMENTATION_BIOS_URL_SHORTENED);
+			return VMBootResult::StartupFailure;
 		}
 	}
 
-	Error error;
+	Error cdvd_error;
 	Console.WriteLn("Opening CDVD...");
-	if (!DoCDVDopen(&error))
+	if (!DoCDVDopen(&cdvd_error))
 	{
-		Host::ReportErrorAsync("Startup Error", fmt::format("Failed to open CDVD '{}': {}.",
-													Path::GetFileName(CDVDsys_GetFile(CDVDsys_GetSourceType())),
-													error.GetDescription()));
-		return false;
+		Error::SetStringFmt(error, TRANSLATE_FS("VMManager", "Failed to open CDVD '{}': {}."),
+			Path::GetFileName(CDVDsys_GetFile(CDVDsys_GetSourceType())),
+			cdvd_error.GetDescription());
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_cdvd(&DoCDVDclose);
 
@@ -1435,8 +1517,9 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	{
 		if (!FileSystem::FileExists(s_elf_override.c_str()))
 		{
-			Host::ReportErrorAsync("Error", fmt::format("Requested boot ELF '{}' does not exist.", s_elf_override));
-			return false;
+			Error::SetStringFmt(error,
+				TRANSLATE_FS("VMManager", "Requested boot ELF '{}' does not exist."), s_elf_override);
+			return VMBootResult::StartupFailure;
 		}
 
 		Hle_SetHostRoot(s_elf_override.c_str());
@@ -1458,44 +1541,17 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 		Achievements::DisableHardcoreMode();
 	else
 		Achievements::ResetHardcoreMode(true);
-	if (Achievements::IsHardcoreModeActive())
-	{
-		auto confirm_hc_mode_disable = [&boot_params, &state_to_load](const char* trigger) mutable {
-			if (FullscreenUI::IsInitialized())
-			{
-				boot_params.elf_override = std::move(s_elf_override);
-				boot_params.save_state = std::move(state_to_load);
-				boot_params.disable_achievements_hardcore_mode = true;
-				s_elf_override = {};
 
-				Achievements::ConfirmHardcoreModeDisableAsync(trigger,
-					[boot_params = std::move(boot_params)](bool approved) mutable {
-						if (approved && Initialize(std::move(boot_params)))
-							SetState(VMState::Running);
-					});
+	if (Achievements::IsHardcoreModeActive() && (!state_to_load.empty() || DebugInterface::getPauseOnEntry()))
+		return VMBootResult::PromptDisableHardcoreMode;
 
-				return false;
-			}
-			else if (!Achievements::ConfirmHardcoreModeDisable(trigger))
-			{
-				return false;
-			}
-			return true;
-		};
+	if (boot_params.start_unlimited.value_or(false))
+		s_limiter_mode = LimiterModeType::Unlimited;
+	else if (boot_params.start_turbo.value_or(false))
+		s_limiter_mode = LimiterModeType::Turbo;
+	else
+		s_limiter_mode = LimiterModeType::Nominal;
 
-		if (!state_to_load.empty())
-		{
-			if (!confirm_hc_mode_disable(TRANSLATE("VMManager", "Resuming state")))
-				return false;
-		}
-		if (DebugInterface::getPauseOnEntry())
-		{
-			if (!confirm_hc_mode_disable(TRANSLATE("VMManager", "Boot and Debug")))
-				return false;
-		}
-	}
-
-	s_limiter_mode = LimiterModeType::Nominal;
 	s_target_speed = GetTargetSpeedForLimiterMode(s_limiter_mode);
 	s_use_vsync_for_timing = false;
 
@@ -1514,8 +1570,8 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	if (!s_gs_open_on_initialize && !MTGS::WaitForOpen())
 	{
 		// we assume GS is going to report its own error
-		Console.WriteLn("Failed to open GS.");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize GS."));
+		return VMBootResult::StartupFailure;
 	}
 
 	ScopedGuard close_gs = []() {
@@ -1526,8 +1582,8 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	Console.WriteLn("Opening SPU2...");
 	if (!SPU2::Open())
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize SPU2.");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize SPU2."));
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_spu2(&SPU2::Close);
 
@@ -1535,16 +1591,17 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	Console.WriteLn("Initializing Pad...");
 	if (!Pad::Initialize())
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize PAD");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize PAD."));
+		return VMBootResult::StartupFailure;
 	}
+	WarnAboutUnconfiguredController();
 	ScopedGuard close_pad = &Pad::Shutdown;
 
 	Console.WriteLn("Initializing SIO2...");
 	if (!g_Sio2.Initialize())
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize SIO2");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize SIO2."));
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_sio2 = []() {
 		g_Sio2.Shutdown();
@@ -1553,8 +1610,8 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	Console.WriteLn("Initializing SIO0...");
 	if (!g_Sio0.Initialize())
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize SIO0");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize SIO0."));
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_sio0 = []() {
 		g_Sio0.Shutdown();
@@ -1563,8 +1620,8 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	Console.WriteLn("Opening DEV9...");
 	if (DEV9init() != 0 || DEV9open() != 0)
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize DEV9.");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize DEV9."));
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_dev9 = []() {
 		DEV9close();
@@ -1574,16 +1631,16 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	Console.WriteLn("Opening USB...");
 	if (!USBopen())
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize USB.");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize USB."));
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_usb = []() { USBclose(); };
 
 	Console.WriteLn("Opening FW...");
 	if (FWopen() != 0)
 	{
-		Host::ReportErrorAsync("Startup Error", "Failed to initialize FW.");
-		return false;
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Failed to initialize FW."));
+		return VMBootResult::StartupFailure;
 	}
 	ScopedGuard close_fw = []() { FWclose(); };
 
@@ -1599,6 +1656,7 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	close_memcards.Cancel();
 	close_cdvd.Cancel();
 	close_cdvd_files.Cancel();
+	unlock_cdvd.Cancel();
 	close_state.Cancel();
 
 	if (EmuConfig.CdvdPrecache)
@@ -1617,16 +1675,15 @@ bool VMManager::Initialize(VMBootParameters boot_params)
 	// do we want to load state?
 	if (!GSDumpReplayer::IsReplayingDump() && !state_to_load.empty())
 	{
-		if (!DoLoadState(state_to_load.c_str()))
+		if (!DoLoadState(state_to_load.c_str(), error))
 		{
 			Shutdown(false);
-			return false;
+			return VMBootResult::StartupFailure;
 		}
 	}
 
 	PerformanceMetrics::Clear();
-
-	return true;
+	return VMBootResult::StartupSuccess;
 }
 
 void VMManager::Shutdown(bool save_resume_state)
@@ -1645,8 +1702,13 @@ void VMManager::Shutdown(bool save_resume_state)
 	if (!GSDumpReplayer::IsReplayingDump() && save_resume_state)
 	{
 		std::string resume_file_name(GetCurrentSaveStateFileName(-1));
-		if (!resume_file_name.empty() && !DoSaveState(resume_file_name.c_str(), -1, true, false))
-			Console.Error("Failed to save resume state");
+		if (!resume_file_name.empty())
+		{
+			DoSaveState(resume_file_name.c_str(), -1, true, false, [](const std::string& error) {
+				Host::AddIconOSDMessage("SaveResumeState", ICON_FA_TRIANGLE_EXCLAMATION,
+					fmt::format(TRANSLATE_FS("VMManager", "Failed to save resume state: {}"), error), Host::OSD_QUICK_DURATION);
+			});
+		}
 	}
 
 	// end input recording before clearing state
@@ -1708,6 +1770,8 @@ void VMManager::Shutdown(bool save_resume_state)
 	else
 		cdvdSaveNVRAM();
 
+	cdvdUnlock();
+
 	s_state.store(VMState::Shutdown, std::memory_order_release);
 	FullscreenUI::OnVMDestroyed();
 	SaveStateSelectorUI::Clear();
@@ -1717,6 +1781,22 @@ void VMManager::Shutdown(bool save_resume_state)
 
 	// clear out any potentially-incorrect settings from the last game
 	LoadSettings();
+}
+
+bool VMManager::RequestReset()
+{
+	if (MemcardBusy::IsBusy())
+	{
+		Host::AddIconOSDMessage("RequestReset", ICON_FA_TRIANGLE_EXCLAMATION,
+			TRANSLATE_STR("VMManager",
+				"The memory card is busy, so the reset operation has been cancelled to prevent data loss."),
+			Host::OSD_WARNING_DURATION);
+		return false;
+	}
+
+	VMManager::Reset();
+
+	return true;
 }
 
 void VMManager::Reset()
@@ -1851,19 +1931,18 @@ std::string VMManager::GetCurrentSaveStateFileName(s32 slot, bool backup)
 	return GetSaveStateFileName(s_disc_serial.c_str(), s_disc_crc, slot, backup);
 }
 
-bool VMManager::DoLoadState(const char* filename)
+bool VMManager::DoLoadState(const char* filename, Error* error)
 {
 	if (GSDumpReplayer::IsReplayingDump())
+	{
+		Error::SetString(error, TRANSLATE_STR("VMManager", "Cannot load state while replaying a GS dump."));
 		return false;
+	}
 
 	Host::OnSaveStateLoading(filename);
 
-	Error error;
-	if (!SaveState_UnzipFromDisk(filename, &error))
-	{
-		Host::ReportErrorAsync(TRANSLATE_SV("VMManager", "Failed to load save state"), error.GetDescription());
+	if (!SaveState_UnzipFromDisk(filename, error))
 		return false;
-	}
 
 	Host::OnSaveStateLoaded(filename, true);
 	if (g_InputRecording.isActive())
@@ -1876,21 +1955,20 @@ bool VMManager::DoLoadState(const char* filename)
 	return true;
 }
 
-bool VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip_on_thread, bool backup_old_state)
+void VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip_on_thread, bool backup_old_state, std::function<void(const std::string&)> error_callback)
 {
 	if (GSDumpReplayer::IsReplayingDump())
-		return false;
+	{
+		error_callback(TRANSLATE_STR("VMManager", "Cannot save state while replaying a GS dump."));
+		return;
+	}
 
-	std::string osd_key(fmt::format("SaveStateSlot{}", slot_for_message));
 	Error error;
-
 	std::unique_ptr<ArchiveEntryList> elist = SaveState_DownloadState(&error);
 	if (!elist)
 	{
-		Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state: {}."), error.GetDescription()),
-			Host::OSD_ERROR_DURATION);
-		return false;
+		error_callback(error.GetDescription());
+		return;
 	}
 
 	std::unique_ptr<SaveStateScreenshotData> screenshot = SaveState_SaveScreenshot();
@@ -1901,10 +1979,10 @@ bool VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 		Console.WriteLn(fmt::format("Creating save state backup {}...", backup_filename));
 		if (!FileSystem::RenamePath(filename, backup_filename.c_str()))
 		{
-			Host::AddIconOSDMessage(osd_key, ICON_FA_TRIANGLE_EXCLAMATION,
-				fmt::format(
-					TRANSLATE_FS("VMManager", "Failed to back up old save state {}."), Path::GetFileName(filename)),
-				Host::OSD_ERROR_DURATION);
+			error_callback(fmt::format(
+				TRANSLATE_FS("VMManager", "Cannot back up old save state '{}'."),
+				Path::GetFileName(filename)));
+			return;
 		}
 	}
 
@@ -1913,48 +1991,48 @@ bool VMManager::DoSaveState(const char* filename, s32 slot_for_message, bool zip
 		// lock order here is important; the thread could exit before we resume here.
 		std::unique_lock lock(s_save_state_threads_mutex);
 		s_save_state_threads.emplace_back(&VMManager::ZipSaveStateOnThread, std::move(elist), std::move(screenshot),
-			std::move(osd_key), std::string(filename), slot_for_message);
+			std::string(filename), slot_for_message, std::move(error_callback));
 	}
 	else
 	{
-		ZipSaveState(std::move(elist), std::move(screenshot), std::move(osd_key), filename, slot_for_message);
+		ZipSaveState(
+			std::move(elist), std::move(screenshot), filename, slot_for_message, std::move(error_callback));
 	}
 
 	Host::OnSaveStateSaved(filename);
 	MemcardBusy::CheckSaveStateDependency();
-	return true;
+	return;
 }
 
 void VMManager::ZipSaveState(std::unique_ptr<ArchiveEntryList> elist,
-	std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, const char* filename,
-	s32 slot_for_message)
+	std::unique_ptr<SaveStateScreenshotData> screenshot, const char* filename,
+	s32 slot_for_message, std::function<void(const std::string&)> error_callback)
 {
 	Common::Timer timer;
 
-	if (SaveState_ZipToDisk(std::move(elist), std::move(screenshot), filename))
+	Error error;
+	if (!SaveState_ZipToDisk(std::move(elist), std::move(screenshot), filename, &error))
 	{
-		if (slot_for_message >= 0 && VMManager::HasValidVM())
-		{
-			Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_FLOPPY_DISK,
-				fmt::format(TRANSLATE_FS("VMManager", "State saved to slot {}."), slot_for_message),
-				Host::OSD_QUICK_DURATION);
-		}
+		error_callback(error.GetDescription());
+		return;
 	}
-	else
+
+	if (slot_for_message >= 0 && VMManager::HasValidVM())
 	{
-		Host::AddIconOSDMessage(std::move(osd_key), ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state to slot {}."), slot_for_message,
-				Host::OSD_ERROR_DURATION));
+		Host::AddIconOSDMessage(fmt::format("SaveStateSlot{}", slot_for_message), ICON_FA_FLOPPY_DISK,
+			fmt::format(TRANSLATE_FS("VMManager", "Saved state to slot {}."), slot_for_message),
+			Host::OSD_QUICK_DURATION);
 	}
 
 	DevCon.WriteLn("Zipping save state to '%s' took %.2f ms", filename, timer.GetTimeMilliseconds());
 }
 
 void VMManager::ZipSaveStateOnThread(std::unique_ptr<ArchiveEntryList> elist,
-	std::unique_ptr<SaveStateScreenshotData> screenshot, std::string osd_key, std::string filename,
-	s32 slot_for_message)
+	std::unique_ptr<SaveStateScreenshotData> screenshot, std::string filename,
+	s32 slot_for_message, std::function<void(const std::string&)> error_callback)
 {
-	ZipSaveState(std::move(elist), std::move(screenshot), std::move(osd_key), filename.c_str(), slot_for_message);
+	ZipSaveState(
+		std::move(elist), std::move(screenshot), filename.c_str(), slot_for_message, std::move(error_callback));
 
 	// remove ourselves from the thread list. if we're joining, we might not be in there.
 	const auto this_id = std::this_thread::get_id();
@@ -2007,95 +2085,115 @@ u32 VMManager::DeleteSaveStates(const char* game_serial, u32 game_crc, bool also
 	return deleted;
 }
 
-bool VMManager::LoadState(const char* filename)
+bool VMManager::LoadState(const char* filename, Error* error)
 {
 	if (Achievements::IsHardcoreModeActive())
 	{
-		Host::AddIconOSDMessage("LoadStateHardcoreBlocked", ICON_FA_TRIANGLE_EXCLAMATION,
-			TRANSLATE_SV("VMManager", "Cannot load save state while RetroAchievements Hardcore Mode is active."),
-			Host::OSD_WARNING_DURATION);
+		Error::SetString(error,
+			TRANSLATE_STR("VMManager", "Cannot load state while RetroAchievements Hardcore Mode is active."));
 		return false;
 	}
 
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Failed to load state (Memory card is busy)")),
-			Host::OSD_QUICK_DURATION);
+		Error::SetString(error,
+			TRANSLATE_STR("VMManager", "The memory card is busy, so the state load operation has been cancelled to prevent data loss."));
 		return false;
 	}
 
 	// TODO: Save the current state so we don't need to reset.
-	if (DoLoadState(filename))
-		return true;
+	if (!DoLoadState(filename, error))
+	{
+		Reset();
+		return false;
+	}
 
-	Reset();
-	return false;
+	return true;
 }
 
-bool VMManager::LoadStateFromSlot(s32 slot, bool backup)
+bool VMManager::LoadStateFromSlot(s32 slot, bool backup, Error* error)
 {
 	const std::string filename = GetCurrentSaveStateFileName(slot, backup);
 	if (filename.empty() || !FileSystem::FileExists(filename.c_str()))
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "There is no saved {} in slot {}."), backup ? TRANSLATE("VMManager", "backup state") : "state", slot),
-			Host::OSD_QUICK_DURATION);
+		Error::SetString(error, TRANSLATE_STR("VMManager", "The save slot is empty."));
 		return false;
 	}
 
 	if (Achievements::IsHardcoreModeActive())
 	{
-		Host::AddIconOSDMessage("LoadStateHardcoreBlocked", ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Cannot load save {} from slot {} while RetroAchievements Hardcore Mode is active."), backup ? TRANSLATE("VMManager", "backup state") : TRANSLATE("VMManager", "state"), slot),
-			Host::OSD_WARNING_DURATION);
+		Error::SetString(error,
+			TRANSLATE_STR("VMManager", "Cannot load state while RetroAchievements Hardcore Mode is active."));
 		return false;
 	}
 
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Failed to load {} from slot {} (Memory card is busy)"), backup ? TRANSLATE("VMManager", "backup state") : TRANSLATE("VMManager", "state"), slot),
-			Host::OSD_QUICK_DURATION);
+		Error::SetString(error,
+			TRANSLATE_STR("VMManager",
+				"The memory card is busy, so the state load operation has been cancelled to prevent data loss."));
 		return false;
 	}
 
-	Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_FOLDER_OPEN,
-		fmt::format(TRANSLATE_FS("VMManager", "Loading {} from slot {}..."), backup ? TRANSLATE("VMManager", "backup state") : TRANSLATE("VMManager", "state"), slot), Host::OSD_QUICK_DURATION);
-	return DoLoadState(filename.c_str());
+	if (!DoLoadState(filename.c_str(), error))
+		return false;
+
+	if (backup)
+	{
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_FOLDER_OPEN,
+			fmt::format(TRANSLATE_FS("VMManager", "Loaded state from backup slot {}."), slot),
+			Host::OSD_QUICK_DURATION);
+	}
+	else
+	{
+		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_FOLDER_OPEN,
+			fmt::format(TRANSLATE_FS("VMManager", "Loaded state from slot {}."), slot),
+			Host::OSD_QUICK_DURATION);
+	}
+
+	return true;
 }
 
-bool VMManager::SaveState(const char* filename, bool zip_on_thread, bool backup_old_state)
+void VMManager::SaveState(
+	const char* filename, bool zip_on_thread, bool backup_old_state, std::function<void(const std::string&)> error_callback)
 {
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state (Memory card is busy)")),
-			Host::OSD_QUICK_DURATION);
-		return false;
+		error_callback(TRANSLATE_STR("VMManager",
+			"The memory card is busy, so the state save operation has been cancelled to prevent data loss."));
+		return;
 	}
 
-	return DoSaveState(filename, -1, zip_on_thread, backup_old_state);
+	DoSaveState(filename, -1, zip_on_thread, backup_old_state, std::move(error_callback));
 }
 
-bool VMManager::SaveStateToSlot(s32 slot, bool zip_on_thread)
+void VMManager::SaveStateToSlot(s32 slot, bool zip_on_thread, std::function<void(const std::string&)> error_callback)
 {
 	const std::string filename(GetCurrentSaveStateFileName(slot));
 	if (filename.empty())
-		return false;
+	{
+		error_callback(TRANSLATE_STR("VMManager", "Cannot generate filename for save state."));
+		return;
+	}
 
 	if (MemcardBusy::IsBusy())
 	{
-		Host::AddIconOSDMessage("LoadStateFromSlot", ICON_FA_TRIANGLE_EXCLAMATION,
-			fmt::format(TRANSLATE_FS("VMManager", "Failed to save state to slot {} (Memory card is busy)"), slot),
-			Host::OSD_QUICK_DURATION);
-		return false;
+		error_callback(TRANSLATE_STR("VMManager",
+			"The memory card is busy, so the state save operation has been cancelled to prevent data loss."));
+		return;
 	}
 
 	// if it takes more than a minute.. well.. wtf.
 	Host::AddIconOSDMessage(fmt::format("SaveStateSlot{}", slot), ICON_FA_FLOPPY_DISK,
 		fmt::format(TRANSLATE_FS("VMManager", "Saving state to slot {}..."), slot), 60.0f);
-	return DoSaveState(filename.c_str(), slot, zip_on_thread, EmuConfig.BackupSavestate);
+
+	auto callback = [error_callback = std::move(error_callback), slot](const std::string& error) {
+		Host::RemoveKeyedOSDMessage(fmt::format("SaveStateSlot{}", slot));
+		error_callback(error);
+	};
+
+	return DoSaveState(
+		filename.c_str(), slot, zip_on_thread, EmuConfig.BackupSavestate, std::move(callback));
 }
 
 LimiterModeType VMManager::GetLimiterMode()
@@ -2571,7 +2669,7 @@ void VMManager::LogCPUCapabilities()
 	LogUserPowerPlan();
 #endif
 
-#ifdef _M_X86
+#ifdef ARCH_X86
 	std::string extensions;
 	if (g_cpu.vectorISA >= ProcessorFeatures::VectorISA::AVX)
 		extensions += "AVX ";
@@ -2579,7 +2677,7 @@ void VMManager::LogCPUCapabilities()
 		extensions += "AVX2 ";
 	if (g_cpu.vectorISA >= ProcessorFeatures::VectorISA::AVX512F)
 		extensions += "AVX512F ";
-#ifdef _M_ARM64
+#ifdef ARCH_ARM64
 	if (cpuinfo_has_arm_neon())
 		extensions += "NEON ";
 #endif
@@ -2591,7 +2689,7 @@ void VMManager::LogCPUCapabilities()
 	Console.WriteLn();
 #endif
 
-#ifdef _M_ARM64
+#ifdef ARCH_ARM64
 	const size_t runtime_cache_line_size = HostSys::GetRuntimeCacheLineSize();
 	if (__cachelinesize != runtime_cache_line_size)
 	{
@@ -2835,8 +2933,8 @@ void VMManager::Internal::EntryPointCompilingOnCPUThread()
 
 	HandleELFChange(true);
 
-	Patch::ApplyLoadedPatches(Patch::PPT_ONCE_ON_LOAD);
-	Patch::ApplyLoadedPatches(Patch::PPT_COMBINED_0_1);
+	Patch::ApplyBootPatches();
+
 	// If the config changes at this point, it's a reset, so the game doesn't currently know about the memcard
 	// so there's no need to leave the eject running.
 	FileMcd_CancelEject();
@@ -2852,8 +2950,7 @@ void VMManager::Internal::VSyncOnCPUThread()
 {
 	Pad::UpdateMacroButtons();
 
-	Patch::ApplyLoadedPatches(Patch::PPT_CONTINUOUSLY);
-	Patch::ApplyLoadedPatches(Patch::PPT_COMBINED_0_1);
+	Patch::ApplyVsyncPatches();
 
 	// Frame advance must be done *before* pumping messages, because otherwise
 	// we'll immediately reduce the counter we just set.
@@ -2995,8 +3092,6 @@ void VMManager::CheckForMemoryCardConfigChanges(const Pcsx2Config& old_config)
 			break;
 		}
 	}
-
-	changed |= (EmuConfig.McdFolderAutoManage != old_config.McdFolderAutoManage);
 
 	if (!changed)
 		return;
@@ -3217,6 +3312,11 @@ void VMManager::WarnAboutUnsafeSettings()
 			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "Estimate texture region is enabled, this may reduce performance."));
 		}
+		if (EmuConfig.GS.UserHacks_DrawBuffering)
+		{
+			append(ICON_FA_CIRCLE_EXCLAMATION,
+				TRANSLATE_SV("VMManager", "Draw Buffering is enabled, this may result in graphical errors."));
+		}
 		if (EmuConfig.GS.DumpReplaceableTextures)
 		{
 			append(ICON_FA_CIRCLE_EXCLAMATION,
@@ -3226,6 +3326,21 @@ void VMManager::WarnAboutUnsafeSettings()
 		{
 			append(ICON_FA_IMAGES,
 				TRANSLATE_SV("VMManager", "Mipmapping is disabled. This may break rendering in some games."));
+		}
+		if (EmuConfig.GS.HWAccurateAlphaTest)
+		{
+			append(ICON_FA_IMAGES,
+				TRANSLATE_SV("VMManager", "Accurate Alpha Test is enabled, this may reduce performance."));
+		}
+		if (EmuConfig.GS.HWAA1)
+		{
+			append(ICON_FA_CIRCLE_EXCLAMATION,
+				TRANSLATE_SV("VMManager", "AA1 is enabled, this may severely degrade performance."));
+		}
+		if (EmuConfig.GS.DepthFeedbackMode != GSDepthFeedbackMode::Auto)
+		{
+			append(ICON_FA_IMAGES,
+				TRANSLATE_SV("VMManager", "Overriding default depth feedback mode, this may break rendering in some games."));
 		}
 		if (EmuConfig.GS.UseDebugDevice)
 		{
@@ -3256,6 +3371,11 @@ void VMManager::WarnAboutUnsafeSettings()
 			append(ICON_FA_CIRCLE_EXCLAMATION,
 				TRANSLATE_SV("VMManager", "Graphics API is not set to Automatic. This may cause performance problems and graphical issues."));
 		}
+	}
+	if (EmuConfig.GS.DumpGSData)
+	{
+		const std::string& dir = is_sw_renderer ? EmuConfig.GS.SWDumpDirectory : EmuConfig.GS.HWDumpDirectory;
+		append(ICON_FA_LAYER_GROUP, fmt::format(TRANSLATE_FS("VMManager", "Dumping draw data to {}."), dir));
 	}
 	if (EmuConfig.GS.TextureFiltering != BiFiltering::PS2)
 	{
@@ -3294,7 +3414,7 @@ void VMManager::WarnAboutUnsafeSettings()
 	if (EmuConfig.Cpu.ExtraMemory)
 	{
 		append(ICON_PF_MICROCHIP,
-			TRANSLATE_SV("VMManager", "128MB RAM is enabled. Compatibility with some games may be affected."));
+			TRANSLATE_SV("VMManager", "Extended RAM is enabled. Compatibility with some games may be affected."));
 	}
 	if (!EmuConfig.EnableGameFixes)
 	{
@@ -3693,7 +3813,7 @@ void VMManager::InitializeDiscordPresence()
 		return;
 
 	DiscordEventHandlers handlers = {};
-	Discord_Initialize("1025789002055430154", &handlers, 0, nullptr);
+	Discord_Initialize(s_discord_presence_app_id, &handlers, 0, nullptr);
 	s_discord_presence_active = true;
 
 	UpdateDiscordPresence(true);
@@ -3718,26 +3838,36 @@ void VMManager::UpdateDiscordPresence(bool update_session_time)
 	if (update_session_time)
 		s_discord_presence_time_epoch = std::time(nullptr);
 
+	std::string rp_title;
+	const bool prefer_english = Host::GetBaseBoolSettingValue("UI", "PreferEnglishGameList", false);
+	if (!s_title.empty())
+		rp_title = GetTitle(prefer_english);
+
 	// https://discord.com/developers/docs/rich-presence/how-to#updating-presence-update-presence-payload-fields
 	DiscordRichPresence rp = {};
-	rp.largeImageKey = "4k-pcsx2";
-	rp.largeImageText = "PCSX2 PS2 Emulator";
+	rp.largeImageKey = s_discord_presence_large_image_key;
+	rp.largeImageText = s_discord_presence_large_image_text;
 	rp.startTimestamp = s_discord_presence_time_epoch;
-	rp.details = s_title.empty() ? TRANSLATE("VMManager", "No Game Running") : s_title.c_str();
+
+	if (rp_title.empty())
+		rp.details = TRANSLATE("VMManager", "No Game Running");
+	else
+		rp.details = rp_title.c_str();
 
 	std::string state_string;
 
 	auto lock = Achievements::GetLock();
 
-	if (Achievements::HasRichPresence())
+	if (Achievements::HasActiveGame() && Achievements::HasAchievementsOrLeaderboards())
 	{
-		rp.state = (state_string = StringUtil::Ellipsise(Achievements::GetRichPresenceString(), 128)).c_str();
-
 		if (const std::string& icon_url = Achievements::GetGameIconURL(); !icon_url.empty())
 		{
 			rp.largeImageKey = icon_url.c_str();
 			rp.largeImageText = s_title.c_str();
 		}
+
+		if (Achievements::HasRichPresence())
+			rp.state = (state_string = StringUtil::Ellipsise(Achievements::GetRichPresenceString(), 128)).c_str();
 	}
 
 	Discord_UpdatePresence(&rp);
@@ -3750,4 +3880,16 @@ void VMManager::PollDiscordPresence()
 		return;
 
 	Discord_RunCallbacks();
+}
+
+bool VMManager::WriteBytesToEESIORXFIFO(const std::span<const u8> data)
+{
+	if(ee_sio_rx_fifo.size() + data.size() > 1024)
+	{
+		Console.Warning("EE RX FIFO is full, not appending more bytes.");
+		return false;
+	}
+
+	ee_sio_rx_fifo.insert(ee_sio_rx_fifo.end(), data.begin(), data.end());
+	return true;
 }

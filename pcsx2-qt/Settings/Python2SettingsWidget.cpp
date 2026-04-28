@@ -219,3 +219,5 @@ void Python2SettingsWidget::onPlayer2CardBrowseClicked()
 }
 
 Python2SettingsWidget::~Python2SettingsWidget() = default;
+
+#include "moc_Python2SettingsWidget.cpp"

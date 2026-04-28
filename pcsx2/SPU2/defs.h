@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -63,11 +63,12 @@ struct StereoOut32
 	}
 };
 
+extern void (*spu2Mix)();
 extern s16* GetMemPtr(u32 addr);
 extern s16 spu2M_Read(u32 addr);
 extern void spu2M_Write(u32 addr, s16 value);
 extern void spu2M_Write(u32 addr, u16 value);
-extern void spu2Mix();
+MULTI_ISA_DEF(void spu2Mix();)
 extern void spu2Output(StereoOut32 out);
 
 static __forceinline s16 SignExtend16(u16 v)
@@ -229,12 +230,6 @@ public:
 
 struct V_Voice
 {
-	u32 PlayCycle; // SPU2 cycle where the Playing started
-	u32 LoopCycle; // SPU2 cycle where it last set its own Loop
-
-	u32 PendingLoopStartA;
-	bool PendingLoopStart;
-
 	V_VolumeSlideLR Volume;
 
 	// Envelope
@@ -262,29 +257,16 @@ struct V_Voice
 	// Sample pointer (19:12 bit fixed point)
 	s32 SP;
 
-	// Sample pointer for Cubic Interpolation
-	// Cubic interpolation mixes a sample behind Linear, so that it
-	// can have sample data to either side of the end points from which
-	// to extrapolate.  This SP represents that late sample position.
-	s32 SPc;
-
-	// Previous sample values - used for interpolation
-	// Inverted order of these members to match the access order in the
-	//   code (might improve cache hits).
-	s32 PV4;
-	s32 PV3;
-	s32 PV2;
-	s32 PV1;
-
 	// Last outputted audio value, used for voice modulation.
 	s32 OutX;
-	s32 NextCrest; // temp value for Crest calculation
 
 	// SBuffer now points directly to an ADPCM cache entry.
 	s16* SBuffer;
 
-	// sample position within the current decoded packet.
-	s32 SCurrent;
+	// Each voice has a buffer of decoded samples
+	s32 DecodeFifo[32];
+	u32 DecPosWrite;
+	u32 DecPosRead;
 
 	// it takes a few ticks for voices to start on the real SPU2?
 	void Start();
@@ -410,7 +392,6 @@ struct V_CoreGates
 
 struct VoiceMixSet
 {
-	static const VoiceMixSet Empty;
 	StereoOut32 Dry, Wet;
 
 	VoiceMixSet() {}
@@ -456,7 +437,7 @@ struct V_Core
 	u32 NoiseOut; // Noise Output
 	u16 AutoDMACtrl; // AutoDMA Status
 	s32 DMAICounter; // DMA Interrupt Counter
-	u32 LastClock; // DMA Interrupt Clock Cycle Counter
+	u64 LastClock; // DMA Interrupt Clock Cycle Counter
 	u32 InputDataLeft; // Input Buffer
 	u32 InputDataTransferred; // Used for simulating MADR increase (GTA VC)
 	u32 InputPosWrite;
@@ -490,16 +471,12 @@ struct V_Core
 	u32 ReadSize;
 	bool IsDMARead;
 
-	u32 KeyOn; // not the KON register (though maybe it is)
+	u32 KeyOn;
+	u32 KeyOff;
 
 	// psxmode caches
 	u16 psxSoundDataTransferControl;
 	u16 psxSPUSTAT;
-
-	// HACK -- This is a temp buffer which is (or isn't?) used to circumvent some memory
-	// corruption that originates elsewhere. >_<  The actual ADMA buffer
-	// is an area mapped to SPU2 main memory.
-	//s16				ADMATempBuffer[0x1000];
 
 	// ----------------------------------------------------------------------------------
 	//  V_Core Methods
@@ -524,7 +501,6 @@ struct V_Core
 	//  Mixer Section
 	// --------------------------------------------------------------------------------------
 
-	StereoOut32 Mix(const VoiceMixSet& inVoices, const StereoOut32& Input, const StereoOut32& Ext);
 	StereoOut32 DoReverb(StereoOut32 Input);
 	s32 RevbGetIndexer(s32 offset);
 
@@ -593,8 +569,6 @@ extern u16 OutPos;
 extern u16 InputPos;
 // SPU Mixing Cycles ("Ticks mixed" counter)
 extern u32 Cycles;
-// DC Filter state
-extern StereoOut32 DCFilterIn, DCFilterOut;
 
 extern s16 spu2regs[0x010000 / sizeof(s16)];
 extern s16 _spu2mem[0x200000 / sizeof(s16)];
@@ -648,3 +622,6 @@ struct PcmCacheEntry
 };
 
 extern PcmCacheEntry pcm_cache_data[pcm_BlockCount];
+extern int g_counter_cache_hits;
+extern int g_counter_cache_misses;
+extern int g_counter_cache_ignores;

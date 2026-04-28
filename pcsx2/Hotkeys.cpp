@@ -1,10 +1,10 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Achievements.h"
 #include "GS.h"
 #include "Host.h"
-#include "IconsFontAwesome6.h"
+#include "IconsFontAwesome.h"
 #include "ImGui/FullscreenUI.h"
 #include "ImGui/ImGuiOverlays.h"
 #include "Input/InputManager.h"
@@ -14,6 +14,7 @@
 #include "SIO/Memcard/MemoryCardFile.h"
 
 #include "common/Assertions.h"
+#include "common/Error.h"
 #include "common/FileSystem.h"
 #include "common/Path.h"
 #include "common/Timer.h"
@@ -103,13 +104,17 @@ static void HotkeyLoadStateSlot(s32 slot)
 			return;
 		}
 
-		VMManager::LoadStateFromSlot(slot);
+		Error error;
+		if (!VMManager::LoadStateFromSlot(slot, false, &error))
+			FullscreenUI::ReportStateLoadError(error.GetDescription(), slot, false);
 	});
 }
 
 static void HotkeySaveStateSlot(s32 slot)
 {
-	VMManager::SaveStateToSlot(slot);
+	VMManager::SaveStateToSlot(slot, true, [slot](const std::string& error) {
+		FullscreenUI::ReportStateSaveError(error, slot);
+	});
 }
 
 static bool CanPause()
@@ -233,7 +238,17 @@ DEFINE_HOTKEY("ShutdownVM", TRANSLATE_NOOP("Hotkeys", "System"), TRANSLATE_NOOP(
 DEFINE_HOTKEY("ResetVM", TRANSLATE_NOOP("Hotkeys", "System"), TRANSLATE_NOOP("Hotkeys", "Reset Virtual Machine"),
 	[](s32 pressed) {
 		if (!pressed && VMManager::HasValidVM())
-			VMManager::Reset();
+			VMManager::RequestReset();
+	})
+DEFINE_HOTKEY("ReloadPatches", TRANSLATE_NOOP("Hotkeys", "System"), TRANSLATE_NOOP("Hotkeys", "Reload Patches"),
+	[](s32 pressed) {
+		if (!pressed && VMManager::HasValidVM())
+		{
+			Host::RunOnCPUThread([]() {
+				Host::AddKeyedOSDMessage("ReloadPatchHotkey", "Reloading Patches...");
+				VMManager::ReloadPatches(true, false, true, true);
+			});
+		}
 	})
 DEFINE_HOTKEY("SwapMemCards", TRANSLATE_NOOP("Hotkeys", "System"),
 	TRANSLATE_NOOP("Hotkeys", "Swap Memory Cards"), [](s32 pressed) {
@@ -334,5 +349,10 @@ DEFINE_HOTKEY("DecreaseVolume", TRANSLATE_NOOP("Hotkeys", "Audio"), TRANSLATE_NO
 	[](s32 pressed) {
 		if (!pressed && VMManager::HasValidVM())
 			HotkeyAdjustVolume(-5);
+	})
+DEFINE_HOTKEY("ToggleMouseLock", TRANSLATE_NOOP("Hotkeys", "System"), TRANSLATE_NOOP("Hotkeys", "Toggle Mouse Lock"),
+	[](s32 pressed) {
+		if (!pressed)
+			Host::SetMouseLock(!Host::GetBoolSettingValue("EmuCore", "EnableMouseLock"));
 	})
 END_HOTKEY_LIST()

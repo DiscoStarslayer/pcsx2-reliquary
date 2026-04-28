@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -19,9 +19,6 @@ public:
 
 	bool addExcludedPath(const std::string& path);
 	void refreshExclusionList();
-
-Q_SIGNALS:
-	void preferEnglishGameListChanged();
 
 public Q_SLOTS:
 	void addSearchDirectory(QWidget* parent_widget);

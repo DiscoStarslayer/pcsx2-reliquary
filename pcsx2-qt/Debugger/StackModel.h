@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
@@ -25,8 +25,7 @@ public:
 		COLUMN_COUNT
 	};
 
-	static constexpr QHeaderView::ResizeMode HeaderResizeModes[StackColumns::COLUMN_COUNT] =
-	{
+	static constexpr QHeaderView::ResizeMode HeaderResizeModes[StackColumns::COLUMN_COUNT] = {
 		QHeaderView::ResizeMode::ResizeToContents,
 		QHeaderView::ResizeMode::Stretch,
 		QHeaderView::ResizeMode::ResizeToContents,

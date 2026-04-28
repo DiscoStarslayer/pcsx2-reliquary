@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
@@ -261,7 +261,7 @@ void InterpVU1::Execute(u32 cycles)
 	const FPControlRegisterBackup fpcr_backup(EmuConfig.Cpu.VU1FPCR);
 
 	VU1.VI[REG_TPC].UL <<= 3;
-	u32 startcycles = VU1.cycle;
+	u64 startcycles = VU1.cycle;
 
 	while ((VU1.cycle - startcycles) < cycles)
 	{

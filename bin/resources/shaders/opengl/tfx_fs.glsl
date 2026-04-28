@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 //#version 420 // Keep it for text editor detection
@@ -10,6 +10,35 @@
 #define SHUFFLE_READ  1
 #define SHUFFLE_WRITE 2
 #define SHUFFLE_READWRITE 3
+
+#ifndef ZTST_GEQUAL
+#define ZTST_GEQUAL 2
+#define ZTST_GREATER 3
+#endif
+
+#ifndef AFAIL_KEEP
+#define AFAIL_KEEP 0
+#define AFAIL_FB_ONLY 1
+#define AFAIL_ZB_ONLY 2
+#define AFAIL_RGB_ONLY 3
+#define AFAIL_RGB_ONLY_DSB 4
+#define AFAIL_RGB_ONLY_SW_Z 5
+#endif
+
+#ifndef PS_ATST_NONE
+#define PS_ATST_NONE 0
+#define PS_ATST_LEQUAL 1
+#define PS_ATST_GEQUAL 2
+#define PS_ATST_EQUAL 3
+#define PS_ATST_NOTEQUAL 4
+#endif
+
+#ifndef PS_AA1_NONE
+#define PS_AA1_NONE 0
+#define PS_AA1_LINE 1
+#define PS_AA1_TRIANGLE 2
+#define PS_AA1_TRIANGLE_SW_Z 3
+#endif
 
 // TEX_COORD_DEBUG output the uv coordinate as color. It is useful
 // to detect bad sampling due to upscaling
@@ -25,9 +54,15 @@
 #define SW_AD_TO_HW (PS_BLEND_C == 1 && PS_A_MASKED)
 #define PS_PRIMID_INIT (PS_DATE == 1 || PS_DATE == 2)
 #define NEEDS_RT_EARLY (PS_TEX_IS_FB == 1 || PS_DATE >= 5)
-#define NEEDS_RT_FOR_AFAIL (PS_AFAIL == 3 && PS_NO_COLOR1)
-#define NEEDS_RT (NEEDS_RT_EARLY || NEEDS_RT_FOR_AFAIL || (!PS_PRIMID_INIT && (PS_FBMASK || SW_BLEND_NEEDS_RT || SW_AD_TO_HW)))
+#define NEEDS_RT_FOR_AFAIL (PS_AFAIL == PS_ZB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY_SW_Z)
+#define NEEDS_DEPTH_FOR_AFAIL (PS_AFAIL == AFAIL_FB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY_SW_Z)
+#define NEEDS_DEPTH_FOR_ZTST (PS_ZTST == ZTST_GEQUAL || PS_ZTST == ZTST_GREATER)
+#define NEEDS_DEPTH_FOR_AA1 (PS_AA1 == PS_AA1_TRIANGLE_SW_Z)
+
+#define NEEDS_RT (NEEDS_RT_EARLY || NEEDS_RT_FOR_AFAIL || (!PS_PRIMID_INIT && (PS_FBMASK || SW_BLEND_NEEDS_RT || SW_AD_TO_HW)) || PS_COLOR_FEEDBACK)
 #define NEEDS_TEX (PS_TFX != 4)
+#define SW_DEPTH (NEEDS_DEPTH_FOR_AFAIL || NEEDS_DEPTH_FOR_ZTST || NEEDS_DEPTH_FOR_AA1)
+#define ZWRITE (SW_DEPTH || PS_ZCLAMP || PS_ZFLOOR)
 
 layout(std140, binding = 0) uniform cb21
 {
@@ -49,6 +84,7 @@ layout(std140, binding = 0) uniform cb21
 	vec4 STRange;
 
 	ivec4 ChannelShuffle;
+	vec2 ChannelShuffleOffset;
 
 	vec2 TC_OffsetHack;
 	vec2 STScale;
@@ -69,6 +105,9 @@ in SHADER
 	#else
 		flat vec4 c;
 	#endif
+
+	float inv_cov; // We use the inverse to make it simpler to interpolate.
+	flat uint interior; // 1 for triangle interior; 0 for edge;
 } PSin;
 
 #define TARGET_0_QUALIFIER out
@@ -96,6 +135,16 @@ in SHADER
 	layout(location = 0) TARGET_0_QUALIFIER vec4 SV_Target0;
 #endif
 
+// Depth feedback mode 2 is for depth as color.
+// Use FB fetch for the feedback if it's available.
+#if SW_DEPTH && PS_NO_COLOR1 && (DEPTH_FEEDBACK_SUPPORT == 2)
+#if HAS_FRAMEBUFFER_FETCH
+	layout(location = 1) inout float SV_Target1;
+#else
+	layout(location = 1) out float SV_Target1;
+#endif
+#endif
+
 #if NEEDS_TEX
 layout(binding = 0) uniform sampler2D TextureSampler;
 layout(binding = 1) uniform sampler2D PaletteSampler;
@@ -107,9 +156,17 @@ layout(binding = 2) uniform sampler2D RtSampler; // note 2 already use by the im
 
 #if PS_DATE == 3
 layout(binding = 3) uniform sampler2D img_prim_min;
+#endif
 
-// I don't remember why I set this parameter but it is surely useless
-//layout(pixel_center_integer) in vec4 gl_FragCoord;
+// Depth feedback mode 1 binds depth buffer directly as a texture.
+// Depth feedback mode 2 (depth as color) can use FB fetch for the feedback,
+// in which case we don't need to explicitly bind depth as a texture.
+#if (DEPTH_FEEDBACK_SUPPORT == 1 || (DEPTH_FEEDBACK_SUPPORT == 2 && !HAS_FRAMEBUFFER_FETCH)) && SW_DEPTH
+layout(binding = 4) uniform sampler2D DepthSampler;
+#endif
+
+#if ZWRITE && PS_HAS_CONSERVATIVE_DEPTH && !SW_DEPTH
+layout(depth_less) out float gl_FragDepth;
 #endif
 
 vec4 sample_from_rt()
@@ -123,7 +180,159 @@ vec4 sample_from_rt()
 #endif
 }
 
+vec4 sample_from_depth()
+{
+#if !SW_DEPTH
+	return vec4(0.0);
+#elif HAS_FRAMEBUFFER_FETCH && (DEPTH_FEEDBACK_SUPPORT == 2)
+	return SV_Target1;
+#else
+	return texelFetch(DepthSampler, ivec2(gl_FragCoord.xy), 0);
+#endif
+}
+
 #if NEEDS_TEX
+
+#if (PS_AUTOMATIC_LOD != 1) && (PS_MANUAL_LOD == 1)
+float manual_lod(float uv_w)
+{
+	// FIXME add LOD: K - ( LOG2(Q) * (1 << L))
+	float K = LODParams.x;
+	float L = LODParams.y;
+	float bias = LODParams.z;
+	float max_lod = LODParams.w;
+
+	float gs_lod = K - log2(abs(uv_w)) * L;
+	// FIXME max useful ?
+	//return max(min(gs_lod, max_lod) - bias, 0.0f);
+	return min(gs_lod, max_lod) - bias;
+}
+#endif
+
+#if PS_ANISOTROPIC_FILTERING > 1
+vec4 sample_c_af(vec2 uv, float uv_w)
+{
+	// Below taken from https://microsoft.github.io/DirectX-Specs/d3d/archive/D3D11_3_FunctionalSpec.htm#7.18.11%20LOD%20Calculations
+	// With guidance from https://pema.dev/2025/05/09/mipmaps-too-much-detail/ 
+	vec2 sz = textureSize(TextureSampler, 0);
+	vec2 dX = dFdx(uv) * sz;
+	vec2 dY = dFdy(uv) * sz;
+
+	// Calculate Ellipse Transform
+	bool d_zero = length(dX) == 0 || length(dY) == 0;
+	bool d_par = (dX.x * dY.y - dY.x * dX.y) == 0;
+	bool d_per = dot(dX, dY) == 0;
+	bool d_inf_nan = any(isinf(dX)) || any(isinf(dY)) || any(isnan(dX)) || any(isnan(dY));
+
+	if (!(d_zero || d_par || d_per || d_inf_nan))
+	{
+		float A = dX.y * dX.y + dY.y * dY.y;
+		float B = -2 * (dX.x * dX.y + dY.x * dY.y);
+		float C = dX.x * dX.x + dY.x * dY.x;
+		float f = (dX.x * dY.y - dY.x * dX.y);
+		float F = f * f;
+
+		float p = A - C;
+		float q = A + C;
+		float t = sqrt(p * p + B * B);
+
+		vec2 new_dX = vec2(
+			sqrt(F * (t + p) / (t * (q + t))),
+			sqrt(F * (t - p) / (t * (q + t))) * sign(B)
+		);
+		
+		vec2 new_dY = vec2(
+			sqrt(F * (t - p) / (t * (q - t))) * -sign(B),
+			sqrt(F * (t + p) / (t * (q - t)))
+		);
+		
+		d_inf_nan = any(isinf(new_dX)) || any(isinf(new_dY)) || any(isnan(new_dX)) || any(isnan(new_dY));
+		if (!d_inf_nan)
+		{
+			dX = new_dX;
+			dY = new_dY;
+		}
+	}
+
+	// Compute AF values
+	float squared_length_x = dX.x * dX.x + dX.y * dX.y;
+	float squared_length_y = dY.x * dY.x + dY.y * dY.y;
+	float determinant = abs(dX.x * dY.y - dX.y * dY.x);
+	bool is_major_x = squared_length_x > squared_length_y;
+	float squared_length_major = is_major_x ? squared_length_x : squared_length_y;
+	float length_major = sqrt(squared_length_major);
+
+	float aniso_ratio;
+	float length_lod;
+	vec2 aniso_line;
+	if (length_major <= 1.0f)
+	{
+		// A zero length_major would result in NaN Lod and break sampling.
+		// A small length_major would result in aniso_ratio getting clamped to 1.
+		// Perform isotropic filtering instead.
+		aniso_ratio = 1.0f;
+		length_lod = length_major;
+		aniso_line = vec2(0, 0);
+	}
+	else
+	{
+		float norm_major = 1.0f / length_major;
+	
+		vec2 aniso_line_dir = vec2(
+			(is_major_x ? dX.x : dY.x) * norm_major,
+			(is_major_x ? dX.y : dY.y) * norm_major
+		);
+	
+		aniso_ratio = squared_length_major / determinant;
+
+		// Calculate the minor length of the ellipse for Lod, while also clamping the ratio of anisotropy.
+		if (aniso_ratio > PS_ANISOTROPIC_FILTERING)
+		{
+			// ratio is clamped - Lod is based on ratio (preserves area)
+			aniso_ratio = PS_ANISOTROPIC_FILTERING;
+			length_lod = length_major / PS_ANISOTROPIC_FILTERING;
+		}
+		else
+		{
+			// ratio not clamped - Lod is based on area
+			length_lod = determinant / length_major;
+		}
+
+		// clamp to top Lod
+		if (length_lod < 1.0f)
+			aniso_ratio = max(1.0f, aniso_ratio * length_lod);
+
+		aniso_ratio = round(aniso_ratio);
+		aniso_line = aniso_line_dir * 0.5f * length_major * (1.0f / sz);
+	}
+	
+#if PS_AUTOMATIC_LOD == 1
+	float lod = log2(length_lod);
+#elif PS_MANUAL_LOD == 1
+	float lod = manual_lod(uv_w);
+#else
+	float lod = 0; // No Lod
+#endif
+	
+	vec4 colour;
+	if (aniso_ratio == 1.0f)
+		colour = textureLod(TextureSampler, uv, lod);
+	else
+	{
+		vec4 num = vec4(0, 0, 0, 0);
+		for (int i = 0; i < aniso_ratio; i++)
+		{		
+			vec2 d = -aniso_line + (0.5f + i) * (2.0f * aniso_line) / aniso_ratio;	
+			vec2 uv_sample = uv + d;
+			vec4 sample_colour = textureLod(TextureSampler, uv_sample, lod);
+			num += sample_colour;
+		}
+
+		colour = num / aniso_ratio;
+	}
+	return colour;
+}
+#endif
 
 vec4 sample_c(vec2 uv)
 {
@@ -148,21 +357,12 @@ vec4 sample_c(vec2 uv)
 	#endif
 #endif
 
-#if PS_AUTOMATIC_LOD == 1
+#if PS_ANISOTROPIC_FILTERING > 1
+	return sample_c_af(uv, PSin.t_float.w);
+#elif PS_AUTOMATIC_LOD == 1
 	return texture(TextureSampler, uv);
 #elif PS_MANUAL_LOD == 1
-	// FIXME add LOD: K - ( LOG2(Q) * (1 << L))
-	float K = LODParams.x;
-	float L = LODParams.y;
-	float bias = LODParams.z;
-	float max_lod = LODParams.w;
-
-	float gs_lod = K - log2(abs(PSin.t_float.w)) * L;
-	// FIXME max useful ?
-	//float lod = max(min(gs_lod, max_lod) - bias, 0.0f);
-	float lod = min(gs_lod, max_lod) - bias;
-
-	return textureLod(TextureSampler, uv, lod);
+	return textureLod(TextureSampler, uv, manual_lod(PSin.t_float.w));
 #else
 	return textureLod(TextureSampler, uv, 0.0f); // No lod
 #endif
@@ -276,8 +476,8 @@ uvec4 sample_4_index(vec4 uv)
 	c.y = sample_c(uv.zy).a;
 	c.z = sample_c(uv.xw).a;
 	c.w = sample_c(uv.zw).a;
-	
-#if PS_RTA_SRC_CORRECTION 
+
+#if PS_RTA_SRC_CORRECTION
 	uvec4 i = uvec4(round(c * 128.25f)); // Denormalize value
 #else
 	uvec4 i = uvec4(c * 255.5f); // Denormalize value
@@ -308,14 +508,14 @@ mat4 sample_4p(uvec4 u)
 	return c;
 }
 
-int fetch_raw_depth()
+uint fetch_raw_depth()
 {
 	float multiplier = exp2(32.0f);
 
 #if PS_TEX_IS_FB == 1
-	return int(sample_from_rt().r * multiplier);
+	return uint(sample_from_rt().r * multiplier);
 #else
-	return int(texelFetch(TextureSampler, ivec2(gl_FragCoord.xy), 0).r * multiplier);
+	return uint(texelFetch(TextureSampler, ivec2(gl_FragCoord.xy + ChannelShuffleOffset), 0).r * multiplier);
 #endif
 }
 
@@ -324,7 +524,7 @@ vec4 fetch_raw_color()
 #if PS_TEX_IS_FB == 1
 	return sample_from_rt();
 #else
-	return texelFetch(TextureSampler, ivec2(gl_FragCoord.xy), 0);
+	return texelFetch(TextureSampler, ivec2(gl_FragCoord.xy + ChannelShuffleOffset), 0);
 #endif
 }
 
@@ -388,10 +588,10 @@ vec4 sample_depth(vec2 st)
 
 #if PS_TALES_OF_ABYSS_HLE == 1
 	// Warning: UV can't be used in channel effect
-	int depth = fetch_raw_depth();
+	uint depth = fetch_raw_depth();
 
 	// Convert msb based on the palette
-	t = texelFetch(PaletteSampler, ivec2((depth >> 8) & 0xFF, 0), 0) * 255.0f;
+	t = texelFetch(PaletteSampler, ivec2((depth >> 8u) & 0xFFu, 0), 0) * 255.0f;
 
 #elif PS_URBAN_CHAOS_HLE == 1
 	// Depth buffer is read as a RGB5A1 texture. The game try to extract the green channel.
@@ -401,13 +601,13 @@ vec4 sample_depth(vec2 st)
 	// To be faster both steps (msb&lsb) are done in a single pass.
 
 	// Warning: UV can't be used in channel effect
-	int depth = fetch_raw_depth();
+	uint depth = fetch_raw_depth();
 
 	// Convert lsb based on the palette
-	t = texelFetch(PaletteSampler, ivec2((depth & 0xFF), 0), 0) * 255.0f;
+	t = texelFetch(PaletteSampler, ivec2((depth & 0xFFu), 0), 0) * 255.0f;
 
 	// Msb is easier
-	float green = float((depth >> 8) & 0xFF) * 36.0f;
+	float green = float((depth >> 8u) & 0xFFu) * 36.0f;
 	green = min(green, 255.0f);
 
 	t.g += green;
@@ -449,7 +649,7 @@ vec4 sample_depth(vec2 st)
 vec4 fetch_red()
 {
 #if PS_DEPTH_FMT == 1 || PS_DEPTH_FMT == 2
-	int depth = (fetch_raw_depth()) & 0xFF;
+	uint depth = (fetch_raw_depth()) & 0xFFu;
 	vec4 rt = vec4(depth) / 255.0f;
 #else
 	vec4 rt = fetch_raw_color();
@@ -460,7 +660,7 @@ vec4 fetch_red()
 vec4 fetch_green()
 {
 #if PS_DEPTH_FMT == 1 || PS_DEPTH_FMT == 2
-	int depth = (fetch_raw_depth() >> 8) & 0xFF;
+	uint depth = (fetch_raw_depth() >> 8u) & 0xFFu;
 	vec4 rt = vec4(depth) / 255.0f;
 #else
 	vec4 rt = fetch_raw_color();
@@ -471,7 +671,7 @@ vec4 fetch_green()
 vec4 fetch_blue()
 {
 #if PS_DEPTH_FMT == 1 || PS_DEPTH_FMT == 2
-	int depth = (fetch_raw_depth() >> 16) & 0xFF;
+	uint depth = (fetch_raw_depth() >> 16u) & 0xFFu;
 	vec4 rt = vec4(depth) / 255.0f;
 #else
 	vec4 rt = fetch_raw_color();
@@ -495,8 +695,8 @@ vec4 fetch_rgb()
 vec4 fetch_gXbY()
 {
 #if PS_DEPTH_FMT == 1 || PS_DEPTH_FMT == 2
-	int depth = fetch_raw_depth();
-	int bg = (depth >> (8 + ChannelShuffle.w)) & 0xFF;
+	uint depth = fetch_raw_depth();
+	uint bg = (depth >> (8u + uint(ChannelShuffle.w))) & 0xFFu;
 	return vec4(bg);
 #else
 	ivec4 rt = ivec4(fetch_raw_color() * 255.0f);
@@ -629,24 +829,33 @@ bool atst(vec4 C)
 {
 	float a = C.a;
 
-#if (PS_ATST == 1)
+#if PS_ATST == PS_ATST_LEQUAL
+
 	return (a <= AREF);
-#elif (PS_ATST == 2)
+
+#elif PS_ATST == PS_ATST_GEQUAL
+
 	return (a >= AREF);
-#elif (PS_ATST == 3)
+
+#elif PS_ATST == PS_ATST_EQUAL
+
 	return (abs(a - AREF) <= 0.5f);
-#elif (PS_ATST == 4)
+
+#elif PS_ATST == PS_ATST_NOTEQUAL
+
 	return (abs(a - AREF) >= 0.5f);
+
 #else
-	// nothing to do
+
 	return true;
+
 #endif
 }
 
 void fog(inout vec4 C, float f)
 {
 #if PS_FOG != 0
-	C.rgb = trunc(mix(FogColor, C.rgb, f));
+	C.rgb = trunc(mix(FogColor, C.rgb, (f * 255.0f) / 256.0f));
 #endif
 }
 
@@ -696,10 +905,10 @@ vec4 ps_color()
 			T.b = float((denorm_c_before.g << 1) & 0xF8u);
 			T.a = float(denorm_c_before.g & 0x80u);
 		#endif
-		
+
 		T.a = ((T.a >= 127.5f) ? TA.y : ((PS_AEM == 0 || any(bvec3(ivec3(T.rgb) & ivec3(0xF8)))) ? TA.x : 0.0f)) * 255.0f;
 	#endif
-	
+
 	vec4 C = tfx(T, PSin.c);
 
 	fog(C, PSin.t_float.z);
@@ -830,7 +1039,7 @@ float As = As_rgba.a;
 			RT.a = float(denorm_rt.g & 0x80u);
 		#endif
 	#endif
-		
+
 	// Let the compiler do its jobs !
 	#if PS_COLCLIP_HW == 1
 		vec3 Cd = trunc(RT.rgb * 65535.0f);
@@ -969,6 +1178,21 @@ float As = As_rgba.a;
 
 void ps_main()
 {
+	float input_z = gl_FragCoord.z;
+
+	// Must floor before depth testing.
+#if PS_ZFLOOR
+	input_z = floor(input_z * exp2(32.0f)) * exp2(-32.0f);
+#endif
+
+#if PS_ZTST == ZTST_GEQUAL
+	if (input_z < sample_from_depth().r)
+		discard;
+#elif PS_ZTST == ZTST_GREATER
+	if (input_z <= sample_from_depth().r)
+		discard;
+#endif
+
 #if PS_SCANMSK & 2
 	// fail depth test on prohibited lines
 	if ((int(gl_FragCoord.y) & 1) == (PS_SCANMSK & 1))
@@ -1017,18 +1241,25 @@ void ps_main()
 #endif
 
 	vec4 C = ps_color();
-	bool atst_pass = atst(C);
 
-#if PS_AFAIL == 0 // KEEP or ATST off
-	if (!atst_pass)
-		discard;
+#if PS_AA1
+	float cov = clamp(1.0f - abs(PSin.inv_cov), 0.0f, 1.0f);
+	#if PS_ABE
+		if (floor(C.a) == 128.0f) // The coverage is only used if the fragment alpha is 128.
+			C.a = 128.0f * cov;
+	#else
+		C.a = 128.0f * cov;
+	#endif
+#elif PS_FIXED_ONE_A
+	// AA (Fixed one) will output a coverage of 1.0 as alpha
+	C.a = 128.0f;
 #endif
 
-	// Must be done before alpha correction
+	bool atst_pass = atst(C);
 
-	// AA (Fixed one) will output a coverage of 1.0 as alpha
-#if PS_FIXED_ONE_A
-	C.a = 128.0f;
+#if PS_AFAIL == AFAIL_KEEP
+	if (!atst_pass)
+		discard;
 #endif
 
 #if SW_AD_TO_HW
@@ -1066,7 +1297,6 @@ void ps_main()
 
 	ps_blend(C, alpha_blend);
 
-
 #if PS_SHUFFLE
 	#if !PS_READ16_SRC && !PS_SHUFFLE_SAME && !(PS_PROCESS_BA == SHUFFLE_READWRITE && PS_PROCESS_RG == SHUFFLE_READWRITE)
 		uvec4 denorm_c_after = uvec4(C);
@@ -1091,12 +1321,9 @@ void ps_main()
 	#elif PS_READ16_SRC
 		uvec4 denorm_c = uvec4(C);
 		uvec2 denorm_TA = uvec2(vec2(TA.xy) * 255.0f + 0.5f);
-		
+
 		C.rb = vec2(float((denorm_c.r >> 3) | (((denorm_c.g >> 3) & 0x7u) << 5)));
-		if (bool(denorm_c.a & 0x80u))
-			C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.y & 0x80u)));
-		else
-			C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.x & 0x80u)));
+		C.ga = vec2(float((denorm_c.g >> 6) | ((denorm_c.b >> 3) << 2) | (denorm_TA.x & 0x80u)));
 	#elif PS_SHUFFLE_ACROSS
 		#if(PS_PROCESS_BA == SHUFFLE_READWRITE && PS_PROCESS_RG == SHUFFLE_READWRITE)
 			C.br = C.rb;
@@ -1118,32 +1345,67 @@ void ps_main()
 
 	ps_fbmask(C);
 
-#if PS_AFAIL == 3 && !PS_NO_COLOR1 // RGB_ONLY
+#if (PS_AFAIL == AFAIL_RGB_ONLY_DSB) && !PS_NO_COLOR1
 	// Use alpha blend factor to determine whether to update A.
 	alpha_blend.a = float(atst_pass);
 #endif
 
 #if !PS_NO_COLOR
 	#if PS_RTA_CORRECTION
-		SV_Target0.a = C.a / 128.0f;
+		C.a = C.a / 128.0f;
 	#else
-		SV_Target0.a = C.a / 255.0f;
+		C.a = C.a / 255.0f;
 	#endif
 	#if PS_COLCLIP_HW == 1
-		SV_Target0.rgb = vec3(C.rgb / 65535.0f);
+		C.rgb = vec3(C.rgb / 65535.0f);
 	#else
-		SV_Target0.rgb = C.rgb / 255.0f;
+		C.rgb = C.rgb / 255.0f;
 	#endif
-	#if PS_AFAIL == 3 && PS_NO_COLOR1 // RGB_ONLY, no dual src blend
+
+	// Alpha test with feedback
+	#if PS_AFAIL == AFAIL_FB_ONLY
 		if (!atst_pass)
-			SV_Target0.a = sample_from_rt().a;
+			input_z = sample_from_depth().r;
+	#elif PS_AFAIL == AFAIL_ZB_ONLY
+		if (!atst_pass)
+			C = sample_from_rt();
+	#elif (PS_AFAIL == AFAIL_RGB_ONLY || PS_AFAIL == AFAIL_RGB_ONLY_SW_Z)
+		if (!atst_pass)
+		{
+			C.a = sample_from_rt().a;
+		#if PS_AFAIL == AFAIL_RGB_ONLY_SW_Z
+			input_z = sample_from_depth().r;
+		#endif
+		}
 	#endif
+
+	// Warning: do not write SV_Target0 until the end since the value might be needed for
+	// FB fetch in sample_from_rt().
+	SV_Target0 = C;
+
 	#if !PS_NO_COLOR1
 		SV_Target1 = alpha_blend;
 	#endif
 #endif
 
 #if PS_ZCLAMP
-	gl_FragDepth = min(gl_FragCoord.z, MaxDepthPS);
+	input_z = min(input_z, MaxDepthPS);
+#endif
+
+#if PS_AA1 == PS_AA1_TRIANGLE_SW_Z
+	if (!bool(PSin.interior))
+		input_z = sample_from_depth().r; // No depth update for triangle edges.
+#endif
+
+#if ZWRITE
+	#if SW_DEPTH && PS_NO_COLOR1 && (DEPTH_FEEDBACK_SUPPORT == 2)
+		// Depth as color write. For depth as color feedback we write to both
+		// color copy and real depth to avoid having to copy back to real depth.
+		// Warning: do not write SV_Target1 until the end since the value might
+		// be needed for FB fetch in sample_from_depth().
+		SV_Target1 = input_z;
+	#endif
+	// Standard depth write.
+	gl_FragDepth = input_z;
 #endif
 }

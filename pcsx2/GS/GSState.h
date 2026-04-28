@@ -1,9 +1,10 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #pragma once
 
 #include "GS/GS.h"
+#include "GS/GSPerfMon.h"
 #include "GS/GSLocalMemory.h"
 #include "GS/GSDrawingContext.h"
 #include "GS/GSDrawingEnvironment.h"
@@ -126,37 +127,41 @@ private:
 
 protected:
 	static constexpr int INVALID_ALPHA_MINMAX = 500;
+	static constexpr int MAX_DRAW_BUFFERS = 3;
 
 	GSVertex m_v = {};
 	float m_q = 1.0f;
 	GSVector4i m_scissor_cull_min = {};
 	GSVector4i m_scissor_cull_max = {};
 	GSVector4i m_xyof = {};
+	int  m_used_buffers_idx = 0;
+	int m_current_buffer_idx = 0;
+	bool m_recent_buffer_switch = false;
 
-	struct
+	struct GSVertexBuff
 	{
 		GSVertex* buff;
-		GSVertex* buff_copy;            // same size buffer to copy/modify the original buffer
+		GSVertex* buff_copy; // same size buffer to copy/modify the original buffer
 		u32 head, tail, next, maxcount; // head: first vertex, tail: last vertex + 1, next: last indexed + 1
 		u32 xy_tail;
 		GSVector4i xy[4];
 		GSVector4i xyhead;
-	} m_vertex = {};
+	};
 
-	struct
+	GSVertexBuff m_vertex_buffers[MAX_DRAW_BUFFERS];
+	GSVertexBuff* m_vertex;
+
+	struct GSIndexBuff
 	{
 		u16* buff;
 		u32 tail;
-	} m_index = {};
+	};
 
-	struct
-	{
-		GSVertex* buff;
-		u32 head, tail, next, maxcount; // head: first vertex, tail: last vertex + 1, next: last indexed + 1
-		u32 xy_tail;
-		GSVector4i xy[4];
-		GSVector4i xyhead;
-	} m_draw_vertex = {};
+	GSIndexBuff m_index_buffers[MAX_DRAW_BUFFERS];
+
+	GSIndexBuff* m_index;
+
+	GSVertexBuff m_draw_vertex = {};
 
 	struct
 	{
@@ -164,15 +169,28 @@ protected:
 		u32 tail;
 	} m_draw_index = {};
 
+	struct GSDrawBufferEnv
+	{
+		GSDrawingEnvironment m_env;
+		int m_backed_up_ctx = 0;
+		u32 m_dirty_regs = 0;
+		GSVector4i draw_rect = GSVector4i::zero();
+		bool related_draw = false;
+	};
+
+	GSDrawBufferEnv m_env_buffers[MAX_DRAW_BUFFERS] = {};
+
 	void UpdateContext();
 	void UpdateScissor();
 
 	void UpdateVertexKick();
 
 	void GrowVertexBuffer();
-	bool IsAutoFlushDraw(u32 prim);
+	bool IsAutoFlushDraw(u32 prim, int& tex_layer);
 	template<u32 prim> void HandleAutoFlush();
+	bool EarlyDetectShuffle(u32 prim);
 	void CheckCLUTValidity(u32 prim);
+	bool CheckOverlapVerts(u32 n);
 
 	template <u32 prim, bool auto_flush> void VertexKick(u32 skip);
 
@@ -201,21 +219,57 @@ protected:
 	};
 	TextureMinMaxResult GetTextureMinMax(GIFRegTEX0 TEX0, GIFRegCLAMP CLAMP, bool linear, bool clamp_to_tsize);
 	bool TryAlphaTest(u32& fm, u32& zm);
+	bool IsFlatShaded();
 	bool IsOpaque();
 	bool IsMipMapDraw();
 	bool IsMipMapActive();
 	bool IsCoverageAlpha();
+	bool IsCoverageAlphaFixedOne();
+	virtual bool IsCoverageAlphaSupported();
 	void CalcAlphaMinMax(const int tex_min, const int tex_max);
 	void CorrectATEAlphaMinMax(const u32 atst, const int aref);
 
+	// Utility functions for getting position/texture coordinates.
+	GSVector4 GetXYWindow(const GSVertex& v);
+	template<bool fst>
+	GSVector4 GetTexCoordsImpl(const GSVertex& v, float q);
+	template<bool fst>
+	GSVector4 GetTexCoordsImpl(const GSVertex& v);
+	GSVector4 GetTexCoords(const GSVertex& v, float q);
+	GSVector4 GetTexCoords(const GSVertex& v);
+
+	// Utility functions to detect and get corners of quads.
+	template<u32 primclass, bool tme = false, bool fst = false>
+	static bool GetQuadCornersImpl(const GSVertex* v, const u16* i, GSVertex& vout0, GSVertex& vout1);
+	bool GetQuadCorners(const GSVertex* v, const u16* i, GSVertex& vout0, GSVertex& vout1);
+
+	// Utility functions to get window/texture coordinates of a quad.
+	template<u32 primclass>
+	void GetQuadBBoxWindowImpl(const GSVertex& v0, const GSVertex& v1, GSVector4& xyout);
+	template<u32 primclass, bool tme = false, bool fst = false>
+	void GetQuadBBoxWindowImpl(const GSVertex& v0, const GSVertex& v1, GSVector4& xyout, GSVector4& texout, bool keep_tex_order = true);
+	void GetQuadBBoxWindow(const GSVertex& v0, const GSVertex& v1, GSVector4& xyout);
+	void GetQuadBBoxWindow(const GSVertex& v0, const GSVertex& v1, GSVector4& xyout, GSVector4& texout, bool keep_tex_order = true);
+
+	// Adjusts a quad so that it contains exactly the centers of the pixels that the GS would rasterize.
+	static void GetQuadRasterizedPoints(GSVector4& xy, bool keep_order = true);
+	static void GetQuadRasterizedPoints(GSVector4& xy, GSVector4& tex, bool keep_order = true);
+
 public:
+	enum EEGS_TransferType
+	{
+		EE_to_GS,
+		GS_to_GS,
+		GS_to_EE
+	};
+
 	struct GSUploadQueue
 	{
 		GIFRegBITBLTBUF blit;
 		GSVector4i rect;
-		int draw;
+		u64 draw;
 		bool zero_clear;
-		bool ee_to_gs;
+		EEGS_TransferType transfer_type;
 	};
 
 	enum NoGapsType
@@ -232,9 +286,10 @@ public:
 	GSLocalMemory m_mem;
 	GSDrawingEnvironment m_env = {};
 	GSDrawingEnvironment m_prev_env = {};
+	GSDrawingEnvironment m_temp_env = {};
 	const GSDrawingEnvironment* m_draw_env = &m_env;
 	GSDrawingContext* m_context = nullptr;
-	GSVector4i temp_draw_rect = {};
+	GSVector4i temp_draw_rect;
 	std::unique_ptr<GSDumpBase> m_dump;
 	bool m_scissor_invalid = false;
 	bool m_quad_check_valid = false;
@@ -249,7 +304,7 @@ public:
 	bool m_using_temp_z = false;
 	bool m_temp_z_full_copy = false;
 	bool m_in_target_draw = false;
-	bool m_channel_shuffle_abort = false;
+	bool m_channel_shuffle_finish = false;
 
 	u32 m_target_offset = 0;
 	u8 m_scanmask_used = 0;
@@ -260,11 +315,28 @@ public:
 	GSVector4i m_r = {};
 	GSVector4i m_r_no_scissor = {};
 
-	static int s_n;
-	static int s_last_transfer_draw_n;
-	static int s_transfer_n;
+	static u64 s_n;
+	static u64 s_last_transfer_draw_n;
+	static u64 s_transfer_n;
+
+	GSPerfMon m_perfmon_frame; // Track stat across a frame.
+	GSPerfMon m_perfmon_draw;  // Track stat across a draw.
 
 	static constexpr u32 STATE_VERSION = 9;
+
+	#define PRIM_REG_MASK 0x7FF
+	#define MIPTBP_REG_MASK ((1ULL << 60) - 1ULL)
+	#define CLAMP_REG_MASK ((1ULL << 44) - 1ULL)
+	#define TEX1_REG_MASK 0xFFF001803FDULL
+	#define XYOFFSET_REG_MASK 0x0000FFFF0000FFFFULL
+	#define TEXA_REG_MASK 0xFF000080FFULL
+	#define FOGCOL_REG_MASK 0xFFFFFF
+	#define SCISSOR_REG_MASK 0x7FF07FF07FF07FFULL
+	#define ALPHA_REG_MASK 0xFF000000FFULL
+	#define DIMX_REG_MASK 0x7777777777777777ULL
+	#define FRAME_REG_MASK 0xFFFFFFFF3F3F01FFULL
+	#define ZBUF_REG_MASK 0x10F0001FFULL
+	#define TEST_REG_MASK 0x7FFFF
 
 	enum REG_DIRTY
 	{
@@ -382,7 +454,7 @@ public:
 
 		// Calculate framebuffer read offsets, should be considered if only one circuit is enabled, or difference is more than 1 line.
 		// Only considered if "Anti-blur" is enabled.
-		void CalculateFramebufferOffset(bool scanmask);
+		void CalculateFramebufferOffset(bool scanmask, GSRegDISPFB framebuffer0Reg, GSRegDISPFB framebuffer1Reg);
 
 		// Used in software mode to align the buffer when reading. Offset is accounted for (block aligned) by GetOutput.
 		void RemoveFramebufferOffset(int display);
@@ -415,7 +487,15 @@ public:
 	virtual void Reset(bool hardware_reset);
 	virtual void UpdateSettings(const Pcsx2Config::GSOptions& old_config);
 
+	void ResetDrawBuffers();
+	void ResetDrawBufferIdx();
+	void FlushBuffers(bool flush_base_only = false, bool use_flush_reason = false, GSFlushReason flush_reason = GSFlushReason::CONTEXTCHANGE);
+	void PushBuffer();
+	void SetDrawBufferEnv();
+	void SetDrawBuffDirty();
+	bool CanBufferNewDraw();
 	void Flush(GSFlushReason reason);
+	void FlushDraw(GSFlushReason reason);
 	u32 CalcMask(int exp, int max_exp);
 	void FlushPrim();
 	bool TestDrawChanged();
@@ -428,7 +508,7 @@ public:
 
 	virtual void Move();
 
-	GSVector4i GetTEX0Rect();
+	GSVector4i GetTEX0Rect(GSDrawingContext prev_ctx);
 	void CheckWriteOverlap(bool req_write, bool req_read);
 	void Write(const u8* mem, int len);
 	void Read(u8* mem, int len);

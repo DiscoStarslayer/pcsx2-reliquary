@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <QtWidgets/QMessageBox>
@@ -30,7 +30,7 @@ DEV9DnsHostDialog::DEV9DnsHostDialog(std::vector<HostEntryUi> hosts, QWidget* pa
 	QStringList headers;
 	headers.push_back(tr("Selected"));
 	headers.push_back(tr("Name"));
-	headers.push_back(tr("Url"));
+	headers.push_back(tr("Hostname"));
 	headers.push_back(tr("Address"));
 	headers.push_back(tr("Enabled"));
 	m_ethHost_model->setHorizontalHeaderLabels(headers);
@@ -130,3 +130,5 @@ bool DEV9DnsHostDialog::eventFilter(QObject* object, QEvent* event)
 }
 
 DEV9DnsHostDialog::~DEV9DnsHostDialog() = default;
+
+#include "moc_DEV9DnsHostDialog.cpp"

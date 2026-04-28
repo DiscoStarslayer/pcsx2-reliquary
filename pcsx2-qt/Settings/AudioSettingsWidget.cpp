@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "AudioSettingsWidget.h"
@@ -115,7 +115,7 @@ AudioSettingsWidget::AudioSettingsWidget(SettingsWindow* settings_dialog, QWidge
 	dialog()->registerWidgetHelp(m_ui.expansionSettings, tr("Expansion Settings"), tr("N/A"),
 		tr("These settings fine-tune the behavior of the FreeSurround-based channel expander."));
 	dialog()->registerWidgetHelp(m_ui.syncMode, tr("Synchronization"), tr("TimeStretch (Recommended)"),
-		tr("When running outside of 100% speed, adjusts the tempo on audio instead of dropping frames. Produces much nicer fast-forward/slowdown audio."));
+		tr("When the emulation isn't running at 100% speed, adjusts the tempo of the audio which produces much nicer sound during fast-forward/slowdown."));
 	dialog()->registerWidgetHelp(m_ui.stretchSettings, tr("Stretch Settings"), tr("N/A"),
 		tr("These settings fine-tune the behavior of the SoundTouch audio time stretcher when running outside of 100% speed."));
 	dialog()->registerWidgetHelp(m_ui.resetStandardVolume, tr("Reset Standard Volume"), tr("N/A"),
@@ -180,7 +180,7 @@ void AudioSettingsWidget::updateDriverNames()
 	const AudioBackend backend = getEffectiveBackend();
 	const std::vector<std::pair<std::string, std::string>> names = AudioStream::GetDriverNames(backend);
 
-	m_ui.driver->disconnect();
+	QObject::disconnect(m_ui.driver, &QComboBox::currentIndexChanged, nullptr, nullptr);
 	m_ui.driver->clear();
 	if (names.empty())
 	{
@@ -208,7 +208,7 @@ void AudioSettingsWidget::updateDeviceNames()
 	const std::string current_device = dialog()->getEffectiveStringValue("SPU2/Output", "DeviceName", "");
 	const std::vector<AudioStream::DeviceInfo> devices = AudioStream::GetOutputDevices(backend, driver_name.c_str());
 
-	m_ui.outputDevice->disconnect();
+	QObject::disconnect(m_ui.outputDevice, &QComboBox::currentIndexChanged, nullptr, nullptr);
 	m_ui.outputDevice->clear();
 	m_output_device_latency = 0;
 
@@ -262,17 +262,17 @@ void AudioSettingsWidget::updateLatencyLabel()
 		if (expand_buffer_ms > 0)
 		{
 			m_ui.bufferingLabel->setText(tr("Maximum Latency: %1 ms (%2 ms buffer + %3 ms expand + %4 ms output)")
-											 .arg(config_buffer_ms + expand_buffer_ms + output_latency_ms)
-											 .arg(config_buffer_ms)
-											 .arg(expand_buffer_ms)
-											 .arg(output_latency_ms));
+					.arg(config_buffer_ms + expand_buffer_ms + output_latency_ms)
+					.arg(config_buffer_ms)
+					.arg(expand_buffer_ms)
+					.arg(output_latency_ms));
 		}
 		else
 		{
 			m_ui.bufferingLabel->setText(tr("Maximum Latency: %1 ms (%2 ms buffer + %3 ms output)")
-											 .arg(config_buffer_ms + output_latency_ms)
-											 .arg(config_buffer_ms)
-											 .arg(output_latency_ms));
+					.arg(config_buffer_ms + output_latency_ms)
+					.arg(config_buffer_ms)
+					.arg(output_latency_ms));
 		}
 	}
 	else
@@ -280,8 +280,8 @@ void AudioSettingsWidget::updateLatencyLabel()
 		if (expand_buffer_ms > 0)
 		{
 			m_ui.bufferingLabel->setText(tr("Maximum Latency: %1 ms (%2 ms expand, minimum output latency unknown)")
-											 .arg(expand_buffer_ms + config_buffer_ms)
-											 .arg(expand_buffer_ms));
+					.arg(expand_buffer_ms + config_buffer_ms)
+					.arg(expand_buffer_ms));
 		}
 		else
 		{
@@ -503,3 +503,5 @@ void AudioSettingsWidget::resetVolume(const bool fast_forward)
 		slider->setValue(100);
 	}
 }
+
+#include "moc_AudioSettingsWidget.cpp"

@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
-#include "IconsFontAwesome6.h"
+#include "IconsFontAwesome.h"
 #include "USB/qemu-usb/qusb.h"
 #include "USB/qemu-usb/desc.h"
 #include "USB/qemu-usb/USBinternal.h"
@@ -1243,7 +1243,7 @@ namespace usb_msd
 			{
 				static constexpr const SettingInfo settings[] = {
 					{SettingInfo::Type::Path, "ImagePathMsd", TRANSLATE_NOOP("USB", "Image Path"),
-						TRANSLATE_NOOP("USB", "Sets the path to image which will back the virtual mass storage device.")},
+						TRANSLATE_NOOP("USB", "Sets the path to the disk image which will back the virtual mass storage device.")},
 				};
 				return settings;
 			}
@@ -1251,7 +1251,7 @@ namespace usb_msd
 			{
 				static constexpr const SettingInfo settings[] = {
 					{SettingInfo::Type::Path, "ImagePathMsac", TRANSLATE_NOOP("USB", "Image Path"),
-						TRANSLATE_NOOP("USB", "Sets the path to image which will back the virtual mass storage device.")},
+						TRANSLATE_NOOP("USB", "Sets the path to the disk image which will back the virtual mass storage device.")},
 				};
 				return settings;
 			}

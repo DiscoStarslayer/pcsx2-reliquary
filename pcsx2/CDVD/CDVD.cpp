@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2002-2025 PCSX2 Dev Team
+// SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "CDVD/CDVD.h"
@@ -29,6 +29,7 @@
 
 #include <cctype>
 #include <ctime>
+#include <type_traits>
 #ifndef _WIN32
 #include <time.h>
 #endif
@@ -36,7 +37,9 @@
 
 cdvdStruct cdvd;
 
-s64 PSXCLK = 36864000;
+u32 PSXCLK = 36864000;
+
+static constexpr s32 GMT9_OFFSET_SECONDS = 9 * 60 * 60; // 32400
 
 static constexpr u8 monthmap[13] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 
@@ -167,10 +170,16 @@ static void CDVD_INT(int eCycle)
 // test (which will cause the exception to be handled).
 static void cdvdSetIrq(uint id = (1 << Irq_CommandComplete))
 {
+	if (!(cdvd.IntrStat & id))
+	{
+		iopIntcIrq(2);
+		psxSetNextBranchDelta(20);
+	}
+	else
+		DevCon.Warning("CDVD trying to double issue IRQ %x", id);
+
 	cdvd.IntrStat |= id;
 	cdvd.AbortRequested = false;
-	iopIntcIrq(2);
-	psxSetNextBranchDelta(20);
 }
 
 static int mg_BIToffset(u8* buffer)
@@ -1210,68 +1219,105 @@ void cdvdReset()
 	cdvd.ReadTime = cdvdBlockReadTime(MODE_DVDROM);
 	cdvd.RotSpeed = cdvdRotationTime(MODE_DVDROM);
 
-	if (EmuConfig.ManuallySetRealTimeClock)
-	{
-		// Convert to GMT+9 (assumes GMT+0)
-		std::tm tm{};
-		tm.tm_sec = EmuConfig.RtcSecond;
-		tm.tm_min = EmuConfig.RtcMinute;
-		tm.tm_hour = EmuConfig.RtcHour;
-		tm.tm_mday = EmuConfig.RtcDay;
-		tm.tm_mon = EmuConfig.RtcMonth - 1;
-		tm.tm_year = EmuConfig.RtcYear + 100; // 2000 - 1900
-		tm.tm_isdst = 1;
+	ReadOSDConfigParames();
 
-		// Need this instead of mktime for timezone independence
-		std::time_t t = 0;
-		#if defined(_WIN32)
-			t = _mkgmtime(&tm) + 32400; //60 * 60 * 9 for GMT+9
-			gmtime_s(&tm, &t);
-		#else
-			t = timegm(&tm) + 32400;
-			gmtime_r(&t, &tm);
-		#endif
+	// Print time zone offset, DST, time format, date format, and system time basis.
+	DevCon.WriteLn(Color_StrongGreen, configParams1.timezoneOffset < 0 ? "Time Zone Offset: GMT%03d:%02d" : "Time Zone Offset: GMT+%02d:%02d",
+				   configParams1.timezoneOffset / 60, std::abs(configParams1.timezoneOffset % 60));
 
-		cdvd.RTC.second = tm.tm_sec;
-		cdvd.RTC.minute = tm.tm_min;
-		cdvd.RTC.hour = tm.tm_hour;
-		cdvd.RTC.day = tm.tm_mday;
-		cdvd.RTC.month = tm.tm_mon + 1;
-		cdvd.RTC.year = tm.tm_year - 100;
-	}
-	// If we are recording, always use the same RTC setting
-	// for games that use the RTC to seed their RNG -- this is very important to be the same everytime!
-	else if (g_InputRecording.isActive())
+	// Time zone ID has exactly 128 possible values.
+	if (configParams1.timeZoneID < 0x80)
 	{
-		Console.WriteLn("Input Recording Active - Using Constant RTC of 04-03-2020 (DD-MM-YYYY)");
-		// Why not just 0 everything? Some games apparently require the date to be valid in terms of when
-		// the PS2 / Game actually came out. (MGS3).  So set it to a value well beyond any PS2 game's release date.
-		cdvd.RTC.second = 0;
-		cdvd.RTC.minute = 0;
-		cdvd.RTC.hour = 0;
-		cdvd.RTC.day = 4;
-		cdvd.RTC.month = 3;
-		cdvd.RTC.year = 20;
+		// Cutoff for the old naming scheme (TimeZoneLocations[][0]) is v01.70 inclusive.
+		const bool new_time_zone_ID_names = ((BiosVersion >> 8) == 2) || ((BiosVersion & 0xFF) >= 90);
+		DevCon.WriteLn(Color_StrongGreen, "Time Zone Location: %s",
+			TimeZoneLocations[configParams1.timeZoneID][new_time_zone_ID_names]);
 	}
 	else
 	{
-		// CDVD internally uses GMT+9.  If you think the time's wrong, you're wrong.
-		// Set up your time zone and winter/summer in the BIOS.  No PS2 BIOS I know of features automatic DST.
-		const std::time_t utc_time = std::time(nullptr);
-		const std::time_t gmt9_time = (utc_time + 32400); //60 * 60 * 9
-		struct tm curtime = {};
-#ifdef _MSC_VER
-		gmtime_s(&curtime, &gmt9_time);
-#else
-		gmtime_r(&gmt9_time, &curtime);
-#endif
-		cdvd.RTC.second = static_cast<u8>(curtime.tm_sec);
-		cdvd.RTC.minute = static_cast<u8>(curtime.tm_min);
-		cdvd.RTC.hour = static_cast<u8>(curtime.tm_hour);
-		cdvd.RTC.day = static_cast<u8>(curtime.tm_mday);
-		cdvd.RTC.month = static_cast<u8>(curtime.tm_mon + 1); // WX returns Jan as "0"
-		cdvd.RTC.year = static_cast<u8>(curtime.tm_year - 100); // offset from 2000
+		DevCon.WriteLn(Color_StrongRed, "Invalid time zone configuration in BIOS (ID: %d)", configParams1.timeZoneID);
 	}
+
+	DevCon.WriteLn(Color_StrongGreen, "DST: %s Time", configParams2.daylightSavings ? "Summer" : "Winter");
+	DevCon.WriteLn(Color_StrongGreen, "Time Format: %s-Hour", configParams2.timeFormat ? "12" : "24");
+	DevCon.WriteLn(Color_StrongGreen, "Date Format: %s", configParams2.dateFormat ? (configParams2.dateFormat == 2 ? "DD/MM/YYYY" : "MM/DD/YYYY") : "YYYY/MM/DD");
+	DevCon.WriteLn(Color_StrongGreen, "System Time Basis: %s",
+				   EmuConfig.ManuallySetRealTimeClock ? "Manual RTC" : g_InputRecording.isActive() ? "Default Input Recording Time" : "Operating System Time");
+
+	std::tm input_tm{};
+	std::tm resulting_tm{};
+
+	const int bios_settings_offset_seconds = 60 * (configParams1.timezoneOffset + configParams2.daylightSavings * 60);
+
+	// CDVD internally uses GMT+9, 1-indexed months, and year offset of 2000 instead of 1900.
+	// tm struct uses 0-indexed months and year offset of 1900.
+	if (EmuConfig.ManuallySetRealTimeClock)
+	{
+		resulting_tm.tm_sec = EmuConfig.RtcSecond;
+		resulting_tm.tm_min = EmuConfig.RtcMinute;
+		resulting_tm.tm_hour = EmuConfig.RtcHour;
+		resulting_tm.tm_mday = EmuConfig.RtcDay;
+		resulting_tm.tm_mon = EmuConfig.RtcMonth - 1;
+		resulting_tm.tm_year = EmuConfig.RtcYear + 100;
+		resulting_tm.tm_isdst = 0;
+
+		// Work backwards to input time by accounting for BIOS settings and GMT+9 defaultism.
+#if defined(_WIN32)
+		const std::time_t input_time = _mkgmtime(&resulting_tm) + GMT9_OFFSET_SECONDS - bios_settings_offset_seconds;
+		gmtime_s(&input_tm, &input_time);
+#else
+		const std::time_t input_time = timegm(&resulting_tm) + GMT9_OFFSET_SECONDS - bios_settings_offset_seconds;
+		gmtime_r(&input_time, &input_tm);
+#endif
+	}
+	else if (g_InputRecording.isActive())
+	{
+		// Default input recording value (2020-03-04 00:00:00) if manual RTC is off. Well beyond any PS2 game's release date.
+		// Some games require a valid date in terms of when the PS2 / game actually came out (see: MGS3).
+		// Changing this will ruin compat with old input recordings (RNG seeding).
+		input_tm.tm_sec = 0;
+		input_tm.tm_min = 0;
+		input_tm.tm_hour = 0;
+		input_tm.tm_mday = 4;
+		input_tm.tm_mon = 2;
+		input_tm.tm_year = 120;
+		input_tm.tm_isdst = 0;
+
+#if defined(_WIN32)
+		const std::time_t resulting_time = _mkgmtime(&input_tm) - GMT9_OFFSET_SECONDS + bios_settings_offset_seconds;
+		gmtime_s(&resulting_tm, &resulting_time);
+#else
+		const std::time_t resulting_time = timegm(&input_tm) - GMT9_OFFSET_SECONDS + bios_settings_offset_seconds;
+		gmtime_r(&resulting_time, &resulting_tm);
+#endif
+	}
+	else
+	{
+		// User must set time zone and winter/summer DST in the BIOS for correct time.
+		const std::time_t input_time = std::time(nullptr) + GMT9_OFFSET_SECONDS;
+		const std::time_t resulting_time = input_time - GMT9_OFFSET_SECONDS + bios_settings_offset_seconds;
+
+#ifdef _MSC_VER
+		gmtime_s(&input_tm, &input_time);
+		gmtime_s(&resulting_tm, &resulting_time);
+#else
+		gmtime_r(&input_time, &input_tm);
+		gmtime_r(&resulting_time, &resulting_tm);
+#endif
+	}
+
+	// Send completed input time to the CDVD.
+	cdvd.RTC.second = static_cast<u8>(input_tm.tm_sec);
+	cdvd.RTC.minute = static_cast<u8>(input_tm.tm_min);
+	cdvd.RTC.hour = static_cast<u8>(input_tm.tm_hour);
+	cdvd.RTC.day = static_cast<u8>(input_tm.tm_mday);
+	cdvd.RTC.month = static_cast<u8>(input_tm.tm_mon + 1);
+	cdvd.RTC.year = static_cast<u8>(input_tm.tm_year - 100);
+
+	// Print time that will appear in the user's BIOS rather than input time.
+	DevCon.WriteLn(Color_StrongGreen, "Resulting System Time: 20%02u-%02u-%02u %02u:%02u:%02u",
+				   resulting_tm.tm_year - 100, resulting_tm.tm_mon + 1, resulting_tm.tm_mday,
+				   resulting_tm.tm_hour, resulting_tm.tm_min, resulting_tm.tm_sec);
 
 	cdvdCtrlTrayClose();
 
@@ -2702,12 +2748,6 @@ static __fi void cdvdWrite14(u8 rt)
 		Console.Warning("*PCSX2*: Unimplemented PS1 mode DISC SPEED = STANDARD");
 }
 
-static __fi void fail_pol_cal()
-{
-	Console.Error("[MG] ERROR - Make sure the file is already decrypted!!!");
-	cdvd.SCMDResultBuff[0] = 0x80;
-}
-
 MECHA_RESULT generateCardChallenge()
 {
 	uint8_t cardIVSeed[8];
@@ -2772,11 +2812,47 @@ MECHA_RESULT verifyCardChallenge()
 static MECHA_RESULT DecryptKelfHeader()
 {
 	KELFHeader* header = (KELFHeader*)cdvd.data_buffer;
+	if (cdvd.DataSize < sizeof(KELFHeader))
+	{
+		Console.Error("Invalid HeaderSize");
+		cdvd.mecha_errorcode = 0x81;
+		return MECHA_RESULT_FAILED;
+	}
+
 	uint32_t headerSize = sizeof(KELFHeader) + sizeof(ConsoleBan) * header->BanCount;
+	if (headerSize > cdvd.DataSize)
+	{
+		Console.Error("Invalid HeaderSize");
+		cdvd.mecha_errorcode = 0x81;
+		return MECHA_RESULT_FAILED;
+	}
+
 	if (header->Flags & 1)
+	{
+		if (headerSize >= cdvd.DataSize)
+		{
+			Console.Error("Invalid HeaderSize");
+			cdvd.mecha_errorcode = 0x81;
+			return MECHA_RESULT_FAILED;
+		}
+
 		headerSize += cdvd.data_buffer[headerSize] + 1;
+		if (headerSize > cdvd.DataSize)
+		{
+			Console.Error("Invalid HeaderSize");
+			cdvd.mecha_errorcode = 0x81;
+			return MECHA_RESULT_FAILED;
+		}
+	}
 
 	uint8_t HeaderSignature[8];
+	if (headerSize > cdvd.DataSize - sizeof(HeaderSignature))
+	{
+		Console.Error("Invalid HeaderSize");
+		cdvd.mecha_errorcode = 0x81;
+		return MECHA_RESULT_FAILED;
+	}
+
 	memset(HeaderSignature, 0, sizeof(HeaderSignature));
 	for (unsigned int i = 0; i < (headerSize & 0xFFFFFFF8); i += 8)
 	{
@@ -2828,12 +2904,18 @@ static MECHA_RESULT DecryptKelfHeader()
 	}
 
 	uint32_t offset = headerSize + sizeof(HeaderSignature);
-
 	// Region check is skipped
 
 	// Nonce ban is skipped
 
 	uint8_t Kbit[16];
+	if (offset > cdvd.DataSize - 32)
+	{
+		Console.Error("Invalid KELF key offset");
+		cdvd.mecha_errorcode = 0x81;
+		return MECHA_RESULT_FAILED;
+	}
+
 	if (cdvd.mode == 1 || cdvd.mode == 3)
 	{
 		memcpy(Kbit, &cdvd.data_buffer[offset], 16);
@@ -2868,6 +2950,13 @@ static MECHA_RESULT DecryptKelfHeader()
 		doubleDesDecrypt(KEK, &cdvd.Kc[8]);
 	}
 
+	if (offset > cdvd.DataSize - 8)
+	{
+		Console.Error("Invalid BitTable offset");
+		cdvd.mecha_errorcode = 0x81;
+		return MECHA_RESULT_FAILED;
+	}
+
 	cdvd.bitTablePtr = (BitTable*)&cdvd.data_buffer[offset];
 
 	uint8_t BitTableEvenCiphertext[8];
@@ -2875,6 +2964,18 @@ static MECHA_RESULT DecryptKelfHeader()
 
 	doubleDesDecrypt(Kbit, cdvd.bitTablePtr);
 	xor_bit(g_keyStore.ContentTableIV, cdvd.bitTablePtr, cdvd.bitTablePtr, 8);
+	const uint32_t bit_table_length = static_cast<uint32_t>(sizeof(cdvd.bitTablePtr->HeaderSize) +
+		sizeof(cdvd.bitTablePtr->BlockCount) + sizeof(cdvd.bitTablePtr->gap) +
+		(sizeof(BitBlock) * static_cast<uint32_t>(cdvd.bitTablePtr->BlockCount)));
+	const uint32_t remaining_data = cdvd.DataSize - offset;
+	if (cdvd.bitTablePtr->BlockCount > std::extent_v<decltype(cdvd.bitTablePtr->Blocks)> ||
+		bit_table_length > remaining_data || remaining_data - bit_table_length < 16)
+	{
+		Console.Error("Invalid BitTable size");
+		cdvd.mecha_errorcode = 0x81;
+		return MECHA_RESULT_FAILED;
+	}
+
 	cdvd.lastBitTable = 0;
 
 	int signedBitBlocks = 0;
@@ -3936,7 +4037,8 @@ static void cdvdWrite16(u8 rt) // SCOMMAND
 				if (cdvd.SCMDParamCnt == 0 &&
 					(cdvd.mecha_state == MECHA_STATE_BIT_LENGTH_SENT ||
 						cdvd.mecha_state == MECHA_STATE_DATA_OUT_LENGTH_SET ||
-						cdvd.mecha_state == MECHA_STATE_CRYPTO_DATA_OUT_SIZE_SET))
+						cdvd.mecha_state == MECHA_STATE_CRYPTO_DATA_OUT_SIZE_SET) &&
+					cdvd.data_out_offset <= cdvd.DataSize)
 				{
 					uint16_t len = cdvd.DataSize - cdvd.data_out_offset;
 					if (len > 0x10)
