@@ -3679,11 +3679,15 @@ bool MainWindow::verifyPython2Configuration(const GameList::Entry* entry)
 		valid = false;
 	}
 
-	std::string iLinkIdPath = si->GetStringValue("Python2/System", "ILinkIdFile", "");
+	std::string iLinkIdPath = si->GetStringValue("Security", "ILinkIdFile", "");
 	if (iLinkIdPath.empty() || !FileSystem::FileExists(iLinkIdPath.c_str()))
 	{
-		Console.Error("Could not find ILINK ID file: '%s'", iLinkIdPath.c_str());
-		valid = false;
+		std::string nvRamPath = si->GetStringValue("Security", "NvRamFile", "");
+		if (nvRamPath.empty() || !FileSystem::FileExists(nvRamPath.c_str()))
+		{
+			Console.Error("Could not find ILINK ID file: '%s' or NV RAM file: '%s'", iLinkIdPath.c_str(), nvRamPath.c_str());
+			valid = false;
+		}
 	}
 
 	// Dongles

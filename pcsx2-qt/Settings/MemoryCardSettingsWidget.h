@@ -10,6 +10,8 @@
 #include <QtWidgets/QToolButton>
 #include <QtWidgets/QListWidget>
 #include <QtWidgets/QCheckBox>
+#include <QtWidgets/QComboBox>
+#include <QtWidgets/QLabel>
 
 #include <array>
 #include <optional>
@@ -83,6 +85,10 @@ private:
 	{
 		QWidget* root;
 		QCheckBox* enable;
+		QLabel* keySourceLabel;
+		QComboBox* keySource;
+		QLabel* keyLabel;
+		QComboBox* key;
 		QToolButton* eject;
 		MemoryCardSlotWidget* slot;
 	};

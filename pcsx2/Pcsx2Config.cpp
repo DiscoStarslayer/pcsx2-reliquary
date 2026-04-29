@@ -652,6 +652,29 @@ const char* Pcsx2Config::GSOptions::FMVAspectRatioSwitchNames[(size_t)FMVAspectR
 	"10:7",
 	nullptr};
 
+const char* Pcsx2Config::McdOptions::KeySourceNames[(size_t)MemoryCardKeySource::MaxCount + 1] = {
+	"keysource",
+	"coh_keysource",
+	nullptr};
+
+const char* Pcsx2Config::McdOptions::KeyNames[(size_t)MemoryCardKey::MaxCount + 1] = {
+	"cex_key",
+	"dex_key",
+	"coh_key",
+	"coh_cex_key",
+	"prt_key",
+	nullptr};
+
+bool Pcsx2Config::McdOptions::operator==(const McdOptions& right) const
+{
+	return OpEqu(Filename) && OpEqu(Enabled) && OpEqu(Type) && OpEqu(KeySource) && OpEqu(Key);
+}
+
+bool Pcsx2Config::McdOptions::operator!=(const McdOptions& right) const
+{
+	return !this->operator==(right);
+}
+
 const char* Pcsx2Config::GSOptions::BlendingLevelNames[] = {
 	"Minimum",
 	"Basic",
@@ -1705,7 +1728,7 @@ Pcsx2Config::SecurityOptions::SecurityOptions()
 
 std::optional<SecurityKeyStoreMode> Pcsx2Config::ParseSecurityKeyStoreMode(const char* name)
 {
-	for (u8 i = 0; i < static_cast<u8>(SecurityKeyStoreMode::Arcade); i++)
+	for (u8 i = 0; i <= static_cast<u8>(SecurityKeyStoreMode::Arcade); i++)
 	{
 		if (std::strcmp(name, SecurityOptions::KeyStoreModeNames[i]) == 0)
 			return static_cast<SecurityKeyStoreMode>(i);
@@ -2013,6 +2036,8 @@ Pcsx2Config::Pcsx2Config()
 		Mcd[slot].Filename = FileMcd_GetDefaultName(slot);
 		// Folder memory card is autodetected later.
 		Mcd[slot].Type = MemoryCardType::File;
+		Mcd[slot].KeySource = MemoryCardKeySource::Retail;
+		Mcd[slot].Key = MemoryCardKey::Retail;
 	}
 
 	GzipIsoIndexTemplate = "$(f).pindex.tmp";
@@ -2114,6 +2139,10 @@ void Pcsx2Config::LoadSaveMemcards(SettingsWrapper& wrap)
 			Mcd[slot].Enabled, Mcd[slot].Enabled);
 		wrap.Entry("MemoryCards", StringUtil::StdStringFromFormat("Slot%u_Filename", slot + 1).c_str(),
 			Mcd[slot].Filename, Mcd[slot].Filename);
+		wrap.EnumEntry("MemoryCards", StringUtil::StdStringFromFormat("Slot%u_KeySource", slot + 1).c_str(),
+			Mcd[slot].KeySource, McdOptions::KeySourceNames, Mcd[slot].KeySource);
+		wrap.EnumEntry("MemoryCards", StringUtil::StdStringFromFormat("Slot%u_Key", slot + 1).c_str(),
+			Mcd[slot].Key, McdOptions::KeyNames, Mcd[slot].Key);
 	}
 
 	for (uint slot = 2; slot < 8; ++slot)

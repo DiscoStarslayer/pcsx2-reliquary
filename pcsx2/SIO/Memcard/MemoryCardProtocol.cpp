@@ -14,6 +14,7 @@
 #include "common/FileSystem.h"
 #include "common/Path.h"
 
+#include <array>
 #include <cstring>
 
 #define MC_LOG_ENABLE 0
@@ -23,47 +24,114 @@
 
 MemoryCardProtocol g_MemoryCardProtocol;
 
-// keysource and key are self generated values
-uint8_t keysource[] = {0xf5, 0x80, 0x95, 0x3c, 0x4c, 0x84, 0xa9, 0xc0};
-uint8_t dex_key[16] = {0x17, 0x39, 0xD3, 0xBC, 0xD0, 0x2C, 0x18, 0x07, 0x0F, 0x7A, 0xF3, 0xB7, 0x9E, 0x73, 0x03, 0x1C};
-uint8_t cex_key[16] = {0x06, 0x46, 0x7a, 0x6c, 0x5b, 0x9b, 0x82, 0x77, 0x0d, 0xdf, 0xe9, 0x7e, 0x24, 0x5b, 0x9f, 0xca};
-uint8_t* key = cex_key;
-uint8_t iv[8];
-uint8_t seed[8];
-uint8_t nonce[8];
-uint8_t MechaChallenge1[8];
-uint8_t MechaChallenge2[8];
-uint8_t MechaChallenge3[8];
-uint8_t MechaResponse1[8];
-uint8_t MechaResponse2[8];
-uint8_t MechaResponse3[8];
+namespace
+{
+	using Bytes8 = std::array<u8, 8>;
+	using Bytes16 = std::array<u8, 16>;
 
-static void desEncrypt(void* key, void* data)
+	// keysource and key are self generated values
+	static constexpr Bytes8 keysource = {0xf5, 0x80, 0x95, 0x3c, 0x4c, 0x84, 0xa9, 0xc0};
+	static constexpr Bytes8 coh_keysource = {0x03, 0x14, 0x93, 0x16, 0x27, 0x02, 0x9D, 0xA2};
+
+	static constexpr Bytes16 cex_key = {0x06, 0x46, 0x7a, 0x6c, 0x5b, 0x9b, 0x82, 0x77, 0x0d, 0xdf, 0xe9, 0x7e, 0x24, 0x5b, 0x9f, 0xca}; // SCPH-10020 in Retail mode
+	static constexpr Bytes16 dex_key = {0x17, 0x39, 0xD3, 0xBC, 0xD0, 0x2C, 0x18, 0x07, 0x0F, 0x7A, 0xF3, 0xB7, 0x9E, 0x73, 0x03, 0x1C}; // SCPH-10020 in Developer mode or SCPH-10020T
+	static constexpr Bytes16 coh_key = {0x05, 0x3D, 0x59, 0x77, 0xC4, 0xF7, 0xB0, 0xD4, 0x37, 0xAE, 0x66, 0xA5, 0x17, 0x71, 0xB8, 0xC0}; // COH-H10020
+	static constexpr Bytes16 coh_cex_key = {0xA9, 0xFB, 0x27, 0x2A, 0x63, 0xCF, 0xED, 0x6F, 0xD0, 0x28, 0xA2, 0x4A, 0x98, 0x11, 0xB8, 0x2E}; // SCPH-10020 in Arcade mode
+	static constexpr Bytes16 prt_key = {0x8C, 0x4B, 0xEF, 0xA6, 0xF4, 0x9A, 0x23, 0xA0, 0x9C, 0xF1, 0x46, 0xAA, 0x17, 0x1C, 0xFE, 0x75}; // Prototype Memory Card (EB-10020?)
+
+	struct MemoryCardAuthState
+	{
+		const u8* key = cex_key.data();
+		Bytes8 iv = {};
+		Bytes8 seed = {};
+		Bytes8 nonce = {};
+		Bytes8 mechaChallenge1 = {};
+		Bytes8 mechaChallenge2 = {};
+		Bytes8 mechaChallenge3 = {};
+		Bytes8 mechaResponse1 = {};
+		Bytes8 mechaResponse2 = {};
+		Bytes8 mechaResponse3 = {};
+		std::array<u8, 9> cryptBuf = {};
+		u8 cryptXorResult = 0;
+	};
+
+	static std::array<MemoryCardAuthState, 8> s_auth_state;
+
+	static u32 getActiveMemoryCardSlot()
+	{
+		if (!mcd)
+			return 0;
+
+		const u32 slot = sioConvertPortAndSlotToPad(mcd->port, mcd->slot);
+		return (slot < s_auth_state.size()) ? slot : 0;
+	}
+
+	static MemoryCardAuthState& getActiveAuthState(u32 slot)
+	{
+		return s_auth_state[slot];
+	}
+
+	static const Bytes8& getConfiguredKeySource(u32 slot)
+	{
+		switch (EmuConfig.Mcd[slot].KeySource)
+		{
+			case MemoryCardKeySource::Arcade:
+				return coh_keysource;
+			case MemoryCardKeySource::Retail:
+			case MemoryCardKeySource::MaxCount:
+			default:
+				return keysource;
+		}
+	}
+
+	static const u8* getConfiguredKey(u32 slot)
+	{
+		switch (EmuConfig.Mcd[slot].Key)
+		{
+			case MemoryCardKey::Development:
+				return dex_key.data();
+			case MemoryCardKey::Arcade:
+				return coh_key.data();
+			case MemoryCardKey::Conquest:
+				return coh_cex_key.data();
+			case MemoryCardKey::Prototype:
+				return prt_key.data();
+			case MemoryCardKey::Retail:
+			case MemoryCardKey::MaxCount:
+			default:
+				return cex_key.data();
+		}
+	}
+}
+
+static void desEncrypt(const void* key, void* data)
 {
 	DesContext dc;
-	desInit(&dc, (uint8_t*)key, 8);
+	desInit(&dc, static_cast<const uint8_t*>(key), 8);
 	desEncryptBlock(&dc, (uint8_t*)data, (uint8_t*)data);
 }
 
-static void desDecrypt(void* key, void* data)
+static void desDecrypt(const void* key, void* data)
 {
 	DesContext dc;
-	desInit(&dc, (uint8_t*)key, 8);
+	desInit(&dc, static_cast<const uint8_t*>(key), 8);
 	desDecryptBlock(&dc, (uint8_t*)data, (uint8_t*)data);
 }
 
-static void doubleDesEncrypt(void* key, void* data)
+static void doubleDesEncrypt(const void* key, void* data)
 {
-	desEncrypt(key, data);
-	desDecrypt(&((uint8_t*)key)[8], data);
-	desEncrypt(key, data);
+	const u8* keyBytes = static_cast<const u8*>(key);
+	desEncrypt(keyBytes, data);
+	desDecrypt(&keyBytes[8], data);
+	desEncrypt(keyBytes, data);
 }
 
-static void doubleDesDecrypt(void* key, void* data)
+static void doubleDesDecrypt(const void* key, void* data)
 {
-	desDecrypt(key, data);
-	desEncrypt(&((uint8_t*)key)[8], data);
-	desDecrypt(key, data);
+	const u8* keyBytes = static_cast<const u8*>(key);
+	desDecrypt(keyBytes, data);
+	desEncrypt(&keyBytes[8], data);
+	desDecrypt(keyBytes, data);
 }
 
 static void xor_bit(const void* a, const void* b, void* Result, size_t Length)
@@ -75,17 +143,18 @@ static void xor_bit(const void* a, const void* b, void* Result, size_t Length)
 	}
 }
 
-void generateIvSeedNonce()
+static void generateIvSeedNonce(u32 slot, MemoryCardAuthState& auth)
 {
+	const Bytes8& source = getConfiguredKeySource(slot);
 	for (int i = 0; i < 8; i++)
 	{
-		iv[i] = rand();
-		seed[i] = keysource[i] ^ iv[i];
-		nonce[i] = rand();
+		auth.iv[i] = static_cast<u8>(rand());
+		auth.seed[i] = source[i] ^ auth.iv[i];
+		auth.nonce[i] = static_cast<u8>(rand());
 	}
 }
 
-void generateResponse()
+static void generateResponse(MemoryCardAuthState& auth)
 {
 	uint8_t challengeIV[8] = {/* SHA256: e7b02f4f8d99a58b96dbca4db81c5d666ea7c46fbf6e1d5c045eaba0ee25416a */};
 	if (!EmuConfig.Security.MgChallengeIvFile.empty())
@@ -99,21 +168,21 @@ void generateResponse()
 		}
 	}
 
-	doubleDesDecrypt(key, MechaChallenge1);
-	uint8_t random[8];
-	xor_bit(MechaChallenge1, challengeIV, random, 8);
+	doubleDesDecrypt(auth.key, auth.mechaChallenge1.data());
+	Bytes8 random;
+	xor_bit(auth.mechaChallenge1.data(), challengeIV, random.data(), random.size());
 
 	// MechaChallenge2 and MechaChallenge3 lets the card verify the console
 
-	xor_bit(nonce, challengeIV, MechaResponse1, 8);
-	doubleDesEncrypt(key, MechaResponse1);
+	xor_bit(auth.nonce.data(), challengeIV, auth.mechaResponse1.data(), auth.mechaResponse1.size());
+	doubleDesEncrypt(auth.key, auth.mechaResponse1.data());
 
-	xor_bit(random, MechaResponse1, MechaResponse2, 8);
-	doubleDesEncrypt(key, MechaResponse2);
+	xor_bit(random.data(), auth.mechaResponse1.data(), auth.mechaResponse2.data(), auth.mechaResponse2.size());
+	doubleDesEncrypt(auth.key, auth.mechaResponse2.data());
 
-	uint8_t cardKey[] = {'M', 'e', 'c', 'h', 'a', 'P', 'w', 'n'};
-	xor_bit(cardKey, MechaResponse2, MechaResponse3, 8);
-	doubleDesEncrypt(key, MechaResponse3);
+	static constexpr Bytes8 cardKey = {'M', 'e', 'c', 'h', 'a', 'P', 'w', 'n'};
+	xor_bit(cardKey.data(), auth.mechaResponse2.data(), auth.mechaResponse3.data(), auth.mechaResponse3.size());
+	doubleDesEncrypt(auth.key, auth.mechaResponse3.data());
 }
 
 // Check if the memcard is for PS1, and if we are working on a command sent over SIO2.
@@ -532,6 +601,8 @@ void MemoryCardProtocol::AuthXor()
 {
 	MC_LOG.WriteLn("%s", __FUNCTION__);
 	PS1_FAIL();
+	const u32 slot = getActiveMemoryCardSlot();
+	MemoryCardAuthState& auth = getActiveAuthState(slot);
 	const u8 modeByte = g_Sio2FifoIn.front();
 	g_Sio2FifoIn.pop_front();
 
@@ -539,14 +610,14 @@ void MemoryCardProtocol::AuthXor()
 	{
 		case 0x01: // get iv
 		{
-			generateIvSeedNonce();
+			generateIvSeedNonce(slot, auth);
 			g_Sio2FifoOut.push_back(0x00);
 			g_Sio2FifoOut.push_back(0x2b);
 			u8 xorResult = 0x00;
 
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = iv[7 - xorCounter];
+				const u8 toXOR = auth.iv[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -562,7 +633,7 @@ void MemoryCardProtocol::AuthXor()
 			u8 xorResult = 0x00;
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = seed[7 - xorCounter];
+				const u8 toXOR = auth.seed[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -578,7 +649,7 @@ void MemoryCardProtocol::AuthXor()
 			u8 xorResult = 0x00;
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = nonce[7 - xorCounter];
+				const u8 toXOR = auth.nonce[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -593,7 +664,7 @@ void MemoryCardProtocol::AuthXor()
 			{
 				const u8 val = g_Sio2FifoIn.front();
 				g_Sio2FifoIn.pop_front();
-				MechaChallenge3[7 - i] = val;
+				auth.mechaChallenge3[7 - i] = val;
 			}
 			The2bTerminator(14);
 			break;
@@ -604,7 +675,7 @@ void MemoryCardProtocol::AuthXor()
 			{
 				const u8 val = g_Sio2FifoIn.front();
 				g_Sio2FifoIn.pop_front();
-				MechaChallenge2[7 - i] = val;
+				auth.mechaChallenge2[7 - i] = val;
 			}
 			The2bTerminator(14);
 			break;
@@ -615,20 +686,20 @@ void MemoryCardProtocol::AuthXor()
 			{
 				const u8 val = g_Sio2FifoIn.front();
 				g_Sio2FifoIn.pop_front();
-				MechaChallenge1[7 - i] = val;
+				auth.mechaChallenge1[7 - i] = val;
 			}
 			The2bTerminator(14);
 			break;
 		}
 		case 0x0f: // CardResponse1
 		{
-			generateResponse();
+			generateResponse(auth);
 			g_Sio2FifoOut.push_back(0x00);
 			g_Sio2FifoOut.push_back(0x2b);
 			u8 xorResult = 0x00;
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = MechaResponse1[7 - xorCounter];
+				const u8 toXOR = auth.mechaResponse1[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -644,7 +715,7 @@ void MemoryCardProtocol::AuthXor()
 			u8 xorResult = 0x00;
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = MechaResponse2[7 - xorCounter];
+				const u8 toXOR = auth.mechaResponse2[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -661,7 +732,7 @@ void MemoryCardProtocol::AuthXor()
 
 			for (size_t xorCounter = 0; xorCounter < 8; xorCounter++)
 			{
-				const u8 toXOR = MechaResponse3[7 - xorCounter];
+				const u8 toXOR = auth.mechaResponse3[7 - xorCounter];
 				g_Sio2FifoIn.pop_front();
 				xorResult ^= toXOR;
 				g_Sio2FifoOut.push_back(toXOR);
@@ -697,11 +768,9 @@ void MemoryCardProtocol::AuthCrypt()
 {
 	MC_LOG.WriteLn("%s", __FUNCTION__);
 	PS1_FAIL();
+	MemoryCardAuthState& auth = getActiveAuthState(getActiveMemoryCardSlot());
 	const u8 modeByte = g_Sio2FifoIn.front();
 	g_Sio2FifoIn.pop_front();
-
-	static u8 xorResult = 0;
-	static u8 buf[9];
 
 	switch (modeByte)
 	{
@@ -713,13 +782,13 @@ void MemoryCardProtocol::AuthCrypt()
 			break;
 		case 0x41:
 		case 0x51:
-			xorResult = 0;
+			auth.cryptXorResult = 0;
 			for (size_t i = 0; i < 8; i++)
 			{
 				const u8 val = g_Sio2FifoIn.front();
 				g_Sio2FifoIn.pop_front();
-				xorResult ^= val;
-				buf[i] = val;
+				auth.cryptXorResult ^= val;
+				auth.cryptBuf[i] = val;
 			}
 			The2bTerminator(14);
 			break;
@@ -729,9 +798,9 @@ void MemoryCardProtocol::AuthCrypt()
 			g_Sio2FifoOut.push_back(0x2b);
 			for (size_t i = 0; i < 8; i++)
 			{
-				g_Sio2FifoOut.push_back(buf[i]);
+				g_Sio2FifoOut.push_back(auth.cryptBuf[i]);
 			}
-			g_Sio2FifoOut.push_back(xorResult);
+			g_Sio2FifoOut.push_back(auth.cryptXorResult);
 			g_Sio2FifoOut.push_back(mcd->term);
 			break;
 		default:
@@ -755,7 +824,8 @@ void MemoryCardProtocol::AuthReset()
 	else
 	{
 		mcd->term = Terminator::READY;
-		key = cex_key;
+		const u32 slot = getActiveMemoryCardSlot();
+		getActiveAuthState(slot).key = getConfiguredKey(slot);
 		The2bTerminator(5);
 	}
 }
@@ -768,7 +838,7 @@ void MemoryCardProtocol::AuthKeySelect()
 	g_Sio2FifoIn.pop_front();
 	if (data == 1)
 	{
-		key = cex_key;
+		getActiveAuthState(getActiveMemoryCardSlot()).key = cex_key.data();
 	}
 	The2bTerminator(5);
 }

@@ -22,9 +22,49 @@
 
 static constexpr const char* CONFIG_SECTION = "MemoryCards";
 
+static const char* s_memory_card_key_source_names[] = {
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Retail"),
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Arcade"),
+	nullptr,
+};
+
+static const char* s_memory_card_key_source_values[] = {
+	"keysource",
+	"coh_keysource",
+	nullptr,
+};
+
+static const char* s_memory_card_key_names[] = {
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Retail"),
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Development"),
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Arcade"),
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Conquest"),
+	QT_TRANSLATE_NOOP("MemoryCardSettingsWidget", "Prototype"),
+	nullptr,
+};
+
+static const char* s_memory_card_key_values[] = {
+	"cex_key",
+	"dex_key",
+	"coh_key",
+	"coh_cex_key",
+	"prt_key",
+	nullptr,
+};
+
 static std::string getSlotFilenameKey(u32 slot)
 {
 	return StringUtil::StdStringFromFormat("Slot%u_Filename", slot + 1);
+}
+
+static std::string getSlotKeySourceKey(u32 slot)
+{
+	return StringUtil::StdStringFromFormat("Slot%u_KeySource", slot + 1);
+}
+
+static std::string getSlotKeyKey(u32 slot)
+{
+	return StringUtil::StdStringFromFormat("Slot%u_Key", slot + 1);
 }
 
 MemoryCardSettingsWidget::MemoryCardSettingsWidget(SettingsWindow* settings_dialog, QWidget* parent)
@@ -107,9 +147,26 @@ void MemoryCardSettingsWidget::createSlotWidgets(SlotGroup* port, u32 slot)
 	port->eject->setToolTip(perGame ? tr("Reset") : tr("Eject Memory Card"));
 	connect(port->eject, &QToolButton::clicked, this, [this, slot]() { ejectSlot(slot); });
 
+	port->keySourceLabel = new QLabel(tr("Keysource:"), port->root);
+	port->keySource = new QComboBox(port->root);
+	SettingWidgetBinder::BindWidgetToEnumSetting(sif, port->keySource, CONFIG_SECTION, getSlotKeySourceKey(slot),
+		s_memory_card_key_source_names, s_memory_card_key_source_values, s_memory_card_key_source_values[0], "MemoryCardSettingsWidget");
+
+	port->keyLabel = new QLabel(tr("Key:"), port->root);
+	port->key = new QComboBox(port->root);
+	SettingWidgetBinder::BindWidgetToEnumSetting(sif, port->key, CONFIG_SECTION, getSlotKeyKey(slot),
+		s_memory_card_key_names, s_memory_card_key_values, s_memory_card_key_values[0], "MemoryCardSettingsWidget");
+
 	port->slot = new MemoryCardSlotWidget(port->root);
 	connect(port->slot, &MemoryCardSlotWidget::cardDropped, this,
 		[this, slot](const QString& card) { tryInsertCard(slot, card); });
+
+	QGridLayout* key_layout = new QGridLayout();
+	key_layout->setContentsMargins(0, 0, 0, 0);
+	key_layout->addWidget(port->keySourceLabel, 0, 0);
+	key_layout->addWidget(port->keySource, 0, 1);
+	key_layout->addWidget(port->keyLabel, 1, 0);
+	key_layout->addWidget(port->key, 1, 1);
 
 	QHBoxLayout* bottom_layout = new QHBoxLayout();
 	bottom_layout->setContentsMargins(0, 0, 0, 0);
@@ -119,6 +176,7 @@ void MemoryCardSettingsWidget::createSlotWidgets(SlotGroup* port, u32 slot)
 	QVBoxLayout* vert_layout = new QVBoxLayout(port->root);
 	vert_layout->setContentsMargins(0, 0, 0, 0);
 	vert_layout->addWidget(port->enable, 0);
+	vert_layout->addLayout(key_layout, 0);
 	vert_layout->addLayout(bottom_layout, 1);
 
 	static_cast<QGridLayout*>(m_ui.slotGroupBox->layout())->addWidget(port->root, 0, (slot != 0) ? 2 : 0);
@@ -315,6 +373,10 @@ void MemoryCardSettingsWidget::refresh()
 
 		m_slots[slot].slot->setCard(name, inherited);
 		m_slots[slot].slot->setEnabled(enabled);
+		m_slots[slot].keySourceLabel->setEnabled(enabled);
+		m_slots[slot].keySource->setEnabled(enabled);
+		m_slots[slot].keyLabel->setEnabled(enabled);
+		m_slots[slot].key->setEnabled(enabled);
 		m_slots[slot].eject->setEnabled(enabled);
 	}
 

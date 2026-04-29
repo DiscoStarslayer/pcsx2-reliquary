@@ -674,6 +674,10 @@ void FileMcd_Swap()
 	// Copy each McdOptions to local memory
 	Pcsx2Config::McdOptions firstSlot = EmuConfig.Mcd[0];
 	Pcsx2Config::McdOptions secondSlot = EmuConfig.Mcd[1];
+	const MemoryCardKeySource firstKeySource = firstSlot.KeySource;
+	const MemoryCardKey firstKey = firstSlot.Key;
+	const MemoryCardKeySource secondKeySource = secondSlot.KeySource;
+	const MemoryCardKey secondKey = secondSlot.Key;
 
 	if (!firstSlot.Enabled || !secondSlot.Enabled || card1Filename.empty() || card2Filename.empty())
 	{
@@ -686,6 +690,10 @@ void FileMcd_Swap()
 	Host::SetBaseStringSettingValue("MemoryCards", "Slot2_Filename", card1Filename.c_str());
 	Host::CommitBaseSettingChanges();
 	VMManager::ApplySettings();
+	secondSlot.KeySource = firstKeySource;
+	secondSlot.Key = firstKey;
+	firstSlot.KeySource = secondKeySource;
+	firstSlot.Key = secondKey;
 	EmuConfig.Mcd[0] = secondSlot;
 	EmuConfig.Mcd[1] = firstSlot;
 

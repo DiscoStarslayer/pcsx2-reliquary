@@ -249,6 +249,23 @@ enum class MemoryCardType
 	MaxCount
 };
 
+enum class MemoryCardKeySource : u8
+{
+	Retail,
+	Arcade,
+	MaxCount
+};
+
+enum class MemoryCardKey : u8
+{
+	Retail,
+	Development,
+	Arcade,
+	Conquest,
+	Prototype,
+	MaxCount
+};
+
 enum class MemoryCardFileType
 {
 	Unknown,
@@ -1283,9 +1300,17 @@ struct Pcsx2Config
 	//
 	struct McdOptions
 	{
+		static const char* KeySourceNames[(size_t)MemoryCardKeySource::MaxCount + 1];
+		static const char* KeyNames[(size_t)MemoryCardKey::MaxCount + 1];
+
 		std::string Filename; // user-configured location of this memory card
 		bool Enabled; // memory card enabled (if false, memcard will not show up in-game)
 		MemoryCardType Type; // the memory card implementation that should be used
+		MemoryCardKeySource KeySource;
+		MemoryCardKey Key;
+
+		bool operator==(const McdOptions& right) const;
+		bool operator!=(const McdOptions& right) const;
 	};
 
 	// ------------------------------------------------------------------------

@@ -531,7 +531,8 @@ bool GameList::GetPython2ListEntry(const std::string& path, GameList::Entry* ent
 	sif->SetStringValue("DEV9/Hdd", "HddIdFile", hdd_id_path.c_str());
 	sif->SetStringValue("Security", "NvRamFile", nvRamPath.c_str());
 	sif->SetStringValue("Security", "ILinkIdFile", iLinkIdPath.c_str());
-	sif->SetIntValue("Security", "KeyStoreMode", static_cast<int>(SecurityKeyStoreMode::Retail));
+	// All python2 games use retail key, so hard-code that config
+	sif->SetStringValue("Security", "MgKeyStoreMode", Pcsx2Config::GetSecurityKeyStoreModeName(SecurityKeyStoreMode::Retail));
 	sif->SetBoolValue("DEV9/Eth", "EthEnable", true);
 	sif->SetBoolValue("EmuCore/Gamefixes", "OPHFlagHack", true);
 	sif->SetBoolValue("EmuCore/GS", "pcrtc_offsets", false);
