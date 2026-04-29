@@ -7,7 +7,7 @@
 #  LibUSB_INCLUDE_DIR: the directory that contains the include file
 #  LibUSB_LIBRARIES:  the libraries
 
-IF(PKG_CONFIG_FOUND)
+IF(PKG_CONFIG_FOUND AND NOT WIN32)
   IF(DEPENDS_DIR) #Otherwise use System pkg-config path
     SET(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${DEPENDS_DIR}/libusb/lib/pkgconfig")
   ENDIF()
@@ -41,15 +41,17 @@ FIND_PATH(LibUSB_INCLUDE_DIRS
     include/libusb-1.0
 )
 
-SET(LIBUSB_NAME libusb)
+SET(LIBUSB_LIBRARY_NAMES libusb-1.0)
 IF(WIN32)
-    SET(LIBUSB_NAME usb)
+    LIST(APPEND LIBUSB_LIBRARY_NAMES usb-1.0)
 ENDIF()
 
-list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+IF(WIN32)
+    LIST(APPEND CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+ENDIF()
 
 FIND_LIBRARY(LibUSB_LIBRARIES
-  NAMES ${LIBUSB_NAME}-1.0
+  NAMES ${LIBUSB_LIBRARY_NAMES}
   PATHS
     "${DEPENDS_DIR}"
     "${DEPENDS_DIR}/libusb"
@@ -67,7 +69,7 @@ FIND_LIBRARY(LibUSB_LIBRARIES
 
 IF(WIN32)
 FIND_FILE(LibUSB_DLL
-  ${LIBUSB_NAME}-1.0.dll
+  NAMES libusb-1.0.dll usb-1.0.dll
   PATHS
     "${DEPENDS_DIR}"
     "${DEPENDS_DIR}/libusb"
