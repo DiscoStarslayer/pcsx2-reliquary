@@ -120,7 +120,7 @@ protected:
 private:
 	enum : u32
 	{
-		MAX_SETTINGS_WIDGETS = 14
+		MAX_SETTINGS_WIDGETS = 15
 	};
 
 	void setupUi(const GameList::Entry* game);

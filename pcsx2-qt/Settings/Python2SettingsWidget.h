@@ -37,6 +37,7 @@ private Q_SLOTS:
 	void onDeviceApiChange(int index);
 	void onHddIdBrowseClicked();
 	void onIlinkIdBrowseClicked();
+	void onNvRamBrowseClicked();
 	void onDongleBlackBrowseClicked();
 	void onDongleWhiteBrowseClicked();
 	void onPatchFileBrowseClicked();

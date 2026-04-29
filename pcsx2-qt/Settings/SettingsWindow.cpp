@@ -95,7 +95,7 @@ void SettingsWindow::setupUi(const GameList::Entry* game)
 
 		if (isPerGameSettings() && game->type == GameList::EntryType::Python2)
 		{
-			addWidget(m_python2_settings = new Python2SettingsWidget(game, this, m_ui.settingsContainer), tr("Python 2"), QStringLiteral("dashboard-line"),
+			addWidget(m_python2_settings = new Python2SettingsWidget(game, this, m_ui.settingsContainer), tr("Python 2"), QStringLiteral("keyboard-line"),
 				tr("<strong>Python 2 Settings</strong><hr>These options control the settings specific to Python 2 games."));
 		}
 
@@ -368,6 +368,7 @@ void SettingsWindow::reopen(const QString& message)
 void SettingsWindow::addWidget(QWidget* widget, QString title, QString icon, QString help_text)
 {
 	const int index = m_ui.settingsCategory->count();
+	pxAssert(index < static_cast<int>(m_category_help_text.size()));
 
 	QListWidgetItem* item = new QListWidgetItem(m_ui.settingsCategory);
 	item->setText(title);

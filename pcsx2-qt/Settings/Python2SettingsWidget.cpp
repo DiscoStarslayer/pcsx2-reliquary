@@ -43,6 +43,10 @@ Python2SettingsWidget::Python2SettingsWidget(const GameList::Entry* entry, Setti
 	m_ui.ilinkIdPath->setEnabled(true);
 	connect(m_ui.ilinkIdBrowse, &QPushButton::clicked, this, &Python2SettingsWidget::onIlinkIdBrowseClicked);
 
+	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.nvRamPath, "Security", "NvRamFile", "ps2_nvram");
+	m_ui.nvRamPath->setEnabled(true);
+	connect(m_ui.nvRamBrowse, &QPushButton::clicked, this, &Python2SettingsWidget::onNvRamBrowseClicked);
+
 	SettingWidgetBinder::BindWidgetToStringSetting(sif, m_ui.dongleBlackPath, "Python2/Game", "DongleBlackFile", "dongle_black.bin");
 	m_ui.dongleBlackPath->setEnabled(true);
 	connect(m_ui.dongleBlackBrowse, &QPushButton::clicked, this, &Python2SettingsWidget::onDongleBlackBrowseClicked);
@@ -146,6 +150,20 @@ void Python2SettingsWidget::onIlinkIdBrowseClicked()
 
 	m_ui.ilinkIdPath->setText(path);
 	m_ui.ilinkIdPath->editingFinished();
+}
+
+void Python2SettingsWidget::onNvRamBrowseClicked()
+{
+	QString path =
+		QDir::toNativeSeparators(QFileDialog::getOpenFileName(QtUtils::GetRootWidget(this), tr("NV RAM File"),
+			!m_ui.nvRamPath->text().isEmpty() ? m_ui.nvRamPath->text() : "ps2_nvram", tr("All Files (*)"), nullptr,
+			QFileDialog::DontConfirmOverwrite));
+
+	if (path.isEmpty())
+		return;
+
+	m_ui.nvRamPath->setText(path);
+	m_ui.nvRamPath->editingFinished();
 }
 
 void Python2SettingsWidget::onDongleBlackBrowseClicked()
