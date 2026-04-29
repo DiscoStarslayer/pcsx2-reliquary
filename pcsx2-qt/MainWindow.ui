@@ -215,9 +215,8 @@
     <addaction name="actionEnableFileLogging"/>
     <addaction name="actionEnableVerboseLogging"/>
     <addaction name="separator"/>
-    <addaction name="actionShowAdvancedSettings"/>
-    <addaction name="actionSaveBlockDump"/>
-    <addaction name="actionSaveGSDump"/>
+     <addaction name="actionSaveBlockDump"/>
+     <addaction name="actionSaveGSDump"/>
    </widget>
    <addaction name="menuSystem"/>
    <addaction name="menuSettings"/>
@@ -1033,14 +1032,6 @@
    </property>
    <property name="text">
     <string>&amp;Cover Downloader...</string>
-   </property>
-  </action>
-  <action name="actionShowAdvancedSettings">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>&amp;Show Advanced Settings</string>
    </property>
   </action>
   <action name="actionInputRecOpenViewer">

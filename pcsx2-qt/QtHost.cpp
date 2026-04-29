@@ -1468,7 +1468,7 @@ bool QtHost::IsOnUIThread()
 
 bool QtHost::ShouldShowAdvancedSettings()
 {
-	return Host::GetBaseBoolSettingValue("UI", "ShowAdvancedSettings", false);
+	return true;
 }
 
 void QtHost::RunOnUIThread(const std::function<void()>& func, bool block /*= false*/)

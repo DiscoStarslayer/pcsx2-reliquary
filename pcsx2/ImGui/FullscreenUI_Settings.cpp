@@ -201,10 +201,9 @@ SettingsInterface* FullscreenUI::GetEditingSettingsInterface(bool game_settings)
 	return (game_settings && s_game_settings_interface) ? s_game_settings_interface.get() : Host::Internal::GetBaseSettingsLayer();
 }
 
-bool FullscreenUI::ShouldShowAdvancedSettings(SettingsInterface* bsi)
+bool FullscreenUI::ShouldShowAdvancedSettings(SettingsInterface* /*bsi*/)
 {
-	return IsEditingGameSettings(bsi) ? Host::GetBaseBoolSettingValue("UI", "ShowAdvancedSettings", false) :
-	                                    bsi->GetBoolValue("UI", "ShowAdvancedSettings", false);
+	return true;
 }
 
 void FullscreenUI::SetSettingsChanged(SettingsInterface* bsi)
@@ -4868,14 +4867,6 @@ void FullscreenUI::DrawAdvancedSettingsPage()
 	const bool show_advanced_settings = ShouldShowAdvancedSettings(bsi);
 
 	BeginMenuButtons();
-
-	if (!IsEditingGameSettings(bsi))
-	{
-		DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_BIOHAZARD, "Show Advanced Settings"),
-			FSUI_CSTR("Changing these options may cause games to become non-functional. Modify at your own risk, the PCSX2 team will not "
-					  "provide support for configurations with these settings changed."),
-			"UI", "ShowAdvancedSettings", false);
-	}
 
 	MenuHeading(FSUI_CSTR("Logging"));
 

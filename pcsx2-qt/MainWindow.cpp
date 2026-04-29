@@ -407,9 +407,7 @@ void MainWindow::connectSignals()
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableLogTimestamps, "Logging", "EnableTimestamps", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionEnableCDVDVerboseReads, "EmuCore", "CdvdVerboseReads", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(nullptr, m_ui.actionSaveBlockDump, "EmuCore", "CdvdDumpBlocks", false);
-	m_ui.actionShowAdvancedSettings->setChecked(QtHost::ShouldShowAdvancedSettings());
 	connect(m_ui.actionSaveBlockDump, &QAction::toggled, this, &MainWindow::onBlockDumpActionToggled);
-	connect(m_ui.actionShowAdvancedSettings, &QAction::toggled, this, &MainWindow::onShowAdvancedSettingsToggled);
 	connect(m_ui.actionSaveGSDump, &QAction::triggered, this, &MainWindow::onSaveGSDumpActionTriggered);
 	connect(m_ui.actionVideoCapture, &QAction::toggled, this, &MainWindow::onVideoCaptureToggled);
 	connect(m_ui.actionEditPatches, &QAction::triggered, this, [this]() { onToolsEditCheatsPatchesTriggered(false); });
@@ -665,51 +663,6 @@ void MainWindow::onBlockDumpActionToggled(bool checked)
 	Host::CommitBaseSettingChanges();
 
 	g_emu_thread->applySettings();
-}
-
-void MainWindow::onShowAdvancedSettingsToggled(bool checked)
-{
-	if (checked && !Host::GetBaseBoolSettingValue("UI", "AdvancedSettingsWarningShown", false))
-	{
-		QCheckBox* cb = new QCheckBox(tr("Do not show again"));
-		QMessageBox mb(this);
-		mb.setWindowIcon(QtHost::GetAppIcon());
-		mb.setWindowModality(Qt::WindowModal);
-		mb.setWindowTitle(tr("Show Advanced Settings"));
-		mb.setText(tr("Changing advanced settings can have unpredictable effects on games, including graphical glitches, lock-ups, and "
-					  "even corrupted save files. "
-					  "We do not recommend changing advanced settings unless you know what you are doing, and the implications of changing "
-					  "each setting.\n\n"
-					  "The PCSX2 team will not provide any support for configurations that modify these settings, you are on your own.\n\n"
-					  "Are you sure you want to continue?"));
-		mb.setIcon(QMessageBox::Warning);
-		mb.addButton(QMessageBox::Yes);
-		mb.addButton(QMessageBox::No);
-		mb.setDefaultButton(QMessageBox::No);
-		mb.setCheckBox(cb);
-
-		if (mb.exec() == QMessageBox::No)
-		{
-			QSignalBlocker sb(m_ui.actionShowAdvancedSettings);
-			m_ui.actionShowAdvancedSettings->setChecked(false);
-			return;
-		}
-
-		if (cb->isChecked())
-		{
-			Host::SetBaseBoolSettingValue("UI", "AdvancedSettingsWarningShown", true);
-			Host::CommitBaseSettingChanges();
-		}
-	}
-
-	Host::SetBaseBoolSettingValue("UI", "ShowAdvancedSettings", checked);
-	Host::CommitBaseSettingChanges();
-
-	updateAdvancedSettingsVisibility();
-
-	// just recreate the entire settings window, it's easier.
-	if (m_settings_window)
-		recreateSettings();
 }
 
 void MainWindow::updateAdvancedSettingsVisibility()
