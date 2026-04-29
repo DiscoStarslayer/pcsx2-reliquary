@@ -273,20 +273,20 @@ void cdvdLoadNVRAM()
 		ERROR_LOG("Failed to open or read NVRAM at {}: {}", Path::GetFileName(nvmfile), error.GetDescription());
 		cdvdCreateNewNVM();
 	}
-	else
-	{
-		// Verify NVRAM is sane.
-		const NVMLayout* nvmLayout = getNvmLayout();
-		constexpr u8 zero[16] = {0};
-
-		if (std::memcmp(&s_nvram[nvmLayout->config1 + 0x10], zero, 16) == 0 ||
-			(((BiosVersion >> 8) == 2) && ((BiosVersion & 0xff) != 10) &&
-				(std::memcmp(&s_nvram[nvmLayout->regparams], zero, 12) == 0)))
-		{
-			ERROR_LOG("Language or Region Parameters missing, filling in defaults");
-			cdvdCreateNewNVM();
-		}
-	}
+	// else
+	// {
+	// 	// Verify NVRAM is sane.
+	// 	const NVMLayout* nvmLayout = getNvmLayout();
+	// 	constexpr u8 zero[16] = {0};
+	//
+	// 	if (std::memcmp(&s_nvram[nvmLayout->config1 + 0x10], zero, 16) == 0 ||
+	// 		(((BiosVersion >> 8) == 2) && ((BiosVersion & 0xff) != 10) &&
+	// 			(std::memcmp(&s_nvram[nvmLayout->regparams], zero, 12) == 0)))
+	// 	{
+	// 		ERROR_LOG("Language or Region Parameters missing, filling in defaults");
+	// 		cdvdCreateNewNVM();
+	// 	}
+	// }
 
 	// Also load the mechacon version while we're here.
 	const std::string mecfile = Path::ReplaceExtension(BiosPath, "mec");
