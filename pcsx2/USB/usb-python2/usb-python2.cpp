@@ -1048,16 +1048,24 @@ namespace usb_python2
 						CheckKeyState(BID_DANCE864_P1_START, P2IO_JAMMA_DANCE864_P1_START);
 						CheckKeyState(BID_DANCE864_P1_SELECT_LEFT, P2IO_JAMMA_DANCE864_P1_LEFT);
 						CheckKeyState(BID_DANCE864_P1_SELECT_RIGHT, P2IO_JAMMA_DANCE864_P1_RIGHT);
-						CheckKeyState(BID_DANCE864_P1_PAD_LEFT, P2IO_JAMMA_DANCE864_P1_PAD_LEFT);
-						CheckKeyState(BID_DANCE864_P1_PAD_CENTER, P2IO_JAMMA_DANCE864_P1_PAD_CENTER);
-						CheckKeyState(BID_DANCE864_P1_PAD_RIGHT, P2IO_JAMMA_DANCE864_P1_PAD_RIGHT);
 
 						CheckKeyState(BID_DANCE864_P2_START, P2IO_JAMMA_DANCE864_P2_START);
 						CheckKeyState(BID_DANCE864_P2_SELECT_LEFT, P2IO_JAMMA_DANCE864_P2_LEFT);
 						CheckKeyState(BID_DANCE864_P2_SELECT_RIGHT, P2IO_JAMMA_DANCE864_P2_RIGHT);
-						CheckKeyState(BID_DANCE864_P2_PAD_LEFT, P2IO_JAMMA_DANCE864_P2_PAD_LEFT);
-						CheckKeyState(BID_DANCE864_P2_PAD_CENTER, P2IO_JAMMA_DANCE864_P2_PAD_CENTER);
-						CheckKeyState(BID_DANCE864_P2_PAD_RIGHT, P2IO_JAMMA_DANCE864_P2_PAD_RIGHT);
+
+						if (s->f.stageState[0].state == GN845PWBB_STAGE_INIT_DONE)
+						{
+							CheckKeyState(BID_DANCE864_P1_PAD_LEFT, P2IO_JAMMA_DANCE864_P1_PAD_LEFT);
+							CheckKeyState(BID_DANCE864_P1_PAD_CENTER, P2IO_JAMMA_DANCE864_P1_PAD_CENTER);
+							CheckKeyState(BID_DANCE864_P1_PAD_RIGHT, P2IO_JAMMA_DANCE864_P1_PAD_RIGHT);
+						}
+
+						if (s->f.stageState[1].state == GN845PWBB_STAGE_INIT_DONE)
+						{
+							CheckKeyState(BID_DANCE864_P2_PAD_LEFT, P2IO_JAMMA_DANCE864_P2_PAD_LEFT);
+							CheckKeyState(BID_DANCE864_P2_PAD_CENTER, P2IO_JAMMA_DANCE864_P2_PAD_CENTER);
+							CheckKeyState(BID_DANCE864_P2_PAD_RIGHT, P2IO_JAMMA_DANCE864_P2_PAD_RIGHT);
+						}
 					}
 					else if (s->f.gameType == GAMETYPE_TOYSMARCH)
 					{
@@ -1075,9 +1083,25 @@ namespace usb_python2
 						CheckKeyState(BID_THRILLDRIVE_GEARSHIFT_DOWN, P2IO_JAMMA_THRILLDRIVE_GEARSHIFT_DOWN);
 						CheckKeyState(BID_THRILLDRIVE_GEARSHIFT_UP, P2IO_JAMMA_THRILLDRIVE_GEARSHIFT_UP);
 
-						analogIo[0] = static_cast<uint16_t>(std::clamp(s->f.wheel, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
-						analogIo[1] = static_cast<uint16_t>(std::clamp(s->f.brake, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
-						analogIo[2] = static_cast<uint16_t>(std::clamp(s->f.accel, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
+						uint16_t wheel = static_cast<uint16_t>(std::clamp(s->f.wheel, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
+						if (s->devices[1] != nullptr)
+						{
+							const auto* aciodev = static_cast<acio_device*>(s->devices[1].get());
+							const auto handle = aciodev->devices.find(1);
+							if (handle != aciodev->devices.end())
+							{
+								const auto* handledev = static_cast<thrilldrive_handle_device*>(handle->second.get());
+								if (handledev->wheelCalibrationHack)
+								{
+									const int32_t calibrated_wheel = P2IO_THRILLDRIVE_ANALOG_MAX - static_cast<int32_t>(P2IO_THRILLDRIVE_ANALOG_MAX * (handledev->wheelForceFeedback / 127.0f));
+									wheel = static_cast<uint16_t>(std::clamp(calibrated_wheel, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
+								}
+							}
+						}
+
+						analogIo[0] = BigEndian16(wheel);
+						analogIo[1] = BigEndian16(static_cast<uint16_t>(std::clamp(s->f.accel, 0, P2IO_THRILLDRIVE_ANALOG_MAX)));
+						analogIo[2] = BigEndian16(static_cast<uint16_t>(std::clamp(s->f.brake, 0, P2IO_THRILLDRIVE_ANALOG_MAX)));
 						analogIo[3] = 0;
 					}
 					else if (s->f.gameType == GAMETYPE_GF)
@@ -1210,9 +1234,9 @@ namespace usb_python2
 		switch (bind)
 		{
 			case BID_THRILLDRIVE_STEERING_LEFT:
-				return static_cast<float>(s->wheelLeft) / static_cast<float>(s->wheelCenter);
+				return static_cast<float>(s->wheelLeft) / static_cast<float>(P2IO_THRILLDRIVE_ANALOG_MAX - s->wheelCenter);
 			case BID_THRILLDRIVE_STEERING_RIGHT:
-				return static_cast<float>(s->wheelRight) / static_cast<float>(P2IO_THRILLDRIVE_ANALOG_MAX - s->wheelCenter);
+				return static_cast<float>(s->wheelRight) / static_cast<float>(s->wheelCenter);
 			case BID_THRILLDRIVE_ACCELERATOR:
 				return static_cast<float>(s->f.accel) / static_cast<float>(P2IO_THRILLDRIVE_ANALOG_MAX);
 			case BID_THRILLDRIVE_BRAKE:
@@ -1231,17 +1255,17 @@ namespace usb_python2
 			return static_cast<int32_t>((std::clamp(value, 0.0f, 1.0f) * static_cast<float>(max)) + 0.5f);
 		};
 		const auto update_wheel = [&]() {
-			s->f.wheel = std::clamp(s->wheelCenter - s->wheelLeft + s->wheelRight, 0, P2IO_THRILLDRIVE_ANALOG_MAX);
+			s->f.wheel = std::clamp(s->wheelCenter + s->wheelLeft - s->wheelRight, 0, P2IO_THRILLDRIVE_ANALOG_MAX);
 		};
 
 		switch (bind)
 		{
 			case BID_THRILLDRIVE_STEERING_LEFT:
-				s->wheelLeft = axis_value(s->wheelCenter);
+				s->wheelLeft = axis_value(P2IO_THRILLDRIVE_ANALOG_MAX - s->wheelCenter);
 				update_wheel();
 				return;
 			case BID_THRILLDRIVE_STEERING_RIGHT:
-				s->wheelRight = axis_value(P2IO_THRILLDRIVE_ANALOG_MAX - s->wheelCenter);
+				s->wheelRight = axis_value(s->wheelCenter);
 				update_wheel();
 				return;
 			case BID_THRILLDRIVE_ACCELERATOR:

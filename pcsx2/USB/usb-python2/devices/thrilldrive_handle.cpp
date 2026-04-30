@@ -13,7 +13,7 @@ namespace usb_python2
 		if (code == 0x0002)
 		{
 			const uint8_t resp[] = {
-				0x00, 0x00, 0x00, 0x00, // Device ID
+				0x03, 0x00, 0x00, 0x00, // Device ID
 				0x00, // Flag
 				0x01, // Major version
 				0x01, // Minor version
