@@ -26,6 +26,20 @@ namespace usb_python2
 		BID_DDR_P2_FOOT_RIGHT,
 		BID_DDR_P2_FOOT_UP,
 		BID_DDR_P2_FOOT_DOWN,
+
+		BID_DANCE864_P1_START,
+		BID_DANCE864_P1_SELECT_LEFT,
+		BID_DANCE864_P1_SELECT_RIGHT,
+		BID_DANCE864_P1_PAD_LEFT,
+		BID_DANCE864_P1_PAD_CENTER,
+		BID_DANCE864_P1_PAD_RIGHT,
+
+		BID_DANCE864_P2_START,
+		BID_DANCE864_P2_SELECT_LEFT,
+		BID_DANCE864_P2_SELECT_RIGHT,
+		BID_DANCE864_P2_PAD_LEFT,
+		BID_DANCE864_P2_PAD_CENTER,
+		BID_DANCE864_P2_PAD_RIGHT,
 				
 		BID_KEYPADP1_0,
 		BID_KEYPADP1_1,
@@ -52,6 +66,36 @@ namespace usb_python2
 		BID_KEYPADP2_9,
 		BID_KEYPADP2_00,
 		BID_KEYPADP2_CARD_IN,
+
+		BID_GF_P1_START,
+		BID_GF_P1_PICK,
+		BID_GF_P1_WAILING,
+		BID_GF_P1_EFFECT1,
+		BID_GF_P1_EFFECT2,
+		BID_GF_P1_EFFECT3,
+		BID_GF_P1_R,
+		BID_GF_P1_G,
+		BID_GF_P1_B,
+
+		BID_GF_P2_START,
+		BID_GF_P2_PICK,
+		BID_GF_P2_WAILING,
+		BID_GF_P2_EFFECT1,
+		BID_GF_P2_EFFECT2,
+		BID_GF_P2_EFFECT3,
+		BID_GF_P2_R,
+		BID_GF_P2_G,
+		BID_GF_P2_B,
+
+		BID_DM_START,
+		BID_DM_HIHAT,
+		BID_DM_SNARE,
+		BID_DM_HIGH_TOM,
+		BID_DM_LOW_TOM,
+		BID_DM_CYMBAL,
+		BID_DM_BASS_DRUM,
+		BID_DM_SELECT_L,
+		BID_DM_SELECT_R,
 	};
 	
 	class Python2Device final : public DeviceProxy
@@ -67,6 +111,7 @@ namespace usb_python2
 		void SetBindingValue(USBDevice* dev, u32 bind, float value) const override;
 		std::span<const InputBindingInfo> Bindings(u32 subtype) const override;
 		std::span<const SettingInfo> Settings(u32 subtype) const override;
+		bool MapAutomaticBindings(SettingsInterface& si, u32 port, const std::vector<std::pair<GenericInputBinding, std::string>>& mapping) const override;
 
 		static bool GetInputState(USBDevice* dev, u32 bind);
 	};

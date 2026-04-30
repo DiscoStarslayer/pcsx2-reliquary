@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>USBBindingWidget_Python2</class>
  <widget class="QWidget" name="USBBindingWidget_Python2">
@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1000</width>
-    <height>400</height>
+    <width>1160</width>
+    <height>1500</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -16,100 +16,215 @@
     <verstretch>0</verstretch>
    </sizepolicy>
   </property>
-  <property name="minimumSize">
-   <size>
-    <width>1000</width>
-    <height>400</height>
-   </size>
-  </property>
-  <layout class="QGridLayout" name="gridLayout_16">
-   <item row="0" column="0" colspan="0">
-    <widget class="QGroupBox" name="groupBox_16">
-     <property name="title">
-      <string>Buttons</string>
-     </property>
-     <layout class="QGridLayout" name="gridLayout_10">
-      <item row="0" column="0">
-       <widget class="QGroupBox" name="TestGroupBox">
-        <property name="title">
-         <string>Test</string>
-        </property>
-        <layout class="QGridLayout" name="TestGridLayout">
-         <property name="leftMargin">
-          <number>6</number>
-         </property>
-         <property name="topMargin">
-          <number>6</number>
-         </property>
-         <property name="rightMargin">
-          <number>6</number>
-         </property>
-         <property name="bottomMargin">
-          <number>6</number>
-         </property>
-         <item row="0" column="0">
-          <widget class="InputBindingWidget" name="Test">
-           <property name="minimumSize">
-            <size>
-             <width>200</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>200</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string notr="true">PushButton</string>
-           </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="frameShape"><enum>QFrame::Shape::NoFrame</enum></property>
+     <property name="widgetResizable"><bool>true</bool></property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>1160</width>
+        <height>1500</height>
+       </rect>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>1160</width>
+         <height>1500</height>
+       </size>
+      </property>
+      <layout class="QGridLayout" name="mainGridLayout">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <property name="horizontalSpacing"><number>12</number></property>
+       <property name="verticalSpacing"><number>12</number></property>
+       <item row="0" column="0" colspan="2">
+        <layout class="QHBoxLayout" name="cabinetRowLayout">
+         <item><spacer name="cabinetLeftSpacer"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>1</width><height>1</height></size></property></spacer></item>
+         <item>
+          <widget class="QGroupBox" name="cabinetControlsGroupBox">
+           <property name="title"><string>Cabinet Controls</string></property>
+           <layout class="QGridLayout" name="cabinetControlsGridLayout">
+            <property name="horizontalSpacing"><number>8</number></property>
+            <property name="verticalSpacing"><number>6</number></property>
+            <item row="0" column="0"><widget class="QLabel" name="labelTest"><property name="text"><string>Test Button</string></property></widget></item>
+            <item row="0" column="1"><widget class="QLabel" name="labelService"><property name="text"><string>Service Button</string></property></widget></item>
+            <item row="1" column="0"><widget class="InputBindingWidget" name="Test"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>220</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+            <item row="1" column="1"><widget class="InputBindingWidget" name="Service"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>220</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+            <item row="2" column="0"><widget class="QLabel" name="labelCoin1"><property name="text"><string>Coin Player 1</string></property></widget></item>
+            <item row="2" column="1"><widget class="QLabel" name="labelCoin2"><property name="text"><string>Coin Player 2</string></property></widget></item>
+            <item row="3" column="0"><widget class="InputBindingWidget" name="Coin1"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>220</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+            <item row="3" column="1"><widget class="InputBindingWidget" name="Coin2"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>220</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           </layout>
           </widget>
          </item>
+         <item><spacer name="cabinetRightSpacer"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>1</width><height>1</height></size></property></spacer></item>
         </layout>
-       </widget>
-      </item>
-      <item row="0" column="0">
-       <widget class="QGroupBox" name="ServiceGroupBox">
-        <property name="title">
-         <string>Service</string>
-        </property>
-        <layout class="QGridLayout" name="ServiceGridLayout">
-         <property name="leftMargin">
-          <number>6</number>
-         </property>
-         <property name="topMargin">
-          <number>6</number>
-         </property>
-         <property name="rightMargin">
-          <number>6</number>
-         </property>
-         <property name="bottomMargin">
-          <number>6</number>
-         </property>
-         <item row="0" column="0">
-          <widget class="InputBindingWidget" name="Service">
-           <property name="minimumSize">
-            <size>
-             <width>200</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="maximumSize">
-            <size>
-             <width>200</width>
-             <height>16777215</height>
-            </size>
-           </property>
-           <property name="text">
-            <string notr="true">PushButton</string>
-           </property>
+       </item>
+       <item row="1" column="0">
+        <widget class="QGroupBox" name="keypadPlayer1GroupBox">
+         <property name="title"><string>Keypad Player 1</string></property>
+         <layout class="QGridLayout" name="keypadPlayer1GridLayout">
+          <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="0"><widget class="QLabel" name="labelKeypadP1CardIn"><property name="text"><string>Key In</string></property></widget></item>
+          <item row="1" column="0"><widget class="InputBindingWidget" name="KeypadP1CardIn"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="labelKeypadP17"><property name="text"><string>7</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelKeypadP18"><property name="text"><string>8</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelKeypadP19"><property name="text"><string>9</string></property></widget></item>
+          <item row="3" column="0"><widget class="InputBindingWidget" name="KeypadP17"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="KeypadP18"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="KeypadP19"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="4" column="0"><widget class="QLabel" name="labelKeypadP14"><property name="text"><string>4</string></property></widget></item><item row="4" column="1"><widget class="QLabel" name="labelKeypadP15"><property name="text"><string>5</string></property></widget></item><item row="4" column="2"><widget class="QLabel" name="labelKeypadP16"><property name="text"><string>6</string></property></widget></item>
+          <item row="5" column="0"><widget class="InputBindingWidget" name="KeypadP14"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="5" column="1"><widget class="InputBindingWidget" name="KeypadP15"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="5" column="2"><widget class="InputBindingWidget" name="KeypadP16"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelKeypadP11"><property name="text"><string>1</string></property></widget></item><item row="6" column="1"><widget class="QLabel" name="labelKeypadP12"><property name="text"><string>2</string></property></widget></item><item row="6" column="2"><widget class="QLabel" name="labelKeypadP13"><property name="text"><string>3</string></property></widget></item>
+          <item row="7" column="0"><widget class="InputBindingWidget" name="KeypadP11"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="1"><widget class="InputBindingWidget" name="KeypadP12"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="2"><widget class="InputBindingWidget" name="KeypadP13"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="8" column="0" colspan="2"><widget class="QLabel" name="labelKeypadP10"><property name="text"><string>0</string></property></widget></item><item row="8" column="2"><widget class="QLabel" name="labelKeypadP100"><property name="text"><string>00</string></property></widget></item>
+          <item row="9" column="0" colspan="2"><widget class="InputBindingWidget" name="KeypadP10"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>300</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="9" column="2"><widget class="InputBindingWidget" name="KeypadP100"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QGroupBox" name="keypadPlayer2GroupBox">
+         <property name="title"><string>Keypad Player 2</string></property>
+         <layout class="QGridLayout" name="keypadPlayer2GridLayout">
+          <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="0"><widget class="QLabel" name="labelKeypadP2CardIn"><property name="text"><string>Key In</string></property></widget></item>
+          <item row="1" column="0"><widget class="InputBindingWidget" name="KeypadP2CardIn"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="labelKeypadP27"><property name="text"><string>7</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelKeypadP28"><property name="text"><string>8</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelKeypadP29"><property name="text"><string>9</string></property></widget></item>
+          <item row="3" column="0"><widget class="InputBindingWidget" name="KeypadP27"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="KeypadP28"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="KeypadP29"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="4" column="0"><widget class="QLabel" name="labelKeypadP24"><property name="text"><string>4</string></property></widget></item><item row="4" column="1"><widget class="QLabel" name="labelKeypadP25"><property name="text"><string>5</string></property></widget></item><item row="4" column="2"><widget class="QLabel" name="labelKeypadP26"><property name="text"><string>6</string></property></widget></item>
+          <item row="5" column="0"><widget class="InputBindingWidget" name="KeypadP24"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="5" column="1"><widget class="InputBindingWidget" name="KeypadP25"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="5" column="2"><widget class="InputBindingWidget" name="KeypadP26"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelKeypadP21"><property name="text"><string>1</string></property></widget></item><item row="6" column="1"><widget class="QLabel" name="labelKeypadP22"><property name="text"><string>2</string></property></widget></item><item row="6" column="2"><widget class="QLabel" name="labelKeypadP23"><property name="text"><string>3</string></property></widget></item>
+          <item row="7" column="0"><widget class="InputBindingWidget" name="KeypadP21"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="1"><widget class="InputBindingWidget" name="KeypadP22"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="2"><widget class="InputBindingWidget" name="KeypadP23"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="8" column="0" colspan="2"><widget class="QLabel" name="labelKeypadP20"><property name="text"><string>0</string></property></widget></item><item row="8" column="2"><widget class="QLabel" name="labelKeypadP200"><property name="text"><string>00</string></property></widget></item>
+          <item row="9" column="0" colspan="2"><widget class="InputBindingWidget" name="KeypadP20"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>300</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="9" column="2"><widget class="InputBindingWidget" name="KeypadP200"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QGroupBox" name="guitarFreaksPlayer1GroupBox">
+         <property name="title"><string>Guitar Freaks Player 1</string></property>
+         <layout class="QGridLayout" name="guitarFreaksPlayer1GridLayout">
+          <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="0" colspan="3"><widget class="QLabel" name="labelGFP1Neck"><property name="text"><string>Neck Buttons (Righty)</string></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="labelGFP1Blue"><property name="text"><string>Blue</string></property></widget></item><item row="1" column="1"><widget class="QLabel" name="labelGFP1Green"><property name="text"><string>Green</string></property></widget></item><item row="1" column="2"><widget class="QLabel" name="labelGFP1Red"><property name="text"><string>Red</string></property></widget></item>
+          <item row="2" column="0"><widget class="InputBindingWidget" name="GFP1Blue"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="2" column="1"><widget class="InputBindingWidget" name="GFP1Green"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="2" column="2"><widget class="InputBindingWidget" name="GFP1Red"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="3" column="0" colspan="3"><widget class="QLabel" name="labelGFP1Pick"><property name="text"><string>Strum Bar</string></property></widget></item>
+          <item row="4" column="0" colspan="3"><widget class="InputBindingWidget" name="GFP1Pick"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>480</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="5" column="0" colspan="3"><widget class="QLabel" name="labelGFP1Effect"><property name="text"><string>Effect Knob</string></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelGFP1Effect1"><property name="text"><string>Effect 1</string></property></widget></item><item row="6" column="1"><widget class="QLabel" name="labelGFP1Effect2"><property name="text"><string>Effect 2</string></property></widget></item><item row="6" column="2"><widget class="QLabel" name="labelGFP1Effect3"><property name="text"><string>Effect 3</string></property></widget></item>
+          <item row="7" column="0"><widget class="InputBindingWidget" name="GFP1Effect1"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="1"><widget class="InputBindingWidget" name="GFP1Effect2"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="2"><widget class="InputBindingWidget" name="GFP1Effect3"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="8" column="0"><widget class="QLabel" name="labelGFP1Wail"><property name="text"><string>Wail (Lift)</string></property></widget></item><item row="8" column="2"><widget class="QLabel" name="labelGFP1Start"><property name="text"><string>Start</string></property></widget></item>
+          <item row="9" column="0"><widget class="InputBindingWidget" name="GFP1Wailing"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="9" column="2"><widget class="InputBindingWidget" name="GFP1Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QGroupBox" name="guitarFreaksPlayer2GroupBox">
+         <property name="title"><string>Guitar Freaks Player 2</string></property>
+         <layout class="QGridLayout" name="guitarFreaksPlayer2GridLayout">
+          <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="0" colspan="3"><widget class="QLabel" name="labelGFP2Neck"><property name="text"><string>Neck Buttons (Lefty)</string></property></widget></item>
+          <item row="1" column="0"><widget class="QLabel" name="labelGFP2Red"><property name="text"><string>Red</string></property></widget></item><item row="1" column="1"><widget class="QLabel" name="labelGFP2Green"><property name="text"><string>Green</string></property></widget></item><item row="1" column="2"><widget class="QLabel" name="labelGFP2Blue"><property name="text"><string>Blue</string></property></widget></item>
+          <item row="2" column="0"><widget class="InputBindingWidget" name="GFP2Red"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="2" column="1"><widget class="InputBindingWidget" name="GFP2Green"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="2" column="2"><widget class="InputBindingWidget" name="GFP2Blue"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="3" column="0" colspan="3"><widget class="QLabel" name="labelGFP2Pick"><property name="text"><string>Strum Bar</string></property></widget></item>
+          <item row="4" column="0" colspan="3"><widget class="InputBindingWidget" name="GFP2Pick"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>480</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="5" column="0" colspan="3"><widget class="QLabel" name="labelGFP2Effect"><property name="text"><string>Effect Knob</string></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelGFP2Effect1"><property name="text"><string>Effect 1</string></property></widget></item><item row="6" column="1"><widget class="QLabel" name="labelGFP2Effect2"><property name="text"><string>Effect 2</string></property></widget></item><item row="6" column="2"><widget class="QLabel" name="labelGFP2Effect3"><property name="text"><string>Effect 3</string></property></widget></item>
+          <item row="7" column="0"><widget class="InputBindingWidget" name="GFP2Effect1"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="1"><widget class="InputBindingWidget" name="GFP2Effect2"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="2"><widget class="InputBindingWidget" name="GFP2Effect3"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="8" column="0"><widget class="QLabel" name="labelGFP2Wail"><property name="text"><string>Wail (Lift)</string></property></widget></item><item row="8" column="2"><widget class="QLabel" name="labelGFP2Start"><property name="text"><string>Start</string></property></widget></item>
+          <item row="9" column="0"><widget class="InputBindingWidget" name="GFP2Wailing"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="9" column="2"><widget class="InputBindingWidget" name="GFP2Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item row="3" column="0" colspan="2">
+        <layout class="QHBoxLayout" name="drumManiaRowLayout">
+         <item><spacer name="drumManiaLeftSpacer"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>1</width><height>1</height></size></property></spacer></item>
+         <item>
+          <widget class="QGroupBox" name="drumManiaGroupBox">
+           <property name="title"><string>Drum Mania</string></property>
+           <layout class="QGridLayout" name="drumManiaGridLayout">
+            <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+            <item row="0" column="0"><widget class="QLabel" name="labelDMHiHat"><property name="text"><string>HiHat</string></property></widget></item><item row="0" column="1"><widget class="QLabel" name="labelDMSnare"><property name="text"><string>Snare</string></property></widget></item><item row="0" column="2"><widget class="QLabel" name="labelDMHighTom"><property name="text"><string>HiTom</string></property></widget></item><item row="0" column="3"><widget class="QLabel" name="labelDMLowTom"><property name="text"><string>LoTom</string></property></widget></item><item row="0" column="4"><widget class="QLabel" name="labelDMCymbal"><property name="text"><string>Cymbal</string></property></widget></item>
+            <item row="1" column="0"><widget class="InputBindingWidget" name="DMHiHat"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="1"><widget class="InputBindingWidget" name="DMSnare"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="2"><widget class="InputBindingWidget" name="DMHighTom"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="3"><widget class="InputBindingWidget" name="DMLowTom"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="4"><widget class="InputBindingWidget" name="DMCymbal"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+            <item row="2" column="2"><widget class="QLabel" name="labelDMBassDrum"><property name="text"><string>Bass Drum</string></property></widget></item>
+            <item row="3" column="2"><widget class="InputBindingWidget" name="DMBassDrum"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+            <item row="4" column="1"><widget class="QLabel" name="labelDMSelectLeft"><property name="text"><string>Select Left</string></property></widget></item><item row="4" column="2"><widget class="QLabel" name="labelDMStart"><property name="text"><string>Start</string></property></widget></item><item row="4" column="3"><widget class="QLabel" name="labelDMSelectRight"><property name="text"><string>Select Right</string></property></widget></item>
+            <item row="5" column="1"><widget class="InputBindingWidget" name="DMSelectLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="5" column="2"><widget class="InputBindingWidget" name="DMStart"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="5" column="3"><widget class="InputBindingWidget" name="DMSelectRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>120</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           </layout>
           </widget>
          </item>
+         <item><spacer name="drumManiaRightSpacer"><property name="orientation"><enum>Qt::Orientation::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>1</width><height>1</height></size></property></spacer></item>
         </layout>
-       </widget>
-      </item>
-     </layout>
+       </item>
+        <item row="4" column="0">
+         <widget class="QGroupBox" name="dance864Player1GroupBox">
+          <property name="title"><string>Dance 86.4 Player 1</string></property>
+          <layout class="QGridLayout" name="dance864Player1GridLayout">
+           <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+           <item row="0" column="0"><widget class="QLabel" name="labelDance864P1PadLeft"><property name="text"><string>Pad Left</string></property></widget></item><item row="0" column="1"><widget class="QLabel" name="labelDance864P1PadCenter"><property name="text"><string>Pad Center</string></property></widget></item><item row="0" column="2"><widget class="QLabel" name="labelDance864P1PadRight"><property name="text"><string>Pad Right</string></property></widget></item>
+           <item row="1" column="0"><widget class="InputBindingWidget" name="Dance864P1PadLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="1"><widget class="InputBindingWidget" name="Dance864P1PadCenter"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="2"><widget class="InputBindingWidget" name="Dance864P1PadRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelDance864P1SelectLeft"><property name="text"><string>Select Left</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelDance864P1Start"><property name="text"><string>Start</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelDance864P1SelectRight"><property name="text"><string>Select Right</string></property></widget></item>
+           <item row="3" column="0"><widget class="InputBindingWidget" name="Dance864P1SelectLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="Dance864P1Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="Dance864P1SelectRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+         <item row="4" column="1">
+         <widget class="QGroupBox" name="dance864Player2GroupBox">
+          <property name="title"><string>Dance 86.4 Player 2</string></property>
+          <layout class="QGridLayout" name="dance864Player2GridLayout">
+           <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+           <item row="0" column="0"><widget class="QLabel" name="labelDance864P2PadLeft"><property name="text"><string>Pad Left</string></property></widget></item><item row="0" column="1"><widget class="QLabel" name="labelDance864P2PadCenter"><property name="text"><string>Pad Center</string></property></widget></item><item row="0" column="2"><widget class="QLabel" name="labelDance864P2PadRight"><property name="text"><string>Pad Right</string></property></widget></item>
+           <item row="1" column="0"><widget class="InputBindingWidget" name="Dance864P2PadLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="1"><widget class="InputBindingWidget" name="Dance864P2PadCenter"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="2"><widget class="InputBindingWidget" name="Dance864P2PadRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelDance864P2SelectLeft"><property name="text"><string>Select Left</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelDance864P2Start"><property name="text"><string>Start</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelDance864P2SelectRight"><property name="text"><string>Select Right</string></property></widget></item>
+           <item row="3" column="0"><widget class="InputBindingWidget" name="Dance864P2SelectLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="Dance864P2Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="Dance864P2SelectRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QGroupBox" name="ddrPlayer1GroupBox">
+         <property name="title"><string>DDR Player 1</string></property>
+         <layout class="QGridLayout" name="ddrPlayer1GridLayout">
+          <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="1"><widget class="QLabel" name="labelDDRP1Up"><property name="text"><string>Up</string></property></widget></item>
+          <item row="1" column="1"><widget class="InputBindingWidget" name="DDRP1FootUp"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="labelDDRP1Left"><property name="text"><string>Left</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelDDRP1Right"><property name="text"><string>Right</string></property></widget></item>
+          <item row="3" column="0"><widget class="InputBindingWidget" name="DDRP1FootLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="3" column="1"><widget class="QLabel" name="ddrPlayer1PadLabel"><property name="minimumSize"><size><width>120</width><height>88</height></size></property><property name="frameShape"><enum>QFrame::Shape::StyledPanel</enum></property><property name="frameShadow"><enum>QFrame::Shadow::Sunken</enum></property><property name="text"><string>Pad</string></property><property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property></widget></item>
+          <item row="3" column="2"><widget class="InputBindingWidget" name="DDRP1FootRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="4" column="1"><widget class="QLabel" name="labelDDRP1Down"><property name="text"><string>Down</string></property></widget></item>
+          <item row="5" column="1"><widget class="InputBindingWidget" name="DDRP1FootDown"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelDDRP1SelectLeft"><property name="text"><string>Select Left</string></property></widget></item><item row="6" column="1"><widget class="QLabel" name="labelDDRP1Start"><property name="text"><string>Start</string></property></widget></item><item row="6" column="2"><widget class="QLabel" name="labelDDRP1SelectRight"><property name="text"><string>Select Right</string></property></widget></item>
+          <item row="7" column="0"><widget class="InputBindingWidget" name="DDRP1SelectLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="1"><widget class="InputBindingWidget" name="DDRP1Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="2"><widget class="InputBindingWidget" name="DDRP1SelectRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QGroupBox" name="ddrPlayer2GroupBox">
+         <property name="title"><string>DDR Player 2</string></property>
+         <layout class="QGridLayout" name="ddrPlayer2GridLayout">
+          <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+          <item row="0" column="1"><widget class="QLabel" name="labelDDRP2Up"><property name="text"><string>Up</string></property></widget></item>
+          <item row="1" column="1"><widget class="InputBindingWidget" name="DDRP2FootUp"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="2" column="0"><widget class="QLabel" name="labelDDRP2Left"><property name="text"><string>Left</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelDDRP2Right"><property name="text"><string>Right</string></property></widget></item>
+          <item row="3" column="0"><widget class="InputBindingWidget" name="DDRP2FootLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="3" column="1"><widget class="QLabel" name="ddrPlayer2PadLabel"><property name="minimumSize"><size><width>120</width><height>88</height></size></property><property name="frameShape"><enum>QFrame::Shape::StyledPanel</enum></property><property name="frameShadow"><enum>QFrame::Shadow::Sunken</enum></property><property name="text"><string>Pad</string></property><property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property></widget></item>
+          <item row="3" column="2"><widget class="InputBindingWidget" name="DDRP2FootRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="4" column="1"><widget class="QLabel" name="labelDDRP2Down"><property name="text"><string>Down</string></property></widget></item>
+          <item row="5" column="1"><widget class="InputBindingWidget" name="DDRP2FootDown"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          <item row="6" column="0"><widget class="QLabel" name="labelDDRP2SelectLeft"><property name="text"><string>Select Left</string></property></widget></item><item row="6" column="1"><widget class="QLabel" name="labelDDRP2Start"><property name="text"><string>Start</string></property></widget></item><item row="6" column="2"><widget class="QLabel" name="labelDDRP2SelectRight"><property name="text"><string>Select Right</string></property></widget></item>
+          <item row="7" column="0"><widget class="InputBindingWidget" name="DDRP2SelectLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="1"><widget class="InputBindingWidget" name="DDRP2Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="7" column="2"><widget class="InputBindingWidget" name="DDRP2SelectRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+        <item row="6" column="0" colspan="2"><spacer name="verticalSpacer"><property name="orientation"><enum>Qt::Orientation::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>1</height></size></property></spacer></item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

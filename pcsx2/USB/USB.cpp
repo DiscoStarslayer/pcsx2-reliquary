@@ -740,6 +740,8 @@ bool USB::MapDevice(SettingsInterface& si, u32 port, const std::vector<std::pair
 	const DeviceProxy* dev = RegisterDevice::instance().Device(type);
 	if (!dev)
 		return false;
+	if (dev->MapAutomaticBindings(si, port, mapping))
+		return true;
 
 	u32 num_mappings = 0;
 	for (const InputBindingInfo& bi : dev->Bindings(subtype))

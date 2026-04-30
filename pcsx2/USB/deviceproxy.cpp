@@ -37,6 +37,11 @@ std::span<const SettingInfo> DeviceProxy::Settings(u32 subtype) const
 	return {};
 }
 
+bool DeviceProxy::MapAutomaticBindings(SettingsInterface& si, u32 port, const std::vector<std::pair<GenericInputBinding, std::string>>& mapping) const
+{
+	return false;
+}
+
 float DeviceProxy::GetBindingValue(const USBDevice* dev, u32 bind) const
 {
 	return 0.0f;

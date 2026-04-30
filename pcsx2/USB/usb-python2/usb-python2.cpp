@@ -10,8 +10,12 @@
 #include "devices/ddr_extio.h"
 #include "devices/icca.h"
 #include "devices/input_device.h"
+#include "USB/USB.h"
 #include "USB/qemu-usb/desc.h"
 #include "USB/qemu-usb/qusb.h"
+
+#include <algorithm>
+#include <bitset>
 
 namespace usb_python2
 {
@@ -245,7 +249,7 @@ namespace usb_python2
 		bool isMinimaidConnected = false;
 		bool isUsingBtoolLights = false;
 
-		u64 buttonState = 0;
+		std::bitset<128> buttonState;
 		
 		struct freeze
 		{
@@ -386,6 +390,25 @@ namespace usb_python2
 				aciodev->add_acio_device(1, std::make_unique<acio_icca_device>(dev, s->f.cardFilenames[0]));
 				aciodev->add_acio_device(2, std::make_unique<acio_icca_device>(dev, s->f.cardFilenames[1]));
 				s->devices[1] = std::move(aciodev);
+			}
+		}
+		else if (s->f.gameType == GAMETYPE_GF)
+		{
+			if (s->devices[0] == nullptr)
+			{
+				auto aciodev = std::make_unique<acio_device>();
+				aciodev->add_acio_device(1, std::make_unique<acio_icca_device>(dev, s->f.cardFilenames[0]));
+				aciodev->add_acio_device(2, std::make_unique<acio_icca_device>(dev, s->f.cardFilenames[1]));
+				s->devices[0] = std::move(aciodev);
+			}
+		}
+		else if (s->f.gameType == GAMETYPE_DM)
+		{
+			if (s->devices[0] == nullptr)
+			{
+				auto aciodev = std::make_unique<acio_device>();
+				aciodev->add_acio_device(1, std::make_unique<acio_icca_device>(dev, s->f.cardFilenames[0]));
+				s->devices[0] = std::move(aciodev);
 			}
 		}
 	}
@@ -949,6 +972,27 @@ namespace usb_python2
 		} \
 	}
 
+					auto select_knob_state = [&](u32 key, s32 state, s32 player_id) {
+						if (Python2Device::GetInputState(dev, key))
+							s->f.knobs[player_id] = state;
+					};
+
+					auto apply_knob_state = [&](s32 player_id, u32 effect1, u32 effect2) {
+						s->f.jammaIoStatus |= (effect1 | effect2);
+						switch (s->f.knobs[player_id])
+						{
+							case 0:
+								s->f.jammaIoStatus &= ~effect1;
+								break;
+							case 1:
+								s->f.jammaIoStatus &= ~effect2;
+								break;
+							case 2:
+								s->f.jammaIoStatus &= ~(effect1 | effect2);
+								break;
+						}
+					};
+
 					// Handle inputs that shouldn't be oneshots typically on every update
 					CheckKeyState(BID_TEST, P2IO_JAMMA_IO_TEST);
 					CheckKeyState(BID_SERVICE, P2IO_JAMMA_IO_SERVICE);
@@ -976,6 +1020,59 @@ namespace usb_python2
 						CheckKeyState(BID_DDR_P2_FOOT_RIGHT, P2IO_JAMMA_DDR_P2_FOOT_RIGHT);
 						CheckKeyState(BID_DDR_P2_FOOT_UP, P2IO_JAMMA_DDR_P2_FOOT_UP);
 						CheckKeyState(BID_DDR_P2_FOOT_DOWN, P2IO_JAMMA_DDR_P2_FOOT_DOWN);
+					}
+					else if (s->f.gameType == GAMETYPE_DANCE864)
+					{
+						CheckKeyState(BID_DANCE864_P1_START, P2IO_JAMMA_DANCE864_P1_START);
+						CheckKeyState(BID_DANCE864_P1_SELECT_LEFT, P2IO_JAMMA_DANCE864_P1_LEFT);
+						CheckKeyState(BID_DANCE864_P1_SELECT_RIGHT, P2IO_JAMMA_DANCE864_P1_RIGHT);
+						CheckKeyState(BID_DANCE864_P1_PAD_LEFT, P2IO_JAMMA_DANCE864_P1_PAD_LEFT);
+						CheckKeyState(BID_DANCE864_P1_PAD_CENTER, P2IO_JAMMA_DANCE864_P1_PAD_CENTER);
+						CheckKeyState(BID_DANCE864_P1_PAD_RIGHT, P2IO_JAMMA_DANCE864_P1_PAD_RIGHT);
+
+						CheckKeyState(BID_DANCE864_P2_START, P2IO_JAMMA_DANCE864_P2_START);
+						CheckKeyState(BID_DANCE864_P2_SELECT_LEFT, P2IO_JAMMA_DANCE864_P2_LEFT);
+						CheckKeyState(BID_DANCE864_P2_SELECT_RIGHT, P2IO_JAMMA_DANCE864_P2_RIGHT);
+						CheckKeyState(BID_DANCE864_P2_PAD_LEFT, P2IO_JAMMA_DANCE864_P2_PAD_LEFT);
+						CheckKeyState(BID_DANCE864_P2_PAD_CENTER, P2IO_JAMMA_DANCE864_P2_PAD_CENTER);
+						CheckKeyState(BID_DANCE864_P2_PAD_RIGHT, P2IO_JAMMA_DANCE864_P2_PAD_RIGHT);
+					}
+					else if (s->f.gameType == GAMETYPE_GF)
+					{
+						CheckKeyState(BID_GF_P1_START, P2IO_JAMMA_GF_P1_START);
+						CheckKeyState(BID_GF_P1_PICK, P2IO_JAMMA_GF_P1_PICK);
+						CheckKeyState(BID_GF_P1_WAILING, P2IO_JAMMA_GF_P1_WAILING);
+						CheckKeyState(BID_GF_P1_R, P2IO_JAMMA_GF_P1_R);
+						CheckKeyState(BID_GF_P1_G, P2IO_JAMMA_GF_P1_G);
+						CheckKeyState(BID_GF_P1_B, P2IO_JAMMA_GF_P1_B);
+
+						CheckKeyState(BID_GF_P2_START, P2IO_JAMMA_GF_P2_START);
+						CheckKeyState(BID_GF_P2_PICK, P2IO_JAMMA_GF_P2_PICK);
+						CheckKeyState(BID_GF_P2_WAILING, P2IO_JAMMA_GF_P2_WAILING);
+						CheckKeyState(BID_GF_P2_R, P2IO_JAMMA_GF_P2_R);
+						CheckKeyState(BID_GF_P2_G, P2IO_JAMMA_GF_P2_G);
+						CheckKeyState(BID_GF_P2_B, P2IO_JAMMA_GF_P2_B);
+
+						select_knob_state(BID_GF_P1_EFFECT1, 0, 0);
+						select_knob_state(BID_GF_P1_EFFECT2, 1, 0);
+						select_knob_state(BID_GF_P1_EFFECT3, 2, 0);
+						select_knob_state(BID_GF_P2_EFFECT1, 0, 1);
+						select_knob_state(BID_GF_P2_EFFECT2, 1, 1);
+						select_knob_state(BID_GF_P2_EFFECT3, 2, 1);
+						apply_knob_state(0, P2IO_JAMMA_GF_P1_EFFECT1, P2IO_JAMMA_GF_P1_EFFECT2);
+						apply_knob_state(1, P2IO_JAMMA_GF_P2_EFFECT1, P2IO_JAMMA_GF_P2_EFFECT2);
+					}
+					else if (s->f.gameType == GAMETYPE_DM)
+					{
+						CheckKeyState(BID_DM_START, P2IO_JAMMA_DM_START);
+						CheckKeyState(BID_DM_HIHAT, P2IO_JAMMA_DM_HIHAT);
+						CheckKeyState(BID_DM_SNARE, P2IO_JAMMA_DM_SNARE);
+						CheckKeyState(BID_DM_HIGH_TOM, P2IO_JAMMA_DM_HIGH_TOM);
+						CheckKeyState(BID_DM_LOW_TOM, P2IO_JAMMA_DM_LOW_TOM);
+						CheckKeyState(BID_DM_CYMBAL, P2IO_JAMMA_DM_CYMBAL);
+						CheckKeyState(BID_DM_BASS_DRUM, P2IO_JAMMA_DM_BASS_DRUM);
+						CheckKeyState(BID_DM_SELECT_L, P2IO_JAMMA_DM_SELECT_L);
+						CheckKeyState(BID_DM_SELECT_R, P2IO_JAMMA_DM_SELECT_R);
 					}
 
 					// Hold the state for a certain amount of updates so the game can register quick changes.
@@ -1031,7 +1128,7 @@ namespace usb_python2
 
 	const char* Python2Device::Name() const
 	{
-		return "Python 2";
+		return TRANSLATE_NOOP("USB", "Python 2 IO Board");
 	}
 
 	const char* Python2Device::TypeName() const
@@ -1067,19 +1164,17 @@ namespace usb_python2
 	{
 		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
 
-		const u64 bit = 1ull << static_cast<u64>(bind);
-		return ((s->buttonState & bit) != 0) ? 1.0f : 0.0f;
+		return s->buttonState.test(bind) ? 1.0f : 0.0f;
 	}
 
 	void Python2Device::SetBindingValue(USBDevice* dev, u32 bind, float value) const
 	{
 		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
 
-		const u64 bit = 1ull << static_cast<u64>(bind);
 		if (value >= 0.5f)
-			s->buttonState |= bit;
+			s->buttonState.set(bind);
 		else
-			s->buttonState &= ~bit;
+			s->buttonState.reset(bind);
 	}
 
 	std::span<const InputBindingInfo> Python2Device::Bindings(u32 subtype) const
@@ -1088,7 +1183,37 @@ namespace usb_python2
 			{"Test", "Test Button", nullptr, InputBindingInfo::Type::Button, BID_TEST, GenericInputBinding::Select},
 			{"Service", "Service Button", nullptr, InputBindingInfo::Type::Button, BID_SERVICE, GenericInputBinding::System},
 			{"Coin1", "Coin Player 1", nullptr, InputBindingInfo::Type::Button, BID_COIN1, GenericInputBinding::L3},
-			{"Coin2", "Coin Player 2", nullptr, InputBindingInfo::Type::Button, BID_COIN2, GenericInputBinding::Unknown},
+			{"Coin2", "Coin Player 2", nullptr, InputBindingInfo::Type::Button, BID_COIN2, GenericInputBinding::R3},
+
+			{"DMStart", "Drum Mania Start", nullptr, InputBindingInfo::Type::Button, BID_DM_START, GenericInputBinding::Start},
+			{"DMHiHat", "Drum Mania Hi-Hat", nullptr, InputBindingInfo::Type::Button, BID_DM_HIHAT, GenericInputBinding::L1},
+			{"DMSnare", "Drum Mania Snare", nullptr, InputBindingInfo::Type::Button, BID_DM_SNARE, GenericInputBinding::Square},
+			{"DMHighTom", "Drum Mania Hi-Tom", nullptr, InputBindingInfo::Type::Button, BID_DM_HIGH_TOM, GenericInputBinding::Triangle},
+			{"DMLowTom", "Drum Mania Lo-Tom", nullptr, InputBindingInfo::Type::Button, BID_DM_LOW_TOM, GenericInputBinding::Circle},
+			{"DMCymbal", "Drum Mania Cymbal", nullptr, InputBindingInfo::Type::Button, BID_DM_CYMBAL, GenericInputBinding::R1},
+			{"DMBassDrum", "Drum Mania Bass Drum", nullptr, InputBindingInfo::Type::Button, BID_DM_BASS_DRUM, GenericInputBinding::Cross},
+			{"DMSelectLeft", "Drum Mania Select Left", nullptr, InputBindingInfo::Type::Button, BID_DM_SELECT_L, GenericInputBinding::LeftStickLeft},
+			{"DMSelectRight", "Drum Mania Select Right", nullptr, InputBindingInfo::Type::Button, BID_DM_SELECT_R, GenericInputBinding::LeftStickRight},
+
+			{"GFP1Start", "Guitar Freaks Player 1 Start", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_START, GenericInputBinding::Start},
+			{"GFP1Pick", "Guitar Freaks Player 1 Strum Bar", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_PICK, GenericInputBinding::Cross},
+			{"GFP1Wailing", "Guitar Freaks Player 1 Wail", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_WAILING, GenericInputBinding::Triangle},
+			{"GFP1Effect1", "Guitar Freaks Player 1 Effect 1", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_EFFECT1, GenericInputBinding::RightStickLeft},
+			{"GFP1Effect2", "Guitar Freaks Player 1 Effect 2", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_EFFECT2, GenericInputBinding::RightStickUp},
+			{"GFP1Effect3", "Guitar Freaks Player 1 Effect 3", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_EFFECT3, GenericInputBinding::RightStickRight},
+			{"GFP1Red", "Guitar Freaks Player 1 Red", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_R, GenericInputBinding::Square},
+			{"GFP1Green", "Guitar Freaks Player 1 Green", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_G, GenericInputBinding::Circle},
+			{"GFP1Blue", "Guitar Freaks Player 1 Blue", nullptr, InputBindingInfo::Type::Button, BID_GF_P1_B, GenericInputBinding::R1},
+
+			{"GFP2Start", "Guitar Freaks Player 2 Start", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_START, GenericInputBinding::Unknown},
+			{"GFP2Pick", "Guitar Freaks Player 2 Strum Bar", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_PICK, GenericInputBinding::Unknown},
+			{"GFP2Wailing", "Guitar Freaks Player 2 Wail", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_WAILING, GenericInputBinding::Unknown},
+			{"GFP2Effect1", "Guitar Freaks Player 2 Effect 1", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_EFFECT1, GenericInputBinding::Unknown},
+			{"GFP2Effect2", "Guitar Freaks Player 2 Effect 2", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_EFFECT2, GenericInputBinding::Unknown},
+			{"GFP2Effect3", "Guitar Freaks Player 2 Effect 3", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_EFFECT3, GenericInputBinding::Unknown},
+			{"GFP2Red", "Guitar Freaks Player 2 Red", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_R, GenericInputBinding::Unknown},
+			{"GFP2Green", "Guitar Freaks Player 2 Green", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_G, GenericInputBinding::Unknown},
+			{"GFP2Blue", "Guitar Freaks Player 2 Blue", nullptr, InputBindingInfo::Type::Button, BID_GF_P2_B, GenericInputBinding::Unknown},
 			
 			{"DDRP1Start", "DDR Player 1 Start", nullptr, InputBindingInfo::Type::Button, BID_DDR_P1_START, GenericInputBinding::Start},
 			{"DDRP1SelectLeft", "DDR Player 1 Select Left", nullptr, InputBindingInfo::Type::Button, BID_DDR_P1_SELECT_LEFT, GenericInputBinding::LeftStickLeft},
@@ -1105,6 +1230,20 @@ namespace usb_python2
 			{"DDRP2FootRight", "DDR Player 2 Foot Right", nullptr, InputBindingInfo::Type::Button, BID_DDR_P2_FOOT_RIGHT, GenericInputBinding::Unknown},
 			{"DDRP2FootUp", "DDR Player 2 Foot Up", nullptr, InputBindingInfo::Type::Button, BID_DDR_P2_FOOT_UP, GenericInputBinding::Unknown},
 			{"DDRP2FootDown", "DDR Player 2 Foot Down", nullptr, InputBindingInfo::Type::Button, BID_DDR_P2_FOOT_DOWN, GenericInputBinding::Unknown},
+
+			{"Dance864P1Start", "Dance 86.4 Player 1 Start", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P1_START, GenericInputBinding::Start},
+			{"Dance864P1SelectLeft", "Dance 86.4 Player 1 Select Left", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P1_SELECT_LEFT, GenericInputBinding::LeftStickLeft},
+			{"Dance864P1SelectRight", "Dance 86.4 Player 1 Select Right", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P1_SELECT_RIGHT, GenericInputBinding::LeftStickRight},
+			{"Dance864P1PadLeft", "Dance 86.4 Player 1 Pad Left", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P1_PAD_LEFT, GenericInputBinding::DPadLeft},
+			{"Dance864P1PadCenter", "Dance 86.4 Player 1 Pad Center", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P1_PAD_CENTER, GenericInputBinding::Cross},
+			{"Dance864P1PadRight", "Dance 86.4 Player 1 Pad Right", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P1_PAD_RIGHT, GenericInputBinding::Circle},
+
+			{"Dance864P2Start", "Dance 86.4 Player 2 Start", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_START, GenericInputBinding::Unknown},
+			{"Dance864P2SelectLeft", "Dance 86.4 Player 2 Select Left", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_SELECT_LEFT, GenericInputBinding::Unknown},
+			{"Dance864P2SelectRight", "Dance 86.4 Player 2 Select Right", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_SELECT_RIGHT, GenericInputBinding::Unknown},
+			{"Dance864P2PadLeft", "Dance 86.4 Player 2 Pad Left", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_PAD_LEFT, GenericInputBinding::Unknown},
+			{"Dance864P2PadCenter", "Dance 86.4 Player 2 Pad Center", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_PAD_CENTER, GenericInputBinding::Unknown},
+			{"Dance864P2PadRight", "Dance 86.4 Player 2 Pad Right", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_PAD_RIGHT, GenericInputBinding::Unknown},
 			
 			{"KeypadP10", "Keypad Player 1 '0'", nullptr, InputBindingInfo::Type::Button, BID_KEYPADP1_0, GenericInputBinding::Unknown},
 			{"KeypadP11", "Keypad Player 1 '1'", nullptr, InputBindingInfo::Type::Button, BID_KEYPADP1_1, GenericInputBinding::Unknown},
@@ -1134,6 +1273,71 @@ namespace usb_python2
 		};
 
 		return bindings;
+	}
+
+	bool Python2Device::MapAutomaticBindings(SettingsInterface& si, u32 port, const std::vector<std::pair<GenericInputBinding, std::string>>& mapping) const
+	{
+		const auto keyboard_mapping = std::ranges::find_if(mapping, [](const auto& entry) { return entry.second.starts_with("Keyboard/"); });
+		if (keyboard_mapping == mapping.end())
+			return false;
+
+		const std::string section = USB::GetConfigSection(port);
+		auto set_binding = [&](const char* binding, const char* key) {
+			si.SetStringValue(section.c_str(), USB::GetConfigSubKey(TypeName(), binding).c_str(), key);
+		};
+
+		set_binding("Test", "Keyboard/Backspace");
+		set_binding("Service", "Keyboard/Backslash");
+		set_binding("Coin1", "Keyboard/Minus");
+		set_binding("Coin2", "Keyboard/Equal");
+
+		set_binding("DMStart", "Keyboard/S");
+		set_binding("DMSelectLeft", "Keyboard/A");
+		set_binding("DMSelectRight", "Keyboard/D");
+		set_binding("DMHiHat", "Keyboard/U");
+		set_binding("DMSnare", "Keyboard/J");
+		set_binding("DMHighTom", "Keyboard/I");
+		set_binding("DMLowTom", "Keyboard/L");
+		set_binding("DMCymbal", "Keyboard/O");
+		set_binding("DMBassDrum", "Keyboard/K");
+
+		set_binding("GFP1Start", "Keyboard/S");
+		set_binding("GFP1Pick", "Keyboard/K");
+		set_binding("GFP1Wailing", "Keyboard/I");
+		set_binding("GFP1Effect1", "Keyboard/Y");
+		set_binding("GFP1Effect2", "Keyboard/U");
+		set_binding("GFP1Effect3", "Keyboard/P");
+		set_binding("GFP1Red", "Keyboard/J");
+		set_binding("GFP1Green", "Keyboard/L");
+		set_binding("GFP1Blue", "Keyboard/O");
+
+		set_binding("DDRP1Start", "Keyboard/S");
+		set_binding("DDRP1SelectLeft", "Keyboard/A");
+		set_binding("DDRP1SelectRight", "Keyboard/D");
+		set_binding("DDRP1FootUp", "Keyboard/I");
+		set_binding("DDRP1FootDown", "Keyboard/K");
+		set_binding("DDRP1FootLeft", "Keyboard/J");
+		set_binding("DDRP1FootRight", "Keyboard/L");
+
+		set_binding("Dance864P1Start", "Keyboard/S");
+		set_binding("Dance864P1SelectLeft", "Keyboard/A");
+		set_binding("Dance864P1SelectRight", "Keyboard/D");
+		set_binding("Dance864P1PadLeft", "Keyboard/J");
+		set_binding("Dance864P1PadCenter", "Keyboard/K");
+		set_binding("Dance864P1PadRight", "Keyboard/L");
+
+		set_binding("KeypadP10", "Keyboard/0");
+		set_binding("KeypadP11", "Keyboard/1");
+		set_binding("KeypadP12", "Keyboard/2");
+		set_binding("KeypadP13", "Keyboard/3");
+		set_binding("KeypadP14", "Keyboard/4");
+		set_binding("KeypadP15", "Keyboard/5");
+		set_binding("KeypadP16", "Keyboard/6");
+		set_binding("KeypadP17", "Keyboard/7");
+		set_binding("KeypadP18", "Keyboard/8");
+		set_binding("KeypadP19", "Keyboard/9");
+
+		return true;
 	}
 
 	std::span<const SettingInfo> Python2Device::Settings(u32 subtype) const
@@ -1179,8 +1383,6 @@ namespace usb_python2
 	{
 		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
 
-		const u64 mask = 1ull << static_cast<u64>(bind);
-
-		return (s->buttonState & mask) > 0;
+		return s->buttonState.test(bind);
 	}
 }

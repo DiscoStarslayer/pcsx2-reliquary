@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
+#include <vector>
 
 #include "qemu-usb/USBinternal.h"
 
@@ -56,6 +57,7 @@ public:
 	virtual std::span<const char*> SubTypes() const;
 	virtual std::span<const InputBindingInfo> Bindings(u32 subtype) const;
 	virtual std::span<const SettingInfo> Settings(u32 subtype) const;
+	virtual bool MapAutomaticBindings(SettingsInterface& si, u32 port, const std::vector<std::pair<GenericInputBinding, std::string>>& mapping) const;
 
 	virtual USBDevice* CreateDevice(SettingsInterface& si, u32 port, u32 subtype) const = 0;
 

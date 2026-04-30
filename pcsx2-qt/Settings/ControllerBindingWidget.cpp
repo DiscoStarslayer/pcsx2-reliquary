@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include <QtCore/QDir>
+#include <QtWidgets/QFrame>
 #include <QtWidgets/QInputDialog>
+#include <QtWidgets/QLabel>
 #include <QtWidgets/QMenu>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QScrollArea>
@@ -29,7 +31,7 @@
 #include "ui_USBBindingWidget_Gametrak.h"
 #include "ui_USBBindingWidget_GTForce.h"
 #include "ui_USBBindingWidget_GunCon2.h"
-// #include "ui_USBBindingWidget_Python2.h"
+#include "ui_USBBindingWidget_Python2.h"
 #include "ui_USBBindingWidget_RealPlay.h"
 #include "ui_USBBindingWidget_RyojouhenCon.h"
 #include "ui_USBBindingWidget_ShinkansenCon.h"
@@ -1443,11 +1445,11 @@ USBBindingWidget* USBBindingWidget::createInstance(
 		Ui::USBBindingWidget_TranceVibrator().setupUi(widget);
 		has_template = true;
 	}
-	// else if (type == "python2io")
-	// {
-	// 	Ui::USBBindingWidget_Python2().setupUi(widget);
-	// 	has_template = true;
-	// }
+	else if (type == "python2io")
+	{
+		Ui::USBBindingWidget_Python2().setupUi(widget);
+		has_template = true;
+	}
 
 	if (has_template)
 		widget->bindWidgets(bindings);
