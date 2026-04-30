@@ -384,6 +384,9 @@ set(pcsx2USBSources
     USB/usb-python2/devices/acio.cpp
     USB/usb-python2/devices/ddr_extio.cpp
     USB/usb-python2/devices/icca.cpp
+    USB/usb-python2/devices/thrilldrive_belt.cpp
+    USB/usb-python2/devices/thrilldrive_handle.cpp
+    USB/usb-python2/devices/toysmarch_drumpad.cpp
 	USB/usb-eyetoy/cam-jpeg.cpp
 	USB/usb-eyetoy/jo_mpeg.cpp
 	USB/usb-eyetoy/usb-eyetoy-webcam.cpp
@@ -423,6 +426,9 @@ set(pcsx2USBHeaders
     USB/usb-python2/devices/ddr_extio.h
     USB/usb-python2/devices/icca.h
     USB/usb-python2/devices/input_device.h
+    USB/usb-python2/devices/thrilldrive_belt.h
+    USB/usb-python2/devices/thrilldrive_handle.h
+    USB/usb-python2/devices/toysmarch_drumpad.h
 	USB/usb-eyetoy/cam-jpeg.h
 	USB/usb-eyetoy/jo_mpeg.h
 	USB/usb-eyetoy/ov519.h

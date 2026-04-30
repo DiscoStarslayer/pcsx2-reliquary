@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1160</width>
-    <height>1500</height>
+     <height>1660</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -30,14 +30,14 @@
        <rect>
         <x>0</x>
         <y>0</y>
-        <width>1160</width>
-        <height>1500</height>
+         <width>1160</width>
+         <height>1660</height>
        </rect>
       </property>
       <property name="minimumSize">
        <size>
-        <width>1160</width>
-         <height>1500</height>
+         <width>1160</width>
+          <height>1660</height>
        </size>
       </property>
       <layout class="QGridLayout" name="mainGridLayout">
@@ -163,7 +163,43 @@
         </layout>
        </item>
         <item row="4" column="0">
-         <widget class="QGroupBox" name="dance864Player1GroupBox">
+         <widget class="QGroupBox" name="toysMarchPlayer1GroupBox">
+          <property name="title"><string>Toy's March Player 1</string></property>
+          <layout class="QGridLayout" name="toysMarchPlayer1GridLayout">
+           <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+           <item row="0" column="0"><widget class="QLabel" name="labelToysMarchP1Cymbal"><property name="text"><string>Cymbal</string></property></widget></item><item row="0" column="1"><widget class="QLabel" name="labelToysMarchP1DrumL"><property name="text"><string>Drum Left</string></property></widget></item><item row="0" column="2"><widget class="QLabel" name="labelToysMarchP1DrumR"><property name="text"><string>Drum Right</string></property></widget></item>
+           <item row="1" column="0"><widget class="InputBindingWidget" name="ToysMarchP1Cymbal"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="1"><widget class="InputBindingWidget" name="ToysMarchP1DrumL"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="2"><widget class="InputBindingWidget" name="ToysMarchP1DrumR"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelToysMarchP1Left"><property name="text"><string>Left</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelToysMarchP1Start"><property name="text"><string>Start</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelToysMarchP1Right"><property name="text"><string>Right</string></property></widget></item>
+           <item row="3" column="0"><widget class="InputBindingWidget" name="ToysMarchP1Left"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="ToysMarchP1Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="ToysMarchP1Right"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QGroupBox" name="toysMarchPlayer2GroupBox">
+          <property name="title"><string>Toy's March Player 2</string></property>
+          <layout class="QGridLayout" name="toysMarchPlayer2GridLayout">
+           <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+           <item row="0" column="0"><widget class="QLabel" name="labelToysMarchP2Cymbal"><property name="text"><string>Cymbal</string></property></widget></item><item row="0" column="1"><widget class="QLabel" name="labelToysMarchP2DrumL"><property name="text"><string>Drum Left</string></property></widget></item><item row="0" column="2"><widget class="QLabel" name="labelToysMarchP2DrumR"><property name="text"><string>Drum Right</string></property></widget></item>
+           <item row="1" column="0"><widget class="InputBindingWidget" name="ToysMarchP2Cymbal"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="1"><widget class="InputBindingWidget" name="ToysMarchP2DrumL"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="2"><widget class="InputBindingWidget" name="ToysMarchP2DrumR"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelToysMarchP2Left"><property name="text"><string>Left</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelToysMarchP2Start"><property name="text"><string>Start</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelToysMarchP2Right"><property name="text"><string>Right</string></property></widget></item>
+           <item row="3" column="0"><widget class="InputBindingWidget" name="ToysMarchP2Left"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="ToysMarchP2Start"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="ToysMarchP2Right"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item row="5" column="0" colspan="2">
+         <widget class="QGroupBox" name="thrillDriveGroupBox">
+          <property name="title"><string>Thrill Drive 3</string></property>
+          <layout class="QGridLayout" name="thrillDriveGridLayout">
+           <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
+           <item row="0" column="0"><widget class="QLabel" name="labelThrillDriveSteeringLeft"><property name="text"><string>Steering Left</string></property></widget></item><item row="0" column="1"><widget class="QLabel" name="labelThrillDriveSteeringRight"><property name="text"><string>Steering Right</string></property></widget></item><item row="0" column="2"><widget class="QLabel" name="labelThrillDriveAccelerator"><property name="text"><string>Accelerator</string></property></widget></item><item row="0" column="3"><widget class="QLabel" name="labelThrillDriveBrake"><property name="text"><string>Brake</string></property></widget></item>
+           <item row="1" column="0"><widget class="InputBindingWidget" name="ThrillDriveSteeringLeft"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="1"><widget class="InputBindingWidget" name="ThrillDriveSteeringRight"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="2"><widget class="InputBindingWidget" name="ThrillDriveAccelerator"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="1" column="3"><widget class="InputBindingWidget" name="ThrillDriveBrake"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="labelThrillDriveGearshiftDown"><property name="text"><string>Gear Shift Down</string></property></widget></item><item row="2" column="1"><widget class="QLabel" name="labelThrillDriveStart"><property name="text"><string>Start</string></property></widget></item><item row="2" column="2"><widget class="QLabel" name="labelThrillDriveGearshiftUp"><property name="text"><string>Gear Shift Up</string></property></widget></item><item row="2" column="3"><widget class="QLabel" name="labelThrillDriveSeatbelt"><property name="text"><string>Seatbelt</string></property></widget></item>
+           <item row="3" column="0"><widget class="InputBindingWidget" name="ThrillDriveGearshiftDown"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="1"><widget class="InputBindingWidget" name="ThrillDriveStart"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="2"><widget class="InputBindingWidget" name="ThrillDriveGearshiftUp"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item><item row="3" column="3"><widget class="InputBindingWidget" name="ThrillDriveSeatbelt"><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="minimumSize"><size><width>160</width><height>0</height></size></property><property name="text"><string notr="true">PushButton</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item row="6" column="0">
+          <widget class="QGroupBox" name="dance864Player1GroupBox">
           <property name="title"><string>Dance 86.4 Player 1</string></property>
           <layout class="QGridLayout" name="dance864Player1GridLayout">
            <property name="horizontalSpacing"><number>8</number></property><property name="verticalSpacing"><number>6</number></property>
@@ -174,7 +210,7 @@
           </layout>
          </widget>
         </item>
-         <item row="4" column="1">
+          <item row="6" column="1">
          <widget class="QGroupBox" name="dance864Player2GroupBox">
           <property name="title"><string>Dance 86.4 Player 2</string></property>
           <layout class="QGridLayout" name="dance864Player2GridLayout">
@@ -186,7 +222,7 @@
           </layout>
          </widget>
         </item>
-        <item row="5" column="0">
+        <item row="7" column="0">
          <widget class="QGroupBox" name="ddrPlayer1GroupBox">
          <property name="title"><string>DDR Player 1</string></property>
          <layout class="QGridLayout" name="ddrPlayer1GridLayout">
@@ -204,7 +240,7 @@
          </layout>
         </widget>
        </item>
-       <item row="5" column="1">
+        <item row="7" column="1">
         <widget class="QGroupBox" name="ddrPlayer2GroupBox">
          <property name="title"><string>DDR Player 2</string></property>
          <layout class="QGridLayout" name="ddrPlayer2GridLayout">
@@ -222,7 +258,7 @@
          </layout>
         </widget>
        </item>
-        <item row="6" column="0" colspan="2"><spacer name="verticalSpacer"><property name="orientation"><enum>Qt::Orientation::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>1</height></size></property></spacer></item>
+          <item row="8" column="0" colspan="2"><spacer name="verticalSpacer"><property name="orientation"><enum>Qt::Orientation::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>1</height></size></property></spacer></item>
       </layout>
      </widget>
     </widget>

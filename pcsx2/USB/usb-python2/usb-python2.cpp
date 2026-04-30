@@ -10,6 +10,9 @@
 #include "devices/ddr_extio.h"
 #include "devices/icca.h"
 #include "devices/input_device.h"
+#include "devices/thrilldrive_belt.h"
+#include "devices/thrilldrive_handle.h"
+#include "devices/toysmarch_drumpad.h"
 #include "USB/USB.h"
 #include "USB/qemu-usb/desc.h"
 #include "USB/qemu-usb/qusb.h"
@@ -137,6 +140,7 @@ namespace usb_python2
 	constexpr uint32_t P2IO_JAMMA_THRILLDRIVE_START = 0x00000100;
 	constexpr uint32_t P2IO_JAMMA_THRILLDRIVE_GEARSHIFT_DOWN = 0x00000200;
 	constexpr uint32_t P2IO_JAMMA_THRILLDRIVE_GEARSHIFT_UP = 0x00000400;
+	constexpr int32_t P2IO_THRILLDRIVE_ANALOG_MAX = 0xffff;
 
 	constexpr uint32_t P2IO_JAMMA_TOYSMARCH_P1_START = 0x00000100;
 	constexpr uint32_t P2IO_JAMMA_TOYSMARCH_P1_LEFT = 0x00000800;
@@ -243,6 +247,8 @@ namespace usb_python2
 
 		// For Thrill Drive 3
 		const static int32_t wheelCenter = 0x7fdf;
+		int32_t wheelLeft = 0;
+		int32_t wheelRight = 0;
 
 		std::vector<uint8_t> buf;
 
@@ -411,6 +417,21 @@ namespace usb_python2
 				s->devices[0] = std::move(aciodev);
 			}
 		}
+		else if (s->f.gameType == GAMETYPE_TOYSMARCH)
+		{
+			if (s->devices[0] == nullptr)
+				s->devices[0] = std::make_unique<toysmarch_drumpad_device>(dev);
+		}
+		else if (s->f.gameType == GAMETYPE_THRILLDRIVE)
+		{
+			if (s->devices[1] == nullptr)
+			{
+				auto aciodev = std::make_unique<acio_device>();
+				aciodev->add_acio_device(1, std::make_unique<thrilldrive_handle_device>());
+				aciodev->add_acio_device(2, std::make_unique<thrilldrive_belt_device>(dev));
+				s->devices[1] = std::move(aciodev);
+			}
+		}
 	}
 
 	static void load_configuration(USBDevice* dev)
@@ -504,6 +525,7 @@ namespace usb_python2
 		s->f.cardFilenames[0] = s->f.cardFilenames[1] = "";
 		s->f.jammaUpdateCounter = 0;
 		s->f.wheel = s->wheelCenter;
+		s->wheelLeft = s->wheelRight = 0;
 		s->f.brake = s->f.accel = 0;
 		s->f.knobs[0] = s->f.knobs[1] = 0;
 		s->f.oldLightCabinet = 0;
@@ -1037,6 +1059,27 @@ namespace usb_python2
 						CheckKeyState(BID_DANCE864_P2_PAD_CENTER, P2IO_JAMMA_DANCE864_P2_PAD_CENTER);
 						CheckKeyState(BID_DANCE864_P2_PAD_RIGHT, P2IO_JAMMA_DANCE864_P2_PAD_RIGHT);
 					}
+					else if (s->f.gameType == GAMETYPE_TOYSMARCH)
+					{
+						CheckKeyState(BID_TOYSMARCH_P1_START, P2IO_JAMMA_TOYSMARCH_P1_START);
+						CheckKeyState(BID_TOYSMARCH_P1_LEFT, P2IO_JAMMA_TOYSMARCH_P1_LEFT);
+						CheckKeyState(BID_TOYSMARCH_P1_RIGHT, P2IO_JAMMA_TOYSMARCH_P1_RIGHT);
+
+						CheckKeyState(BID_TOYSMARCH_P2_START, P2IO_JAMMA_TOYSMARCH_P2_START);
+						CheckKeyState(BID_TOYSMARCH_P2_LEFT, P2IO_JAMMA_TOYSMARCH_P2_LEFT);
+						CheckKeyState(BID_TOYSMARCH_P2_RIGHT, P2IO_JAMMA_TOYSMARCH_P2_RIGHT);
+					}
+					else if (s->f.gameType == GAMETYPE_THRILLDRIVE)
+					{
+						CheckKeyState(BID_THRILLDRIVE_START, P2IO_JAMMA_THRILLDRIVE_START);
+						CheckKeyState(BID_THRILLDRIVE_GEARSHIFT_DOWN, P2IO_JAMMA_THRILLDRIVE_GEARSHIFT_DOWN);
+						CheckKeyState(BID_THRILLDRIVE_GEARSHIFT_UP, P2IO_JAMMA_THRILLDRIVE_GEARSHIFT_UP);
+
+						analogIo[0] = static_cast<uint16_t>(std::clamp(s->f.wheel, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
+						analogIo[1] = static_cast<uint16_t>(std::clamp(s->f.brake, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
+						analogIo[2] = static_cast<uint16_t>(std::clamp(s->f.accel, 0, P2IO_THRILLDRIVE_ANALOG_MAX));
+						analogIo[3] = 0;
+					}
 					else if (s->f.gameType == GAMETYPE_GF)
 					{
 						CheckKeyState(BID_GF_P1_START, P2IO_JAMMA_GF_P1_START);
@@ -1164,12 +1207,52 @@ namespace usb_python2
 	{
 		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
 
+		switch (bind)
+		{
+			case BID_THRILLDRIVE_STEERING_LEFT:
+				return static_cast<float>(s->wheelLeft) / static_cast<float>(s->wheelCenter);
+			case BID_THRILLDRIVE_STEERING_RIGHT:
+				return static_cast<float>(s->wheelRight) / static_cast<float>(P2IO_THRILLDRIVE_ANALOG_MAX - s->wheelCenter);
+			case BID_THRILLDRIVE_ACCELERATOR:
+				return static_cast<float>(s->f.accel) / static_cast<float>(P2IO_THRILLDRIVE_ANALOG_MAX);
+			case BID_THRILLDRIVE_BRAKE:
+				return static_cast<float>(s->f.brake) / static_cast<float>(P2IO_THRILLDRIVE_ANALOG_MAX);
+			default:
+				break;
+		}
+
 		return s->buttonState.test(bind) ? 1.0f : 0.0f;
 	}
 
 	void Python2Device::SetBindingValue(USBDevice* dev, u32 bind, float value) const
 	{
 		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
+		const auto axis_value = [value](int32_t max) {
+			return static_cast<int32_t>((std::clamp(value, 0.0f, 1.0f) * static_cast<float>(max)) + 0.5f);
+		};
+		const auto update_wheel = [&]() {
+			s->f.wheel = std::clamp(s->wheelCenter - s->wheelLeft + s->wheelRight, 0, P2IO_THRILLDRIVE_ANALOG_MAX);
+		};
+
+		switch (bind)
+		{
+			case BID_THRILLDRIVE_STEERING_LEFT:
+				s->wheelLeft = axis_value(s->wheelCenter);
+				update_wheel();
+				return;
+			case BID_THRILLDRIVE_STEERING_RIGHT:
+				s->wheelRight = axis_value(P2IO_THRILLDRIVE_ANALOG_MAX - s->wheelCenter);
+				update_wheel();
+				return;
+			case BID_THRILLDRIVE_ACCELERATOR:
+				s->f.accel = axis_value(P2IO_THRILLDRIVE_ANALOG_MAX);
+				return;
+			case BID_THRILLDRIVE_BRAKE:
+				s->f.brake = axis_value(P2IO_THRILLDRIVE_ANALOG_MAX);
+				return;
+			default:
+				break;
+		}
 
 		if (value >= 0.5f)
 			s->buttonState.set(bind);
@@ -1244,6 +1327,29 @@ namespace usb_python2
 			{"Dance864P2PadLeft", "Dance 86.4 Player 2 Pad Left", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_PAD_LEFT, GenericInputBinding::Unknown},
 			{"Dance864P2PadCenter", "Dance 86.4 Player 2 Pad Center", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_PAD_CENTER, GenericInputBinding::Unknown},
 			{"Dance864P2PadRight", "Dance 86.4 Player 2 Pad Right", nullptr, InputBindingInfo::Type::Button, BID_DANCE864_P2_PAD_RIGHT, GenericInputBinding::Unknown},
+
+			{"ToysMarchP1Start", "Toy's March Player 1 Start", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P1_START, GenericInputBinding::Start},
+			{"ToysMarchP1Left", "Toy's March Player 1 Left", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P1_LEFT, GenericInputBinding::LeftStickLeft},
+			{"ToysMarchP1Right", "Toy's March Player 1 Right", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P1_RIGHT, GenericInputBinding::LeftStickRight},
+			{"ToysMarchP1Cymbal", "Toy's March Player 1 Cymbal", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P1_CYMBAL, GenericInputBinding::Triangle},
+			{"ToysMarchP1DrumL", "Toy's March Player 1 Drum Left", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P1_DRUM_L, GenericInputBinding::Square},
+			{"ToysMarchP1DrumR", "Toy's March Player 1 Drum Right", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P1_DRUM_R, GenericInputBinding::Circle},
+
+			{"ToysMarchP2Start", "Toy's March Player 2 Start", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P2_START, GenericInputBinding::Unknown},
+			{"ToysMarchP2Left", "Toy's March Player 2 Left", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P2_LEFT, GenericInputBinding::Unknown},
+			{"ToysMarchP2Right", "Toy's March Player 2 Right", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P2_RIGHT, GenericInputBinding::Unknown},
+			{"ToysMarchP2Cymbal", "Toy's March Player 2 Cymbal", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P2_CYMBAL, GenericInputBinding::Unknown},
+			{"ToysMarchP2DrumL", "Toy's March Player 2 Drum Left", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P2_DRUM_L, GenericInputBinding::Unknown},
+			{"ToysMarchP2DrumR", "Toy's March Player 2 Drum Right", nullptr, InputBindingInfo::Type::Button, BID_TOYSMARCH_P2_DRUM_R, GenericInputBinding::Unknown},
+
+			{"ThrillDriveStart", "Thrill Drive Start", nullptr, InputBindingInfo::Type::Button, BID_THRILLDRIVE_START, GenericInputBinding::Start},
+			{"ThrillDriveGearshiftDown", "Thrill Drive Gear Shift Down", nullptr, InputBindingInfo::Type::Button, BID_THRILLDRIVE_GEARSHIFT_DOWN, GenericInputBinding::DPadDown},
+			{"ThrillDriveGearshiftUp", "Thrill Drive Gear Shift Up", nullptr, InputBindingInfo::Type::Button, BID_THRILLDRIVE_GEARSHIFT_UP, GenericInputBinding::DPadUp},
+			{"ThrillDriveSteeringLeft", "Thrill Drive Steering Left", nullptr, InputBindingInfo::Type::HalfAxis, BID_THRILLDRIVE_STEERING_LEFT, GenericInputBinding::LeftStickLeft},
+			{"ThrillDriveSteeringRight", "Thrill Drive Steering Right", nullptr, InputBindingInfo::Type::HalfAxis, BID_THRILLDRIVE_STEERING_RIGHT, GenericInputBinding::LeftStickRight},
+			{"ThrillDriveAccelerator", "Thrill Drive Accelerator", nullptr, InputBindingInfo::Type::HalfAxis, BID_THRILLDRIVE_ACCELERATOR, GenericInputBinding::R2},
+			{"ThrillDriveBrake", "Thrill Drive Brake", nullptr, InputBindingInfo::Type::HalfAxis, BID_THRILLDRIVE_BRAKE, GenericInputBinding::L2},
+			{"ThrillDriveSeatbelt", "Thrill Drive Seatbelt", nullptr, InputBindingInfo::Type::Button, BID_THRILLDRIVE_SEATBELT, GenericInputBinding::Triangle},
 			
 			{"KeypadP10", "Keypad Player 1 '0'", nullptr, InputBindingInfo::Type::Button, BID_KEYPADP1_0, GenericInputBinding::Unknown},
 			{"KeypadP11", "Keypad Player 1 '1'", nullptr, InputBindingInfo::Type::Button, BID_KEYPADP1_1, GenericInputBinding::Unknown},
@@ -1325,6 +1431,22 @@ namespace usb_python2
 		set_binding("Dance864P1PadLeft", "Keyboard/J");
 		set_binding("Dance864P1PadCenter", "Keyboard/K");
 		set_binding("Dance864P1PadRight", "Keyboard/L");
+
+		set_binding("ToysMarchP1Start", "Keyboard/S");
+		set_binding("ToysMarchP1Left", "Keyboard/A");
+		set_binding("ToysMarchP1Right", "Keyboard/D");
+		set_binding("ToysMarchP1Cymbal", "Keyboard/I");
+		set_binding("ToysMarchP1DrumL", "Keyboard/J");
+		set_binding("ToysMarchP1DrumR", "Keyboard/L");
+
+		set_binding("ThrillDriveStart", "Keyboard/S");
+		set_binding("ThrillDriveSteeringLeft", "Keyboard/A");
+		set_binding("ThrillDriveSteeringRight", "Keyboard/D");
+		set_binding("ThrillDriveAccelerator", "Keyboard/I");
+		set_binding("ThrillDriveBrake", "Keyboard/K");
+		set_binding("ThrillDriveGearshiftDown", "Keyboard/J");
+		set_binding("ThrillDriveGearshiftUp", "Keyboard/L");
+		set_binding("ThrillDriveSeatbelt", "Keyboard/U");
 
 		set_binding("KeypadP10", "Keyboard/0");
 		set_binding("KeypadP11", "Keyboard/1");

@@ -415,6 +415,9 @@
     <ClCompile Include="USB\usb-python2\devices\acio.cpp" />
     <ClCompile Include="USB\usb-python2\devices\ddr_extio.cpp" />
     <ClCompile Include="USB\usb-python2\devices\icca.cpp" />
+    <ClCompile Include="USB\usb-python2\devices\thrilldrive_belt.cpp" />
+    <ClCompile Include="USB\usb-python2\devices\thrilldrive_handle.cpp" />
+    <ClCompile Include="USB\usb-python2\devices\toysmarch_drumpad.cpp" />
     <ClCompile Include="USB\usb-python2\usb-python2.cpp" />
     <ClCompile Include="USB\USB.cpp" />
     <ClCompile Include="VMManager.cpp" />
@@ -877,6 +880,9 @@
     <ClInclude Include="USB\usb-python2\devices\ddr_extio.h" />
     <ClInclude Include="USB\usb-python2\devices\icca.h" />
     <ClInclude Include="USB\usb-python2\devices\input_device.h" />
+    <ClInclude Include="USB\usb-python2\devices\thrilldrive_belt.h" />
+    <ClInclude Include="USB\usb-python2\devices\thrilldrive_handle.h" />
+    <ClInclude Include="USB\usb-python2\devices\toysmarch_drumpad.h" />
     <ClInclude Include="USB\usb-python2\usb-python2.h" />
     <ClInclude Include="USB\USB.h" />
     <ClInclude Include="Utilities\AsciiFile.h" />
