@@ -365,6 +365,7 @@
     <QtUi Include="Settings\GraphicsPostProcessingSettingsTab.ui" />
     <QtUi Include="Settings\GraphicsSettingsHeader.ui" />
     <QtUi Include="Settings\GraphicsSoftwareRenderingSettingsTab.ui" />
+    <QtUi Include="Settings\GraphicsPGSRenderingSettingsTab.ui" />
     <QtUi Include="Settings\GraphicsTextureReplacementSettingsTab.ui" />
     <QtUi Include="Settings\GraphicsUpscalingFixesSettingsTab.ui" />
     <QtUi Include="Settings\InputBindingDialog.ui" />
