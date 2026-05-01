@@ -514,7 +514,7 @@ void GSRendererPGS::VSync(u32 field, bool registers_written)
 	info.crtc_offsets = GSConfig.PCRTCOffsets;
 	info.dst_access = VK_ACCESS_2_SHADER_SAMPLED_READ_BIT;
 	info.dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	info.dst_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	info.dst_layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
 	// The scaling blur is technically a blur ...
 	info.adapt_to_internal_horizontal_resolution = GSConfig.PCRTCAntiBlur;
 	info.raw_circuit_scanout = true;
