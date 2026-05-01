@@ -53,6 +53,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v6
+        with:
+          submodules: true
 
       # actions/checkout elides tags, fetch them primarily for releases
       - name: Fetch Tags

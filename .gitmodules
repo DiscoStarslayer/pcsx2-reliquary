@@ -1,0 +1,3 @@
+[submodule "pcsx2/GS/parallel-gs"]
+	path = pcsx2/GS/parallel-gs
+	url = https://github.com/Arntzen-Software/parallel-gs.git

@@ -58,6 +58,7 @@ jobs:
           # This is required for the tagging logic in generate-metainfo.sh
           fetch-depth: 10
           fetch-tags: true
+          submodules: true
 
       # Work around container ownership issue
       - name: Set Safe Directory
