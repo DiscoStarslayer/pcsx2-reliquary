@@ -403,9 +403,9 @@ void logPhyAccessRegs()
 
 void logFwAction(u32 addr, u32 value, bool write)
 {
-	char * mode;
-	char * writeS = "write";
-	char * readS = "read";
+	const char* mode;
+	const char* writeS = "write";
+	const char* readS = "read";
 	if (write != 0)
 	{
 		mode = writeS;

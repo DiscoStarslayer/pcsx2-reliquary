@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: true
+          submodules: recursive
 
       # Docs - https://github.com/mathieudutour/github-tag-action
       - name: Bump Version and Push Tag
@@ -180,7 +180,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: true
+          submodules: recursive
 
       - name: Prepare Artifact Folder
         run: mkdir ./ci-artifacts/
