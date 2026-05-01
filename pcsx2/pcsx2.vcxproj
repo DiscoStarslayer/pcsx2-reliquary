@@ -296,6 +296,7 @@
     <ClCompile Include="GS\parallel-gs\Granite\vulkan\query_pool.cpp" />
     <ClCompile Include="GS\parallel-gs\Granite\vulkan\render_pass.cpp" />
     <ClCompile Include="GS\parallel-gs\Granite\vulkan\renderdoc_capture.cpp" />
+    <ClCompile Include="GS\parallel-gs\Granite\vulkan\rtas.cpp" />
     <ClCompile Include="GS\parallel-gs\Granite\vulkan\sampler.cpp" />
     <ClCompile Include="GS\parallel-gs\Granite\vulkan\semaphore.cpp" />
     <ClCompile Include="GS\parallel-gs\Granite\vulkan\semaphore_manager.cpp" />
