@@ -687,6 +687,9 @@ if (TARGET parallel-gs)
 	if (WIN32)
 		target_compile_definitions(granite-volk PUBLIC VK_USE_PLATFORM_WIN32_KHR)
 	endif()
+	if (APPLE)
+		target_compile_definitions(granite-volk PUBLIC VK_USE_PLATFORM_METAL_EXT)
+	endif()
 endif()
 
 set(pcsx2GSMetalShaders

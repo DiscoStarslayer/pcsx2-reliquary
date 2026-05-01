@@ -33,6 +33,12 @@ check_no_parenthesis_in_path()
 detect_operating_system()
 detect_compiler()
 
+# parallel-gs targets are added before BuildParameters, so set the macOS
+# deployment target here too to avoid mixing SDK defaults with PCSX2's min OS.
+if(NOT CMAKE_GENERATOR MATCHES "Xcode")
+	set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0)
+endif()
+
 # Need to make sure this is included early, so we can make sure we use our own Vulkan headers,
 # which are more recent than system headers.
 # Otherwise, Qt6 includes system Vulkan headers in SearchForStuff.
