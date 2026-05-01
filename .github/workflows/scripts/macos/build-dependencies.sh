@@ -381,7 +381,8 @@ cd ..
 echo "Installing libusb..."
 tar xjf "libusb-$LIBUSB.tar.bz2"
 cd "libusb-$LIBUSB"
-./configure --prefix "$INSTALLDIR" --disable-option-checking --enable-shared --disable-static
+CC="clang -arch x86_64" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+	./configure --prefix "$INSTALLDIR" --host=x86_64-apple-darwin --disable-option-checking --enable-shared --disable-static
 make "-j$NPROCS"
 make install
 cd ..

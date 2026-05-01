@@ -130,6 +130,7 @@ jobs:
 
       - name: Generate CMake Files
         run: |
+          PKG_CONFIG_PATH="$HOME/deps/lib/pkgconfig:$PKG_CONFIG_PATH" \
           cmake -DCMAKE_PREFIX_PATH="$HOME/deps" \
                 -DCMAKE_BUILD_TYPE=Release \
                 -DCMAKE_OSX_ARCHITECTURES="${{ case(inputs.arch == 'x86-64', 'x86_64', inputs.arch) }}" \

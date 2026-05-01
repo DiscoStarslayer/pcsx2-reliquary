@@ -54,6 +54,7 @@ LZ4=1.10.0
 LIBPNG=1.6.56
 LIBJPEGTURBO=3.1.4.1
 LIBWEBP=1.6.0
+LIBUSB=1.0.26
 FFMPEG=8.1
 MOLTENVK=1.4.1
 KDDOCKWIDGETS=2.4.0
@@ -106,6 +107,7 @@ b072aed6871998cce9b36e7774033105ca29e33632be5b6347f3206898e0756a  ffmpeg-$FFMPEG
 51dbf24fe72e43dd7cb9a289d3cab47112010f1a2ed69b6fc8ac0dff31991ed2  KDDockWidgets-$KDDOCKWIDGETS.tar.gz
 7bd4e79ce18b1d47517e7e91fbb7cf19d4f01942804a519bc7c0bf32b6325dd5  plutovg-$PLUTOVG.tar.gz
 78561b571ac224030cdc450ca2986b4de915c2ba7616004a6d71a379bffd15f3  plutosvg-$PLUTOSVG.tar.gz
+12ce7a61fc9854d1d2a1ffe095f7b5fac19ddba095c259e6067a46500381b5a5  libusb-$LIBUSB.tar.bz2
 9d9938269adc25e9a9b84650338b87d130cf469d82685fffc028c325279619c1  rapidyaml-$RAPIDYAML-src.tgz
 
 245002feccbe7f8361b223545a5654cea69780745886872d7efff50a38d96c66  shaderc-$SHADERC.tar.gz
@@ -140,6 +142,7 @@ if ! shasum -sa 256 --check SHASUMS 2> /dev/null; then
 		-O "https://github.com/KDAB/KDDockWidgets/archive/v$KDDOCKWIDGETS/KDDockWidgets-$KDDOCKWIDGETS.tar.gz" \
 		-O "https://github.com/sammycage/plutovg/archive/v$PLUTOVG/plutovg-$PLUTOVG.tar.gz" \
 		-O "https://github.com/sammycage/plutosvg/archive/v$PLUTOSVG/plutosvg-$PLUTOSVG.tar.gz" \
+		-O "https://github.com/libusb/libusb/releases/download/v$LIBUSB/libusb-$LIBUSB.tar.bz2" \
 		-O "https://github.com/biojppm/rapidyaml/releases/download/v$RAPIDYAML/rapidyaml-$RAPIDYAML-src.tgz"
 fi
 
@@ -431,6 +434,27 @@ cmake "${CMAKE_COMMON[@]}" "$CMAKE_ARCH_UNIVERSAL" -DBUILD_SHARED_LIBS=ON -DPLUT
 make -C build "-j$NPROCS"
 make -C build install
 cd ..
+
+echo "Installing libusb..."
+rm -fr "libusb-$LIBUSB"
+tar xjf "libusb-$LIBUSB.tar.bz2"
+cd "libusb-$LIBUSB"
+mkdir build
+cd build
+CC="clang -arch x86_64" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+	../configure --prefix="$INSTALLDIR" --host=x86_64-apple-darwin --disable-option-checking --enable-shared --disable-static
+make "-j$NPROCS"
+cd ..
+mkdir build-arm64
+cd build-arm64
+CC="clang -arch arm64" CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" \
+	../configure --prefix="$INSTALLDIR" --host=aarch64-apple-darwin --disable-option-checking --enable-shared --disable-static
+make "-j$NPROCS"
+cd ..
+merge_binaries $(realpath build) $(realpath build-arm64)
+cd build
+make install
+cd ../..
 
 echo "Building RapidYAML..."
 rm -fr "rapidyaml-$RAPIDYAML-src"
