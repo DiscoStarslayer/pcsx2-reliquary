@@ -79,6 +79,7 @@ void COP2FlagHackPass::Run(u32 start, u32 end, EEINST* inst_cache)
 		if (_Rs_ == 6 && _Rd_ == REG_STATUS_FLAG)
 		{
 			// Read ahead, looking for cfc2.
+			const u32 instruction = cpuRegs.code;
 			m_cfc2_pc = apc;
 			ForEachInstruction(apc, end, inst, [this](u32 capc, EEINST*) {
 				if (_Opcode_ == 022 && _Rs_ == 2 && _Rd_ == REG_STATUS_FLAG)
@@ -88,6 +89,7 @@ void COP2FlagHackPass::Run(u32 start, u32 end, EEINST* inst_cache)
 				}
 				return true;
 			});
+			cpuRegs.code = instruction;
 #ifdef PCSX2_DEVBUILD
 			if (m_cfc2_pc != apc)
 				DevCon.WriteLn("CTC2 at %08X paired with CFC2 %08X", apc, m_cfc2_pc);

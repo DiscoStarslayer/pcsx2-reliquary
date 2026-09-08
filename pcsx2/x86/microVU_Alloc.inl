@@ -48,10 +48,6 @@ __fi void mVUallocSFLAGb(const x32& reg, int fInstance)
 __ri void mVUallocSFLAGc(const x32& reg, const x32& regT, int fInstance)
 {
 	mVUallocSFLAGa(regT, fInstance);
-	// Adding seven to the low three bits sets each nibble's high bit exactly
-	// when that nibble is nonzero; masking first prevents carry between nibbles.
-	// Pack them in low-to-high order ZS, SS, Z, S, then rotate them into
-	// architectural low-byte order Z, S, unused, ZS, SS.
 	xMOV(reg, regT);
 	xAND(reg, 0x7777);
 	xADD(reg, 0x7777);
@@ -69,8 +65,8 @@ __ri void mVUallocSFLAGc(const x32& reg, const x32& regT, int fInstance)
 // Denormalizes Status Flag; destroys tmp1/tmp2
 __ri void mVUallocSFLAGd(u32* memAddr, const x32& reg = eax, const x32& tmp1 = ecx, const x32& tmp2 = edx)
 {
-	xMOV(tmp2, ptr32[memAddr]);
-	xMOV(reg, tmp2);
+	xMOV(reg, ptr32[memAddr]);
+	xMOV(tmp2, reg);
 	xSHR(reg, 3);
 	xAND(reg, 0x18);
 

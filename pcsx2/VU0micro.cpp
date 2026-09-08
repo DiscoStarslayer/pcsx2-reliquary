@@ -22,7 +22,7 @@ void vu0ResetRegs()
 static __fi u32 vu0DenormalizeMicroStatus(u32 nstatus)
 {
 	// from mVUallocSFLAGd()
-	return ((nstatus >> 3) & 0x18u) | ((nstatus >> 11) & 0x1800u) | ((nstatus >> 14) & 0x3cf0000u);
+	return ((nstatus >> 3) & 0x18u) | ((nstatus << 11) & 0x1800u) | ((nstatus << 14) & 0x3cf0000u);
 }
 
 static __fi void vu0SetMicroFlags(u32* flags, u32 value)

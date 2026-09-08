@@ -57,36 +57,25 @@ static void mVUemitLowerSoftQAndStatusWriteback(microVU& mVU)
 {
 	// Internal exact-kernel ABI: eax = raw result, edx = current I/D exception bits.
 	xMOV(ptr32[&mVU.regs().q.UL], eax);
-	xMOV(gprT1, ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL]);
-	xAND(gprT1, ~0x30u);
-	xOR(gprT1, edx);
-	xMOV(gprT2, edx);
-	xSHL(gprT2, 6);
-	xOR(gprT1, gprT2);
-	xMOV(ptr32[&mVU.regs().statusflag], gprT1);
-
 	const xmm& q_result = mVU.regAlloc->allocReg();
-	xMOVDZX(q_result, ptr32[&mVU.regs().q.UL]);
+	xMOVDZX(q_result, eax);
 	writeQreg(q_result, mVUinfo.writeQ);
 	mVU.regAlloc->clearNeeded(q_result);
-	xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
-	xXOR(gprT2, gprT2);
-	xTEST(edx, 0x10);
-	xForwardJZ8 not_invalid;
-	xOR(gprT2, divI);
-	not_invalid.SetTarget();
-	xTEST(edx, 0x20);
-	xForwardJZ8 no_div_flag;
-	xOR(gprT2, divD);
-	no_div_flag.SetTarget();
-	xMOV(ptr32[&mVU.divFlag], gprT2);
-	if (sFLAG.doFlag)
+
+	xMOV(ecx, edx);
+	xSHL(ecx, 14);
+	xMOV(eax, ecx);
+	xSHL(eax, 6);
+	xOR(ecx, eax);
+	xMOV(ptr32[&mVU.divFlag], ecx);
+	// Micro mode commits these causes through mVUdivSet when Q matures.
+	if (mVU.cop2)
 	{
-		mVUallocSFLAGd(&mVU.regs().VI[REG_STATUS_FLAG].UL, gprT1, gprT2);
-		constexpr u32 div_status_mask = divI | divD;
-		xAND(gprT1, div_status_mask);
-		xAND(getFlagReg(sFLAG.write), ~div_status_mask);
-		xOR(getFlagReg(sFLAG.write), gprT1);
+		xAND(gprF0, ~0xc0000u);
+		xSHL(edx, 14);
+		xOR(gprF0, edx);
+		xSHL(edx, 6);
+		xOR(gprF0, edx);
 	}
 }
 
@@ -1693,26 +1682,6 @@ mVUop(mVU_FSAND)
 		if (_Imm12_ & 0x030c) DevCon.WriteLn(Color_Green, "mVU_FSAND: Checking U/O/US/OS Flags");
 		const xRegister32& reg = mVU.regAlloc->allocGPR(-1, _It_, mVUlow.backupVI);
 		mVUallocSFLAGc(reg, gprT1, sFLAG.read);
-		// Exact Q helpers classify I/D when the operation is issued.  Once Q has
-		// matured, reconcile those causes with the architectural status shadow so
-		// a WAITQ stall cannot leave FSAND reading the preceding delayed-ring slot.
-		// Do not consult the new divFlag while Q is pending: it belongs to the
-		// writeQ instance and is not yet architecturally visible.
-		if (CHECK_VU_SOFT(mVU.index) && !mVUregs.q && (_Imm12_ & 0x0c30))
-		{
-			xMOV(gprT1, ptr32[&mVU.regs().statusflag]);
-			xAND(gprT1, 0xc00);
-			xOR(reg, gprT1);
-			xMOV(gprT1, ptr32[&mVU.divFlag]);
-			xTEST(gprT1, divI);
-			xForwardJZ8 no_invalid_divflag;
-			xOR(reg, 0x10);
-			no_invalid_divflag.SetTarget();
-			xTEST(gprT1, divD);
-			xForwardJZ8 no_divide_divflag;
-			xOR(reg, 0x20);
-			no_divide_divflag.SetTarget();
-		}
 		xAND(reg, _Imm12_);
 		mVU.regAlloc->clearNeeded(reg);
 		mVU.profiler.EmitOp(opFSAND);
@@ -1792,15 +1761,6 @@ mVUop(mVU_FSSET)
 		xAND(getFlagReg(sFLAG.write), 0xfff00); // Keep Non-Sticky Bits
 		if (imm)
 			xOR(getFlagReg(sFLAG.write), imm);
-		if (CHECK_VU_SOFT(mVU.index))
-		{
-			xMOV(gprT1, ptr32[&mVU.regs().statusflag]);
-			xAND(gprT1, ~0xfc0u);
-			if (_Imm12_ & 0xfc0)
-				xOR(gprT1, _Imm12_ & 0xfc0);
-			xMOV(ptr32[&mVU.regs().statusflag], gprT1);
-			xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
-		}
 		mVU.profiler.EmitOp(opFSSET);
 	}
 	pass3 { mVUlog("FSSET $%x", _Imm12_); }
@@ -2635,14 +2595,28 @@ mVUop(mVU_WAITQ)
 	pass1
 	{
 		mVUstall = std::max(mVUstall, mVUregs.q);
-		mVUinfo.doDivFlag = 1;
+		if (!CHECK_VU_SOFT(mVU.index))
+			mVUinfo.doDivFlag = 1;
 	}
 	pass2
 	{
-		if (!sFLAG.doFlag)
-			xMOV(getFlagReg(sFLAG.write), getFlagReg(sFLAG.lastWrite));
-		xAND(getFlagReg(sFLAG.write), 0xfff3ffff);
-		xOR(getFlagReg(sFLAG.write), ptr32[&mVU.divFlag]);
+		if (CHECK_VU_SOFT(mVU.index) && mVUinfo.doDivFlag && mVUstall >= 4)
+		{
+			// The stall drains earlier FMAC/FSSET writes. Publish Q's causes now,
+			// including in the delayed instance of an FMAC paired with WAITQ.
+			for (int i = 0; i < 4; i++)
+			{
+				xAND(getFlagReg(i), ~0xc0000u);
+				xOR(getFlagReg(i), ptr32[&mVU.divFlag]);
+			}
+		}
+		else if (!CHECK_VU_SOFT(mVU.index))
+		{
+			if (!sFLAG.doFlag)
+				xMOV(getFlagReg(sFLAG.write), getFlagReg(sFLAG.lastWrite));
+			xAND(getFlagReg(sFLAG.write), 0xfff3ffff);
+			xOR(getFlagReg(sFLAG.write), ptr32[&mVU.divFlag]);
+		}
 		mVU.profiler.EmitOp(opWAITQ);
 	}
 	pass3 { mVUlog("WAITQ"); }

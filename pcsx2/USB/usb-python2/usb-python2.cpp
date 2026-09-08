@@ -1224,7 +1224,12 @@ namespace usb_python2
 		if (!sw.DoMarker("Python2Device"))
 			return false;
 
-		sw.DoBytes(&s->f, sizeof(Python2State::freeze));
+		constexpr size_t filenames_offset = offsetof(Python2State::freeze, cardFilenames);
+		constexpr size_t tail_offset = offsetof(Python2State::freeze, jammaUpdateCounter);
+		u8 unused_filenames[tail_offset - filenames_offset] = {};
+		sw.DoBytes(&s->f, filenames_offset);
+		sw.DoBytes(unused_filenames, sizeof(unused_filenames));
+		sw.DoBytes(&s->f.jammaUpdateCounter, sizeof(s->f) - tail_offset);
 
 		return !sw.HasError();
 	}

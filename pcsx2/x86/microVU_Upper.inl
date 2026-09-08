@@ -16,7 +16,6 @@ struct VuSoftFmacJitResult
 	u32 acc_overflow_mask;
 };
 static_assert(sizeof(VuSoftFmacJitResult) == 9 * sizeof(u32));
-static u32 s_vu_cop2_opm_old_mac;
 
 //------------------------------------------------------------------
 // mVUupdateFlags() - Updates status/mac flags
@@ -567,11 +566,6 @@ mVUop(mVU_OPMULA)
 		if (CHECK_VU_SOFT(mVU.index))
 		{
 			mVU.regAlloc->flushCallerSavedGPRs();
-			if (mVU.cop2)
-			{
-				xMOV(gprT1, ptr32[&mVU.regs().VI[REG_MAC_FLAG].UL]);
-				xMOV(ptr32[&s_vu_cop2_opm_old_mac], gprT1);
-			}
 			const xmm& source = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
 			const xmm& operand = mVU.regAlloc->allocReg(_Ft_, 0, 0xf);
 			xPSHUF.D(source, source, 0xC9); // WXZY
@@ -579,12 +573,8 @@ mVUop(mVU_OPMULA)
 			const xmm& destination = mVU.regAlloc->allocReg(32, 32, _X_Y_Z_W);
 			const VuUpperFmacSoftDescriptor soft_op = {
 				VuUpperFmacSoftKind::Mul, VuUpperFmacSoftOperandSource::Ft, VuUpperFmacSoftDestination::Acc};
-			// OPMULA preserves inactive W separately. Its active XYZ exception bits
-			// must come from the exact product, because reconstructing flags from the
-			// final ACC value cannot distinguish an underflowed result from zero.
-			const VuSoftDelayedSFlagSource delayed_sflag_source = VuSoftDelayedSFlagSource::ResultStatus;
-			mVUemitUpperInlineMulExactResult(mVU, soft_op, delayed_sflag_source,
-				source, operand, destination, true, true);
+			mVUemitUpperInlineMulExactResult(mVU, soft_op,
+				source, operand, destination);
 			mVU.profiler.EmitOp(opOPMULA);
 			return;
 		}
@@ -620,11 +610,6 @@ mVUop(mVU_OPMSUB)
 		if (CHECK_VU_SOFT(mVU.index))
 		{
 			mVU.regAlloc->flushCallerSavedGPRs();
-			if (mVU.cop2)
-			{
-				xMOV(gprT1, ptr32[&mVU.regs().VI[REG_MAC_FLAG].UL]);
-				xMOV(ptr32[&s_vu_cop2_opm_old_mac], gprT1);
-			}
 			const xmm& source = mVU.regAlloc->allocReg(_Fs_, 0, 0xf);
 			const xmm& operand = mVU.regAlloc->allocReg(_Ft_, 0, 0xf);
 			xPSHUF.D(source, source, 0xC9); // WXZY
@@ -634,10 +619,8 @@ mVUop(mVU_OPMSUB)
 			const xmm& destination = mVU.regAlloc->allocReg(destination_load, _Fd_, _X_Y_Z_W);
 			const VuUpperFmacSoftDescriptor soft_op = {
 				VuUpperFmacSoftKind::Msub, VuUpperFmacSoftOperandSource::Ft, VuUpperFmacSoftDestination::Fd};
-			const VuSoftDelayedSFlagSource delayed_sflag_source =
-				mVUselectUpperSoftDelayedSFlagSource(mVU, soft_op);
-			mVUemitUpperInlineMaddExactResult(mVU, soft_op, delayed_sflag_source,
-				source, operand, accumulator, destination, true, false, false, false, false, true);
+			mVUemitUpperInlineMaddExactResult(mVU, soft_op,
+				source, operand, accumulator, destination);
 			mVU.profiler.EmitOp(opOPMSUB);
 			return;
 		}
