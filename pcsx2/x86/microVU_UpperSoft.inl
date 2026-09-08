@@ -51,24 +51,6 @@ static VuUpperFmacSoftDescriptor mVUmakeUpperSoftDescriptor(microVU& mVU, int op
 	return {kind, mVUselectUpperSoftOperandSource(mVU, opCase), destination};
 }
 
-enum class VuSoftDelayedSFlagSource
-{
-	ResultStatus,
-	FinalAccNativeUpdate,
-};
-
-static VuSoftDelayedSFlagSource mVUselectUpperSoftDelayedSFlagSource(microVU& mVU, VuUpperFmacSoftDescriptor op)
-{
-	// COP2 macro operations are synchronous and write their visible status in
-	// this instruction. The final-ACC repair is only for the delayed microVU
-	// flag ring; applying it to COP2 discards merged sticky causes on masked ACC
-	// writes before endMacroOp normalizes the result.
-	if (!mVU.cop2 && _X_Y_Z_W != 0xf && op.WritesAcc())
-		return VuSoftDelayedSFlagSource::FinalAccNativeUpdate;
-	return VuSoftDelayedSFlagSource::ResultStatus;
-}
-
-
 static bool mVUupperSoftNeedsTruncateMxcsr(microVU& mVU)
 {
 	const FPControlRegister& fpcr = mVU.index == 0 ? EmuConfig.Cpu.VU0FPCR : EmuConfig.Cpu.VU1FPCR;
@@ -101,9 +83,6 @@ static void mVUemitUpperStatusFromMacFlags(const MacFlags& mac_flags, const xInd
 		return;
 	}
 
-	// Adding seven to each nibble's low three bits sets its high bit exactly
-	// when the nibble is nonzero. The set bits are four apart, so multiplying
-	// by bits 0, 3, 6, and 9 packs them into adjacent positions without overlap.
 	xMOV(ecx, eax);
 	xAND(eax, 0x7777);
 	xADD(eax, 0x7777);
@@ -112,27 +91,11 @@ static void mVUemitUpperStatusFromMacFlags(const MacFlags& mac_flags, const xInd
 	xMUL(ecx, eax, 0x249);
 	xSHR(ecx, 12);
 	xAND(ecx, 0xf);
-	// Callers composing multiply-stage sticky flags also consume ECX directly.
+
 	xMOV(status_flags, ecx);
 }
 
-static void mVUdenormalizeSoftSFLAGFromReg(const x32& reg, const x32& tmp1, const x32& tmp2)
-{
-	xMOV(tmp2, reg);
-	xSHR(reg, 3);
-	xAND(reg, 0x18);
-
-	xMOV(tmp1, tmp2);
-	xSHL(tmp1, 11);
-	xAND(tmp1, 0x1800);
-	xOR(reg, tmp1);
-
-	xSHL(tmp2, 14);
-	xAND(tmp2, 0x3cf0000);
-	xOR(reg, tmp2);
-}
-
-static void mVUemitSoftMFlagWriteback(microVU& mVU, int result_offset, bool preserve_opm_inactive_w)
+static void mVUemitSoftMFlagWriteback(microVU& mVU, int result_offset)
 {
 	const auto resultPtr = [result_offset](int offset) {
 		return ptr32[rsp + result_offset + offset];
@@ -141,18 +104,11 @@ static void mVUemitSoftMFlagWriteback(microVU& mVU, int result_offset, bool pres
 	if (mFLAG.doFlag)
 	{
 		xMOV(gprT1, resultPtr(offsetof(VuSoftFmacJitResult, mac_flags)));
-		if (preserve_opm_inactive_w)
-		{
-			xMOV(gprT2, ptr32[mVU.cop2 ? &s_vu_cop2_opm_old_mac : &mVU.regs().macflag]);
-			xAND(gprT2, 0x1111);
-			xOR(gprT1, gprT2);
-			xMOV(resultPtr(offsetof(VuSoftFmacJitResult, mac_flags)), gprT1);
-		}
 		mVUallocMFLAGb(mVU, gprT1, mFLAG.write);
 	}
 }
 
-static void mVUemitSoftMaskCop2InactiveAccFlags(microVU& mVU, int result_offset)
+static void mVUemitSoftMaskInactiveAccFlags(microVU& mVU, int result_offset)
 {
 	const auto resultPtr = [result_offset](int offset) {
 		return ptr32[rsp + result_offset + offset];
@@ -168,180 +124,44 @@ static void mVUemitSoftMaskCop2InactiveAccFlags(microVU& mVU, int result_offset)
 	xMOV(resultPtr(offsetof(VuSoftFmacJitResult, sticky_status_flags)), gprT2);
 }
 
-static void mVUemitSoftVisibleStatusWriteback(microVU& mVU, int result_offset,
-	VuUpperFmacSoftDescriptor op, bool cop2_opm_status, bool preserve_opm_inactive_w)
+// FMAC semantics are shared; micro mode publishes a delayed flag instance.
+static void mVUemitSoftSFlagWriteback(microVU& mVU, const x32& current, const x32& sticky)
 {
-	const auto resultPtr = [result_offset](int offset) {
-		return ptr32[rsp + result_offset + offset];
-	};
-
-	if (cop2_opm_status)
-	{
-		xMOV(edx, resultPtr(offsetof(VuSoftFmacJitResult, mac_flags)));
-		xMOV(gprT2, ptr32[&s_vu_cop2_opm_old_mac]);
-		xAND(gprT2, 0x1111);
-		xOR(edx, gprT2);
-		mVUemitUpperStatusFromMacFlags(
-			edx, resultPtr(offsetof(VuSoftFmacJitResult, status_flags)));
-		xMOV(gprT1, ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL]);
-		xAND(gprT1, 0xff0);
-		xOR(gprT1, gprT2);
-		xMOV(edx, gprT2);
-		xSHL(edx, 6);
-		xOR(gprT1, edx);
-
-		xMOV(edx, ptr32[&mVU.regs().statusflag]);
-		xAND(edx, 0xfc0);
-		xOR(edx, gprT2);
-		xMOV(ptr32[&mVU.regs().statusflag], edx);
-		xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
-		return;
-	}
-
-	if (op.IsMultiplyAdd())
-	{
-		// Micro mode keeps the four-cycle status pipeline in the flag ring. Use
-		// the preceding ring value when carrying sticky causes forward; the
-		// architectural VI register can still be one FMAC behind here. COP2 is
-		// synchronous and continues to use the architectural status directly.
-		if (mVU.cop2)
-			xMOV(gprT1, ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL]);
-		else
-			mVUallocSFLAGc(gprT1, gprT2, sFLAG.lastWrite);
-		xAND(gprT1, 0x3c0);
-		xMOV(gprT2, resultPtr(offsetof(VuSoftFmacJitResult, status_flags)));
-		xMOV(edx, resultPtr(offsetof(VuSoftFmacJitResult, sticky_status_flags)));
-		xSHL(edx, 6);
-		xOR(gprT1, edx);
-		xOR(gprT1, gprT2);
-		// The micro path exposes a MADD product underflow as early sticky overflow. MSUB
-		// follows the normal exact-product sticky path instead.
-		if (!mVU.cop2 && op.IsKind(VuUpperFmacSoftKind::Madd) && op.HasNativeProductUnderflowFd())
-		{
-			xTEST(resultPtr(offsetof(VuSoftFmacJitResult, mul_stage_status_flags)), 0x4);
-			xForwardJZ8 no_native_product_underflow;
-			xOR(gprT1, 0x200);
-			no_native_product_underflow.SetTarget();
-		}
-		if (mVU.cop2)
-		{
-			// COP2 executes synchronously, so keep the interpreter-facing
-			// denormalized status shadow in step with the visible VI status.
-			// EDX still contains the sticky nibble shifted into bits 6-9.
-			xMOV(gprT2, gprT1);
-			xOR(gprT2, edx);
-			xSHR(gprT2, 6);
-			xAND(gprT2, 0xf);
-			xSHL(gprT2, 16);
-			xOR(gprT2, gprT1);
-			xOR(gprT2, 1u << 20);
-			xMOV(ptr32[&mVU.regs().statusflag], gprT2);
-		}
-		else
-		{
-			xMOV(ptr32[&mVU.regs().statusflag], gprT1);
-		}
-		if (!mVU.cop2 && op.HasNativeProductUnderflowFd())
-			xOR(ptr32[&mVU.regs().statusflag], 1u << 21);
-		xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
-		return;
-	}
-	// OPMULA preserves inactive W and participates in microVU's delayed status
-	// pipeline. Its preceding sticky value must come from that ring, not the
-	// potentially older architectural VI status shadow.
-	const bool stalled_fd_add_sub_mul = !mVU.cop2 && mVUstall && op.IsAddSubMul() && !op.WritesAcc();
-	if (op.UsesRingStatusSource(mVU.index) || stalled_fd_add_sub_mul || (!mVU.cop2 && preserve_opm_inactive_w))
-		mVUallocSFLAGc(gprT1, gprT2, sFLAG.lastWrite);
-	else
-		xMOV(gprT1, ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL]);
-	// FMAC status does not carry the division unit's sticky I/D causes through
-	// an OPMULA update. The hardware status-only sequences clear those bits.
-	const u32 prior_status_mask = (!mVU.cop2 && preserve_opm_inactive_w) ? 0xfc0 :
-	                                                                       (mVU.cop2 ? 0xff0 : 0xfc0);
-	xAND(gprT1, prior_status_mask);
-	if (!mVU.cop2 && op.IsImmediateFdAddSubMul())
-	{
-		xMOV(edx, ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL]);
-		xAND(edx, 0xfc0);
-		xOR(gprT1, edx);
-	}
-	const bool broadcast_fd = !mVU.cop2 && op.IsBroadcastFdAddSubMul();
-	if (broadcast_fd)
-	{
-		// Broadcast Fd operations promote an existing sticky underflow to overflow.
-		xMOV(edx, gprT1);
-		xAND(edx, 0x100u);
-		xSHL(edx, 1);
-		xAND(gprT1, ~0x100u);
-		xOR(gprT1, edx);
-	}
-	xMOV(gprT2, resultPtr(offsetof(VuSoftFmacJitResult, status_flags)));
-	xOR(gprT1, gprT2);
-	if (broadcast_fd)
-	{
-		// Broadcast Fd operations also publish their new current cause into the sticky half.
-		xMOV(edx, gprT2);
-		xSHL(edx, 6);
-		xOR(gprT1, edx);
-	}
-	if (mVU.cop2)
-	{
-		xMOV(edx, gprT2);
-		xSHL(edx, 6);
-		xOR(gprT1, edx);
-		xMOV(edx, ptr32[&mVU.regs().statusflag]);
-		xAND(edx, 0xfc0);
-		xOR(edx, gprT2);
-		xMOV(ptr32[&mVU.regs().statusflag], edx);
-	}
-	else
-	{
-		xMOV(ptr32[&mVU.regs().statusflag], gprT1);
-	}
-	xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
+	const x32& status = mVU.cop2 ? gprF0 : getFlagReg(sFLAG.write);
+	if (!mVU.cop2)
+		xMOV(status, getFlagReg(sFLAG.lastWrite));
+	xAND(status, ~0x3ff00u);
+	xMOV(eax, current);
+	xSHL(eax, 11);
+	xAND(eax, 0x1800);
+	xOR(status, eax);
+	xSHL(current, 14);
+	xAND(current, 0x30000);
+	xOR(status, current);
+	xMOV(eax, sticky);
+	xSHL(eax, 3);
+	xAND(eax, 0x18);
+	xOR(status, eax);
+	xSHL(sticky, 20);
+	xAND(sticky, 0xc00000);
+	xOR(status, sticky);
 }
 
-static void mVUemitSoftDelayedSFlagWritebackFromResult(microVU& mVU, int result_offset, VuUpperFmacSoftDescriptor op)
+static void mVUemitSoftFlagWriteback(microVU& mVU, int result_offset, VuUpperFmacSoftDescriptor op)
 {
-	const auto resultPtr = [result_offset](int offset) {
-		return ptr32[rsp + result_offset + offset];
-	};
-	if (op.PromotesNonSticky() && sFLAG.doNonSticky)
-	{
-		// Promote the current Z/S/U/O causes into their visible sticky positions before
-		// converting the status value back to mVU's delayed flag-ring representation.
-		xMOV(gprT2, resultPtr(offsetof(VuSoftFmacJitResult, status_flags)));
-		xSHL(gprT2, 6);
-		xOR(gprT1, gprT2);
-	}
-	mVUdenormalizeSoftSFLAGFromReg(gprT1, gprT2, edx);
-	mVUallocSFLAGb(gprT1, sFLAG.write);
-	// Forward the same MADD-only underflow quirk to reads which occur before
-	// this four-cycle FMAC write matures. Do not stamp unrelated future slots.
-	if (op.IsKind(VuUpperFmacSoftKind::Madd) && op.HasNativeProductUnderflowFd())
-	{
-		xTEST(resultPtr(offsetof(VuSoftFmacJitResult, mul_stage_status_flags)), 0x4);
-		xForwardJZ8 no_early_product_underflow;
-		xOR(getFlagReg((sFLAG.write + 1) & 3), 0x0800000);
-		xOR(getFlagReg((sFLAG.write + 2) & 3), 0x0800000);
-		xOR(getFlagReg((sFLAG.write + 3) & 3), 0x0800000);
-		no_early_product_underflow.SetTarget();
-	}
-}
-
-static void mVUemitSoftFlagWriteback(microVU& mVU, int result_offset, VuUpperFmacSoftDescriptor op,
-	VuSoftDelayedSFlagSource delayed_sflag_source, bool cop2_opm_status = false,
-	bool preserve_opm_inactive_w = false)
-{
-	if (mVU.cop2 && op.WritesAcc() && !preserve_opm_inactive_w)
-		mVUemitSoftMaskCop2InactiveAccFlags(mVU, result_offset);
-	mVUemitSoftMFlagWriteback(mVU, result_offset, preserve_opm_inactive_w);
+	if (op.WritesAcc() && (mFLAG.doFlag || mVUupperSoftNeedsStatusValue(mVU)))
+		mVUemitSoftMaskInactiveAccFlags(mVU, result_offset);
+	mVUemitSoftMFlagWriteback(mVU, result_offset);
 	if (mVUupperSoftNeedsStatusValue(mVU))
 	{
-		mVUemitSoftVisibleStatusWriteback(mVU, result_offset, op, cop2_opm_status,
-			preserve_opm_inactive_w);
-		if (delayed_sflag_source == VuSoftDelayedSFlagSource::ResultStatus)
-			mVUemitSoftDelayedSFlagWritebackFromResult(mVU, result_offset, op);
+		const auto resultPtr = [result_offset](int offset) {
+			return ptr32[rsp + result_offset + offset];
+		};
+		xMOV(edx, resultPtr(offsetof(VuSoftFmacJitResult, status_flags)));
+		xMOV(ecx, op.IsMultiplyAdd() ?
+					  resultPtr(offsetof(VuSoftFmacJitResult, sticky_status_flags)) :
+					  resultPtr(offsetof(VuSoftFmacJitResult, status_flags)));
+		mVUemitSoftSFlagWriteback(mVU, edx, ecx);
 	}
 }
 
@@ -359,7 +179,6 @@ static void mVUemitUpperInlineSoftAccOverflowWriteback(microVU& mVU, int result_
 	xMOV(ptr32[&mVU.regs().accflag], gprT1);
 }
 
-static void mVUemitUpperExactMaskedAccSFlagRepair(microVU& mVU);
 
 static void mVUemitUpperInlineExtractOperand(const x32& dst, const xmm& operand, VuUpperFmacSoftDescriptor op, int lane)
 {
@@ -601,8 +420,7 @@ static void mVUemitUpperInlineAddSubExactLane(microVU& mVU, int result_offset, i
 	}
 }
 
-static void mVUemitUpperInlineAddSubExactResult(microVU& mVU, VuUpperFmacSoftDescriptor op,
-	VuSoftDelayedSFlagSource delayed_sflag_source)
+static void mVUemitUpperInlineAddSubExactResult(microVU& mVU, VuUpperFmacSoftDescriptor op)
 {
 	{
 		// The inline path only clobbers allocator-visible EDX. Keep the other
@@ -821,7 +639,7 @@ static void mVUemitUpperInlineAddSubExactResult(microVU& mVU, VuUpperFmacSoftDes
 			scalar_result_flags_ready_from_zero.SetTarget();
 			if (op.WritesAcc())
 				mVUemitUpperInlineSoftAccOverflowWriteback(mVU, scalar_result_offset);
-			mVUemitSoftFlagWriteback(mVU, scalar_result_offset, op, delayed_sflag_source);
+			mVUemitSoftFlagWriteback(mVU, scalar_result_offset, op);
 			mVUemitUpperSoftStackFree(scalar_stack_size);
 		}
 		stackless_add_finished.emplace();
@@ -997,7 +815,7 @@ static void mVUemitUpperInlineAddSubExactResult(microVU& mVU, VuUpperFmacSoftDes
 	{
 		mVUemitUpperInlineSoftAccOverflowWriteback(mVU, result_offset);
 	}
-	mVUemitSoftFlagWriteback(mVU, result_offset, op, delayed_sflag_source);
+	mVUemitSoftFlagWriteback(mVU, result_offset, op);
 	mVUemitUpperSoftStackFree(stack_size);
 	if (stackless_add_finished.has_value())
 		stackless_add_finished->SetTarget();
@@ -1013,11 +831,6 @@ static void mVUemitUpperInlineAddSubExactResult(microVU& mVU, VuUpperFmacSoftDes
 	}
 	mVU.regAlloc->clearNeeded(operand);
 	mVU.regAlloc->clearNeeded(source);
-	if (op.WritesAcc())
-	{
-		if (delayed_sflag_source == VuSoftDelayedSFlagSource::FinalAccNativeUpdate)
-			mVUemitUpperExactMaskedAccSFlagRepair(mVU);
-	}
 }
 
 static void mVUGenerateSoftMulExactKernel(microVU& mVU)
@@ -2638,8 +2451,8 @@ static void mVUGenerateSoftMaddExactVectorKernels(microVU& mVU)
 }
 
 static void mVUemitUpperInlineMulExactResult(microVU& mVU, VuUpperFmacSoftDescriptor op,
-	VuSoftDelayedSFlagSource delayed_sflag_source, const xmm& source, const xmm& operand, const xmm& destination,
-	bool allow_fast_normal = true, bool preserve_opm_inactive_w = false)
+	const xmm& source, const xmm& operand, const xmm& destination,
+	bool allow_fast_normal = true)
 {
 	constexpr sptr result_offset = 0;
 	const int variant = op.OperandVariant();
@@ -2650,8 +2463,8 @@ static void mVUemitUpperInlineMulExactResult(microVU& mVU, VuUpperFmacSoftDescri
 	const bool flush_to_zero = vu_fpcr.GetFlushToZero();
 	const bool native_ps2_zero = flush_to_zero && vu_fpcr.GetDenormalsAreZero();
 	const bool switch_native_mxcsr = switch_mxcsr && native_ps2_zero;
-	const bool needs_mac_flags = mFLAG.doFlag;
 	const bool needs_status_flags = mVUupperSoftNeedsStatusValue(mVU);
+	const bool needs_mac_flags = mFLAG.doFlag || (op.WritesAcc() && needs_status_flags);
 	const bool native_path_available = allow_fast_normal && use_packed_native &&
 	                                   (!switch_mxcsr || switch_native_mxcsr);
 	const bool emit_stackless_prefix =
@@ -3067,8 +2880,7 @@ static void mVUemitUpperInlineMulExactResult(microVU& mVU, VuUpperFmacSoftDescri
 			}
 			xMOV(resultPtr(offsetof(VuSoftFmacJitResult, status_flags)), edx);
 		}
-		mVUemitSoftFlagWriteback(mVU, result_offset, op, delayed_sflag_source,
-			false, preserve_opm_inactive_w);
+		mVUemitSoftFlagWriteback(mVU, result_offset, op);
 		mVUemitUpperSoftStackFree(fast_stack_size);
 		fast_normal_finished.emplace();
 
@@ -3102,8 +2914,7 @@ static void mVUemitUpperInlineMulExactResult(microVU& mVU, VuUpperFmacSoftDescri
 		mVUemitUpperInlineCommitResult(mVU, destination, native_product);
 		if (op.WritesAcc())
 			mVUemitUpperInlineSoftAccOverflowWriteback(mVU, result_offset);
-		mVUemitSoftFlagWriteback(mVU, result_offset, op, delayed_sflag_source,
-			false, preserve_opm_inactive_w);
+		mVUemitSoftFlagWriteback(mVU, result_offset, op);
 		mVUemitUpperSoftStackFree(outlined_stack_size);
 		if (fast_normal_finished.has_value())
 			fast_normal_finished->SetTarget();
@@ -3117,20 +2928,15 @@ static void mVUemitUpperInlineMulExactResult(microVU& mVU, VuUpperFmacSoftDescri
 		mVU.regAlloc->clearNeeded(native_product);
 		mVU.regAlloc->clearNeeded(operand);
 		mVU.regAlloc->clearNeeded(source);
-		if (op.WritesAcc() &&
-			delayed_sflag_source == VuSoftDelayedSFlagSource::FinalAccNativeUpdate)
-		{
-			mVUemitUpperExactMaskedAccSFlagRepair(mVU);
-		}
 		return;
 	}
 }
 
 static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescriptor op,
-	VuSoftDelayedSFlagSource delayed_sflag_source, const xmm& source, const xmm& operand,
+	const xmm& source, const xmm& operand,
 	const xmm& accumulator, const xmm& destination, bool allow_fast_normal = true,
 	bool accumulator_nonextended = false, bool source_nonextended = false,
-	bool operand_nonextended = false, bool operand_known_normal = false, bool opm = false)
+	bool operand_nonextended = false, bool operand_known_normal = false)
 {
 	constexpr sptr result_offset = 0;
 	constexpr int scratch_base = (sizeof(VuSoftFmacJitResult) + 15) & ~15;
@@ -3146,8 +2952,8 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 	const int variant = op.OperandVariant();
 	const bool use_packed_native = _X_Y_Z_W != 0;
 	const bool use_vector_native_prepare = g_cpu.vectorISA >= ProcessorFeatures::VectorISA::AVX2;
-	const bool needs_mac_flags = mFLAG.doFlag;
 	const bool needs_status_flags = mVUupperSoftNeedsStatusValue(mVU);
+	const bool needs_mac_flags = mFLAG.doFlag || (op.WritesAcc() && needs_status_flags);
 	const bool needs_result_flags = needs_mac_flags || needs_status_flags;
 	const bool use_identity_stackless_madd = variant == 6 && _Ft_ == 0;
 	const bool switch_mxcsr = mVUupperSoftNeedsTruncateMxcsr(mVU);
@@ -3458,7 +3264,8 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 			xMOV64(r11, reinterpret_cast<uptr>(s_vu_soft_lane_mask));
 			xMOVZX(ecx, ptr8[xAddressVoid(r11, rcx, 1)]);
 			xSHL(ecx, 4);
-			mVUallocMFLAGb(mVU, ecx, mFLAG.write);
+			if (mFLAG.doFlag)
+				mVUallocMFLAGb(mVU, ecx, mFLAG.write);
 		}
 		if (needs_status_flags)
 		{
@@ -3467,17 +3274,8 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 			xTEST(ecx, ecx);
 			xSETNZ(dl);
 			xSHL(edx, 1);
-			xMOV(gprT1, ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL]);
-			xAND(gprT1, 0x3c0);
-			xMOV(ecx, r9d);
-			xOR(ecx, edx);
-			xSHL(ecx, 6);
-			xOR(gprT1, ecx);
-			xOR(gprT1, edx);
-			xMOV(ptr32[&mVU.regs().statusflag], gprT1);
-			xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
-			mVUdenormalizeSoftSFLAGFromReg(gprT1, gprT2, edx);
-			mVUallocSFLAGb(gprT1, sFLAG.write);
+			xOR(r9d, edx);
+			mVUemitSoftSFlagWriteback(mVU, edx, r9d);
 		}
 		if (op.WritesAcc())
 			xMOV(ptr32[&mVU.regs().accflag], 0);
@@ -3803,8 +3601,7 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 		}
 		if (op.WritesAcc())
 			xAND(ptr32[&mVU.regs().accflag], ~static_cast<u32>(_X_Y_Z_W));
-		mVUemitSoftFlagWriteback(mVU, result_offset, op, delayed_sflag_source,
-			mVU.cop2 && opm, opm);
+		mVUemitSoftFlagWriteback(mVU, result_offset, op);
 		if (switch_native_mxcsr)
 			xLDMXCSR(ptr32[mVU.index == 0 ? &EmuConfig.Cpu.VU0FPCR.bitmask : &EmuConfig.Cpu.VU1FPCR.bitmask]);
 		mVUemitUpperSoftStackFree(register_stack_size);
@@ -3848,8 +3645,7 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 		mVUemitUpperInlineCommitResult(mVU, destination, native_product);
 		if (op.WritesAcc())
 			mVUemitUpperInlineSoftAccOverflowWriteback(mVU, result_offset);
-		mVUemitSoftFlagWriteback(mVU, result_offset, op, delayed_sflag_source,
-			mVU.cop2 && opm, opm);
+		mVUemitSoftFlagWriteback(mVU, result_offset, op);
 		mVUemitUpperSoftStackFree(exact_vector_stack_size);
 		if (register_common_finished.has_value())
 			register_common_finished->SetTarget();
@@ -3872,11 +3668,6 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 		}
 		mVU.regAlloc->clearNeeded(operand);
 		mVU.regAlloc->clearNeeded(source);
-		if (op.WritesAcc() &&
-			delayed_sflag_source == VuSoftDelayedSFlagSource::FinalAccNativeUpdate)
-		{
-			mVUemitUpperExactMaskedAccSFlagRepair(mVU);
-		}
 		return;
 	}
 
@@ -4056,8 +3847,7 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 	{
 		mVUemitUpperInlineSoftAccOverflowWriteback(mVU, result_offset);
 	}
-	mVUemitSoftFlagWriteback(mVU, result_offset, op, delayed_sflag_source,
-		mVU.cop2 && opm, opm);
+	mVUemitSoftFlagWriteback(mVU, result_offset, op);
 	mVUemitUpperSoftStackFree(stack_size);
 	if (register_common_finished.has_value())
 		register_common_finished->SetTarget();
@@ -4076,19 +3866,13 @@ static void mVUemitUpperInlineMaddExactResult(microVU& mVU, VuUpperFmacSoftDescr
 	}
 	mVU.regAlloc->clearNeeded(operand);
 	mVU.regAlloc->clearNeeded(source);
-	if (op.WritesAcc())
-	{
-		if (delayed_sflag_source == VuSoftDelayedSFlagSource::FinalAccNativeUpdate)
-			mVUemitUpperExactMaskedAccSFlagRepair(mVU);
-	}
 }
 
 static void mVUemitUpperSoftExact(microVU& mVU, VuUpperFmacSoftDescriptor op)
 {
 	if (op.IsAddSub())
 	{
-		const VuSoftDelayedSFlagSource delayed_sflag_source = mVUselectUpperSoftDelayedSFlagSource(mVU, op);
-		mVUemitUpperInlineAddSubExactResult(mVU, op, delayed_sflag_source);
+		mVUemitUpperInlineAddSubExactResult(mVU, op);
 		mVU.regAlloc->markSoftNonExtended(op.WritesAcc() ? mVUsoftAccRegisterIndex : _Fd_, _X_Y_Z_W);
 		return;
 	}
@@ -4113,13 +3897,12 @@ static void mVUemitUpperSoftExact(microVU& mVU, VuUpperFmacSoftDescriptor op)
 	{
 		xMOVSS(ptr32[&mVU.regs().VI[REG_Q].UL], operand);
 	}
-	const VuSoftDelayedSFlagSource delayed_sflag_source = mVUselectUpperSoftDelayedSFlagSource(mVU, op);
 	if (op.IsKind(VuUpperFmacSoftKind::Mul))
 	{
 		const int destination_reg = op.WritesAcc() ? mVUsoftAccRegisterIndex : _Fd_;
 		const int destination_load = _X_Y_Z_W == 0xf ? -1 : destination_reg;
 		const xmm& destination = mVU.regAlloc->allocReg(destination_load, destination_reg, _X_Y_Z_W);
-		mVUemitUpperInlineMulExactResult(mVU, op, delayed_sflag_source, source, operand, destination);
+		mVUemitUpperInlineMulExactResult(mVU, op, source, operand, destination);
 		mVU.regAlloc->markSoftNonExtended(destination_reg, _X_Y_Z_W);
 		return;
 	}
@@ -4144,7 +3927,7 @@ static void mVUemitUpperSoftExact(microVU& mVU, VuUpperFmacSoftDescriptor op)
 		const int destination_load = op.WritesAcc() ? 32 : (_X_Y_Z_W == 0xf ? -1 : _Fd_);
 		const xmm& destination = mVU.regAlloc->allocReg(destination_load, destination_reg, _X_Y_Z_W,
 			!op.WritesAcc());
-		mVUemitUpperInlineMaddExactResult(mVU, op, delayed_sflag_source, source, operand,
+		mVUemitUpperInlineMaddExactResult(mVU, op, source, operand,
 			accumulator, destination, true, accumulator_nonextended,
 			source_nonextended, operand_nonextended, false);
 		mVU.regAlloc->markSoftNonExtended(destination_reg, _X_Y_Z_W);
@@ -4155,25 +3938,6 @@ static void mVUemitUpperSoftExact(microVU& mVU, VuUpperFmacSoftDescriptor op)
 }
 
 
-// Masked ACC writes derive delayed sFLAG state from the final committed ACC vector.
-static void mVUemitUpperExactMaskedAccSFlagRepair(microVU& mVU)
-{
-	const xmm& acc = mVU.regAlloc->allocReg(32, 0, 0xf);
-
-	if (_XYZW_SS2)
-	{
-		const xmm& acc_for_flags = mVU.regAlloc->allocReg();
-		xPSHUF.D(acc_for_flags, acc, shuffleSS(_X_Y_Z_W));
-		mVUupdateFlags(mVU, acc_for_flags);
-		mVU.regAlloc->clearNeeded(acc_for_flags);
-	}
-	else
-	{
-		mVUupdateFlags(mVU, acc);
-	}
-
-	mVU.regAlloc->clearNeeded(acc);
-}
 
 static bool mVUdecodeBroadcastDotProductOp(u32 code, VuUpperFmacSoftDescriptor* op)
 {
