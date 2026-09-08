@@ -392,6 +392,7 @@ set(pcsx2USBSources
 	USB/qemu-usb/usb-ohci.cpp
 	USB/shared/ringbuffer.cpp
 	USB/usb-perfect-pool-camera/perfect-pool-camera.cpp
+    USB/usb-python2/ddr-hardware.cpp
     USB/usb-python2/usb-python2.cpp
     USB/usb-python2/devices/acio.cpp
     USB/usb-python2/devices/ddr_extio.cpp
@@ -434,6 +435,7 @@ set(pcsx2USBHeaders
 	USB/qemu-usb/qusb.h
 	USB/shared/ringbuffer.h
 	USB/usb-perfect-pool-camera/perfect-pool-camera.h
+    USB/usb-python2/ddr-hardware.h
     USB/usb-python2/usb-python2.h
     USB/usb-python2/devices/acio.h
     USB/usb-python2/devices/ddr_extio.h
@@ -1282,6 +1284,9 @@ else()
 endif()
 
 # additonal include directories
+if(WIN32)
+	target_include_directories(PCSX2 PRIVATE "${CMAKE_SOURCE_DIR}/3rdparty")
+endif()
 if(ARCH_X86)
 	target_include_directories(PCSX2_FLAGS INTERFACE "${CMAKE_SOURCE_DIR}/3rdparty/xbyak")
 	target_compile_definitions(PCSX2_FLAGS INTERFACE XBYAK_NO_EXCEPTION)

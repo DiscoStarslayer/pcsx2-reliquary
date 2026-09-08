@@ -34,7 +34,7 @@
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DepsIncludeDir)\plutovg;$(DepsIncludeDir)\plutosvg</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DepsIncludeDir)\SDL3</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(DepsIncludeDir)\freetype2</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\include;$(SolutionDir)3rdparty</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\fatfs\source</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\fmt\include</AdditionalIncludeDirectories>
       <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(SolutionDir)3rdparty\des</AdditionalIncludeDirectories>
@@ -485,6 +485,7 @@
     <ClCompile Include="USB\usb-python2\devices\thrilldrive_belt.cpp" />
     <ClCompile Include="USB\usb-python2\devices\thrilldrive_handle.cpp" />
     <ClCompile Include="USB\usb-python2\devices\toysmarch_drumpad.cpp" />
+    <ClCompile Include="USB\usb-python2\ddr-hardware.cpp" />
     <ClCompile Include="USB\usb-python2\usb-python2.cpp" />
     <ClCompile Include="USB\USB.cpp" />
     <ClCompile Include="VMManager.cpp" />
@@ -966,6 +967,7 @@
     <ClInclude Include="USB\usb-python2\devices\thrilldrive_belt.h" />
     <ClInclude Include="USB\usb-python2\devices\thrilldrive_handle.h" />
     <ClInclude Include="USB\usb-python2\devices\toysmarch_drumpad.h" />
+    <ClInclude Include="USB\usb-python2\ddr-hardware.h" />
     <ClInclude Include="USB\usb-python2\usb-python2.h" />
     <ClInclude Include="USB\USB.h" />
     <ClInclude Include="Utilities\AsciiFile.h" />

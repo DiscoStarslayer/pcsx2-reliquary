@@ -416,6 +416,9 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="USB\usb-python2\ddr-hardware.cpp">
+      <Filter>System\Ps2\USB</Filter>
+    </ClCompile>
     <ClCompile Include="Patch.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
@@ -1493,6 +1496,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="USB\usb-python2\ddr-hardware.h">
+      <Filter>System\Ps2\USB</Filter>
+    </ClInclude>
     <ClInclude Include="Patch.h">
       <Filter>Misc</Filter>
     </ClInclude>

@@ -6,6 +6,7 @@
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/SettingsInterface.h"
+#include "ddr-hardware.h"
 #include "devices/acio.h"
 #include "devices/ddr_extio.h"
 #include "devices/icca.h"
@@ -258,6 +259,9 @@ namespace usb_python2
 		USBDesc desc{};
 		USBDescDevice desc_dev{};
 
+		DDRHardware ddrHardware;
+		bool enableDDRIO = false;
+		bool enableMinimaid = false;
 		std::unique_ptr<input_device> devices[2];
 
 		u32 port = 0;
@@ -268,9 +272,6 @@ namespace usb_python2
 		int32_t wheelRight = 0;
 
 		std::vector<uint8_t> buf;
-
-		bool isMinimaidConnected = false;
-		bool isUsingBtoolLights = false;
 
 		std::bitset<128> buttonState;
 		
@@ -391,20 +392,21 @@ namespace usb_python2
 	{
 		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
 
-		// It seems like the device is recreated from scratch every time the config dialog is closed so this isn't all that helpful after all
-		if (s->f.gameType != s->f.prevGameType && s->devices[0] != nullptr)
+		if (s->f.gameType != s->f.prevGameType)
+		{
 			s->devices[0].reset();
-
-		if (s->f.gameType != s->f.prevGameType && s->devices[1] != nullptr)
 			s->devices[1].reset();
-
+			s->ddrHardware.ResetLights();
+		}
 		s->f.prevGameType = s->f.gameType;
+		s->ddrHardware.Configure(s->f.gameType == GAMETYPE_DDR && s->enableDDRIO,
+			s->f.gameType == GAMETYPE_DDR && s->enableMinimaid);
 
 		if (s->f.gameType == GAMETYPE_DDR)
 		{
 			if (s->devices[0] == nullptr)
 			{
-				s->devices[0] = std::make_unique<extio_device>();
+				s->devices[0] = std::make_unique<extio_device>(s->ddrHardware);
 			}
 
 			if (s->devices[1] == nullptr)
@@ -526,8 +528,7 @@ namespace usb_python2
 
 		// Initialize all variables to try and keep a consistent state
 		s->buf.clear();
-		s->isMinimaidConnected = false;
-		s->isUsingBtoolLights = false;
+		s->ddrHardware.ResetLights();
 
 		s->f.gameType = s->f.prevGameType = -1;
 		s->f.jammaIoStatus = 0xf0ffff80;
@@ -763,13 +764,15 @@ namespace usb_python2
 				data.push_back(0);
 			}
 
-			else if (header->cmd == P2IO_CMD_LAMP_OUT && s->buf[4] == 0xff)
+			else if (header->cmd == P2IO_CMD_LAMP_OUT && totalPacketLen >= 9 && s->buf[4] == 0xff)
 			{
-				DevCon.WriteLn("p2io: P2IO_CMD_LAMP_OUT_ALL %08x", *(int*)&s->buf[5]);
+				DevCon.WriteLn("p2io: P2IO_CMD_LAMP_OUT_ALL %02x %02x %02x %02x", s->buf[5], s->buf[6], s->buf[7], s->buf[8]);
+				if (s->f.gameType == GAMETYPE_DDR)
+					s->ddrHardware.SetCabinetLights(s->buf[5]);
 
 				data.push_back(0);
 			}
-			else if (header->cmd == P2IO_CMD_LAMP_OUT)
+			else if (header->cmd == P2IO_CMD_LAMP_OUT && totalPacketLen >= 6 && s->buf[4] != 0xff)
 			{
 				// printf("LAMP_OUT: %02x %02x [%d %d] [%d %d] %08x %d\n", s->buf[4], s->buf[5], s->buf[5] & 8, s->buf[5] & 4, s->buf[5] & 2, s->buf[5] & 1, s->f.jammaIoStatus, s->f.gameType == GAMETYPE_DANCE864);
 
@@ -783,20 +786,10 @@ namespace usb_python2
 				}
 				else if (s->f.gameType == GAMETYPE_DDR)
 				{
-					// 73 is 0111 0011 // p1 halogen up
-					// b3 is 1011 0011 // p1 halogen down
-					// d3 is 1101 0011 // p2 halogen up
-					// e3 is 1110 0011 // p2 halogen down
-					// f1 is 1111 0001 // p1
-					// f2 is 1111 0010 // p2
-					// f3 is 1111 0011 // p1 + p2
-					// 53 is 0101 0011 // p1 halogen up + p2 halogen up
-					// b0 is 1011 0000 // p1 halogen down + p1 + p2 start
-					// f0 is 1111 0000 // p1 + p2 seen from p2io. Mask ???
-					// f3 is 1111 0011 // dunno what this is. Maybe bass lights???
-					// 03 is 0000 0011 // halogen lights seen from P2io. Mask???
-					// 00 is 0000 0000 // all lights
-					//            XX   // don't care
+					// DDR cabinet lamps are on output bank 0. Bulk writes above carry
+					// all four banks; their ordering still needs proper testing on a cabinet.
+					if (s->buf[4] == 0)
+						s->ddrHardware.SetCabinetLights(s->buf[5]);
 				}
 
 				data.push_back(0);
@@ -1029,10 +1022,6 @@ namespace usb_python2
 					CheckKeyState(BID_COIN1, P2IO_JAMMA_IO_COIN1);
 					CheckKeyState(BID_COIN2, P2IO_JAMMA_IO_COIN2);
 
-					// Python 2 games only accept coins via the P2IO directly, even though the game sees the JAMMA coin buttons returned here(?)
-					CoinInc(P2IO_JAMMA_IO_COIN1, 0);
-					CoinInc(P2IO_JAMMA_IO_COIN2, 1);
-
 					if (s->f.gameType == GAMETYPE_DDR)
 					{
 						CheckKeyState(BID_DDR_P1_START, P2IO_JAMMA_DDR_P1_START);
@@ -1150,6 +1139,13 @@ namespace usb_python2
 						CheckKeyState(BID_DM_SELECT_R, P2IO_JAMMA_DM_SELECT_R);
 					}
 
+					if (s->f.gameType == GAMETYPE_DDR)
+						s->f.jammaIoStatus &= ~s->ddrHardware.GetPressedButtons();
+
+					// Python 2 games only accept coins via the P2IO directly, even though the game sees the JAMMA coin buttons returned here(?)
+					CoinInc(P2IO_JAMMA_IO_COIN1, 0);
+					CoinInc(P2IO_JAMMA_IO_COIN2, 1);
+
 					// Hold the state for a certain amount of updates so the game can register quick changes.
 					// Setting this value too low will result in very fast key changes being dropped.
 					// Setting this value too high will result in latency with key presses.
@@ -1231,12 +1227,21 @@ namespace usb_python2
 		sw.DoBytes(unused_filenames, sizeof(unused_filenames));
 		sw.DoBytes(&s->f.jammaUpdateCounter, sizeof(s->f) - tail_offset);
 
+		if (sw.IsReading() && !sw.HasError())
+			s->ddrHardware.ResetLights();
+
 		return !sw.HasError();
 	}
 
 	void Python2Device::UpdateSettings(USBDevice* dev, SettingsInterface& si) const
 	{
+#ifdef _WIN32
+		Python2State* s = USB_CONTAINER_OF(dev, Python2State, dev);
+		s->enableDDRIO = USB::GetConfigBool(si, s->port, TypeName(), "DDRIO", false);
+		s->enableMinimaid = USB::GetConfigBool(si, s->port, TypeName(), "Minimaid", false);
+#endif
 		load_configuration(dev);
+		initialize_device(dev);
 	}
 
 
@@ -1502,6 +1507,10 @@ namespace usb_python2
 	std::span<const SettingInfo> Python2Device::Settings(u32 subtype) const
 	{
 		static constexpr SettingInfo info[] = {
+#ifdef _WIN32
+			{SettingInfo::Type::Boolean, "DDRIO", TRANSLATE_NOOP("USB", "Bemanitools DDRIO Input and Lights"), TRANSLATE_NOOP("USB", "Loads ddrio.dll from the PCSX2 executable directory for DDR cabinet input and lights. Only used by the DDR input profile."), "false"},
+			{SettingInfo::Type::Boolean, "Minimaid", TRANSLATE_NOOP("USB", "Minimaid DDR Lights"), TRANSLATE_NOOP("USB", "Loads mmmagic64.dll from the PCSX2 executable directory for DDR cabinet and pad lights. Configure Minimaid inputs using the normal controller bindings."), "false"},
+#endif
 			{SettingInfo::Type::Boolean, "custom_config", TRANSLATE_NOOP("USB", "Manual Screen Configuration"), TRANSLATE_NOOP("USB", "Forces the use of the screen parameters below, instead of automatic parameters if available."), "false"},
 		};
 		return info;
@@ -1530,6 +1539,10 @@ namespace usb_python2
 
 		usb_desc_init(&s->dev);
 		usb_ep_init(&s->dev);
+#ifdef _WIN32
+		s->enableDDRIO = USB::GetConfigBool(si, port, TypeName(), "DDRIO", false);
+		s->enableMinimaid = USB::GetConfigBool(si, port, TypeName(), "Minimaid", false);
+#endif
 		usb_python2_handle_reset(&s->dev);
 
 		return &s->dev;
