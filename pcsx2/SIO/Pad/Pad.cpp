@@ -239,6 +239,9 @@ void Pad::SetDefaultHotkeyConfig(SettingsInterface& si)
 	si.SetStringValue("Hotkeys", "ZoomOut", "Keyboard/Control & Keyboard/Minus");
 	// Missing hotkey for resetting zoom back to 100 with Keyboard/Control & Keyboard/Asterisk
 
+	// PCSX2 Controller Settings - Hotkeys - Graphics
+	si.SetStringValue("Hotkeys", "Mute", "Keyboard/Control & Keyboard/M");
+
 	// PCSX2 Controller Settings - Hotkeys - Input Recording
 	si.SetStringValue("Hotkeys", "InputRecToggleMode", "Keyboard/Shift & Keyboard/R");
 
@@ -549,6 +552,32 @@ void Pad::SetControllerState(u32 controller, u32 bind, float value)
 		return;
 
 	s_controllers[controller]->Set(bind, value);
+}
+
+void Pad::ResetControllerInputs(u32 controller)
+{
+	if (controller >= NUM_CONTROLLER_PORTS || !HasConnectedPad(controller))
+		return;
+
+	for (InputBindingInfo binding : s_controllers[controller]->GetInfo().bindings)
+	{
+		switch (binding.bind_type)
+		{
+			case InputBindingInfo::Type::Button:
+			case InputBindingInfo::Type::Axis:
+			case InputBindingInfo::Type::HalfAxis:
+				s_controllers[controller]->Set(binding.bind_index, 0);
+				break;
+			default:
+				break;
+		}
+	}
+}
+
+void Pad::ResetAllControllerInputs()
+{
+	for (u32 port = 0; port < NUM_CONTROLLER_PORTS; port++)
+		ResetControllerInputs(port);
 }
 
 bool Pad::Freeze(StateWrapper& sw)

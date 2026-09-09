@@ -249,6 +249,8 @@ bool GSDevice11::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 
 		ShaderMacro sm_ps;
 		sm_ps.AddMacro("PIXEL_SHADER", 1);
+		sm_ps.AddMacro("PRIMID_MAX", GSShader::PRIMID_MAX);
+		sm_ps.AddMacro("PRIMID_MIN", GSShader::PRIMID_MIN);
 		sm_ps.AddMacro("HAS_BILN", static_cast<int>(shader.Biln()));
 		sm_ps.AddMacro("HAS_STENCIL_OUTPUT", static_cast<int>(shader.StencilOutput()));
 		sm_ps.AddMacro("HAS_INTEGER_OUTPUT", static_cast<int>(shader.IntegerOutputBpp() != 0));
@@ -582,6 +584,8 @@ bool GSDevice11::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
 		const std::string entry_point_macro = WrapEntryPointMacro(entry_point);
 		ShaderMacro sm_ps;
 		sm_ps.AddMacro("PIXEL_SHADER", 1);
+		sm_ps.AddMacro("PRIMID_MAX", GSShader::PRIMID_MAX);
+		sm_ps.AddMacro("PRIMID_MIN", GSShader::PRIMID_MIN);
 		sm_ps.AddMacro(entry_point_macro.c_str(), 1);
 		m_date.primid_init_ps[i] = m_shader_cache.GetPixelShader(m_dev.get(), *convert_hlsl, sm_ps.GetPtr(), entry_point.c_str());
 		if (!m_date.primid_init_ps[i])
@@ -1094,12 +1098,34 @@ GSDevice::PresentResult GSDevice11::BeginPresent(bool frame_skip)
 	m_state.rtv = m_swap_chain_rtv.get();
 	m_state.rtv->AddRef();
 	m_state.current_rt = nullptr;
+
+	if (m_state.dsv_as_rtv)
+	{
+		m_state.dsv_as_rtv->Release();
+		m_state.dsv_as_rtv = nullptr;
+	}
+	m_state.current_ds_as_rt = nullptr;
+
 	if (m_state.dsv)
 	{
 		m_state.dsv->Release();
 		m_state.dsv = nullptr;
 	}
 	m_state.current_ds = nullptr;
+
+	if (m_state.rt_uav)
+	{
+		m_state.rt_uav->Release();
+		m_state.rt_uav = nullptr;
+	}
+	m_state.current_rt_uav = nullptr;
+
+	if (m_state.ds_uav)
+	{
+		m_state.ds_uav->Release();
+		m_state.ds_uav = nullptr;
+	}
+	m_state.current_ds_uav = nullptr;
 
 	g_perfmon.Put(GSPerfMon::RenderPasses, 1);
 
@@ -2359,7 +2385,7 @@ void GSDevice11::RenderImGui()
 {
 	ImGui::Render();
 	const ImDrawData* draw_data = ImGui::GetDrawData();
-	if (draw_data->CmdListsCount == 0)
+	if (draw_data->CmdLists.Size == 0)
 		return;
 
 	UpdateImGuiTextures();
@@ -2393,7 +2419,7 @@ void GSDevice11::RenderImGui()
 	PSSetSamplerState(m_convert.ln.get());
 
 	// Render command lists
-	for (int n = 0; n < draw_data->CmdListsCount; n++)
+	for (int n = 0; n < draw_data->CmdLists.Size; n++)
 	{
 		const ImDrawList* cmd_list = draw_data->CmdLists[n];
 
@@ -2926,7 +2952,7 @@ void GSDevice11::OMSetRenderTargets(GSTexture* rt, GSTexture* ds_as_rt, GSTextur
 			m_state.dsv_as_rtv->Release();
 		if (dsv_as_rtv)
 			dsv_as_rtv->AddRef();
-		m_state.rtv = dsv_as_rtv;
+		m_state.dsv_as_rtv = dsv_as_rtv;
 		m_state.current_ds_as_rt = ds_as_rt;
 	}
 	if (m_state.dsv != dsv)
@@ -2984,6 +3010,7 @@ void GSDevice11::OMSetRenderTargets(GSTexture* rt, GSTexture* ds_as_rt, GSTextur
 	{
 		const GSVector2i size =
 			rt ? rt->GetSize() :
+			ds_as_rt ? ds_as_rt->GetSize() :
 			ds ? ds->GetSize() :
 			(rt_uav_tex && rt_uav_tex != m_null_texture) ? rt_uav_tex->GetSize() :
 			ds_uav_tex->GetSize();

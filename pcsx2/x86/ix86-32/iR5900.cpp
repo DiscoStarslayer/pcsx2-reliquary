@@ -14,7 +14,6 @@
 #include "VMManager.h"
 #include "vtlb.h"
 #include "x86/BaseblockEx.h"
-#include "x86/iFPU.h"
 #include "x86/iR5900.h"
 #include "x86/iR5900Analysis.h"
 
@@ -2678,7 +2677,7 @@ StartRecomp:
 			if ((oldBlock->startpc + oldBlock->size * 4) <= HWADDR(startpc))
 				break;
 
-			if (memcmp(&recRAMCopy[oldBlock->startpc / 4], PSM(oldBlock->startpc),
+			if (memcmp(&recRAMCopy[oldBlock->startpc], PSM(oldBlock->startpc),
 					oldBlock->size * 4))
 			{
 				recClear(startpc, (pc - startpc) / 4);
@@ -2688,7 +2687,7 @@ StartRecomp:
 			}
 		}
 
-		memcpy(&recRAMCopy[HWADDR(startpc) / 4], PSM(startpc), pc - startpc);
+		memcpy(&recRAMCopy[HWADDR(startpc)], PSM(startpc), pc - startpc);
 	}
 
 	s_pCurBlock->SetFnptr((uptr)recPtr);

@@ -343,7 +343,6 @@ namespace usb_python2
 
 	void DDRHardware::Configure(bool ddrio, bool minimaid)
 	{
-		// (AI-assisted) Retry inactive backends here; cabinet handoff still needs proper testing.
 		ConfigureDDRIO(ddrio);
 		ConfigureMinimaid(minimaid);
 		m_impl->Publish();

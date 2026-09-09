@@ -35,12 +35,6 @@ if defined DEBUG (
   set DEBUG=1
 )
 
-if defined BUILD_FFMPEG (
-  echo BUILD_FFMPEG=%BUILD_FFMPEG%
-) else (
-  set BUILD_FFMPEG=0
-)
-
 pushd %~dp0
 set "SCRIPTDIR=%CD%"
 cd ..\..\..\..
@@ -61,11 +55,12 @@ set "PATH=%PATH%;%INSTALLDIR%\bin"
 
 cd "%BUILDDIR%"
 
-set QT=6.11.1
+set QT=6.11.2
 set QTMINOR=6.11
 set QTAPNG=1.3.0
 
 set FFMPEG=9.0.1
+set MAKE=4.4.1
 set MESON=1.10.2
 set PKGCONF=2.5.1
 set AMF=1.5.2
@@ -77,7 +72,7 @@ set LIBX264=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
 
 set FREETYPE=2.14.3
 set HARFBUZZ=14.2.0
-set SDL=SDL3-3.4.12
+set SDL=SDL3-3.4.16
 set LIBJPEGTURBO=3.2.0
 set LIBPNG=1658
 set LIBPNGLONG=1.6.58
@@ -100,14 +95,15 @@ set SHADERC_SPIRVTOOLS=6337eb62cadd7d124ac6789bf39c0f71148f0a73
 set AGILITYSDK=1.619.2
 set DXHEADERS=1.619.1
 
-call :downloadfile "qtbase-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtbase-everywhere-src-%QT%.zip" 3529cc37297a5a7aae4486843b9fd41c30df1d79a770f85e240b537dcc327ca5 || goto error
-call :downloadfile "qtimageformats-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtimageformats-everywhere-src-%QT%.zip" 37fba768f2780580dfae535ad6654cb9dc0bf2272e71b9b9781988de9ed0dac0 || goto error
-call :downloadfile "qtsvg-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtsvg-everywhere-src-%QT%.zip" 767730188d4610a89bf8da502f87acf1c8881a3ac54f1e0eb167ab1e08b03a75 || goto error
-call :downloadfile "qttools-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttools-everywhere-src-%QT%.zip" 2d6ed2a98f458152e3cb17bf0be0494250194933a2d937b5a434e5b2006efca9 || goto error
-call :downloadfile "qttranslations-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttranslations-everywhere-src-%QT%.zip" eef43700ffd079f5893e435aca1330c8bdbf2a94ae45013e3fc63870df53d3b0 || goto error
+call :downloadfile "qtbase-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtbase-everywhere-src-%QT%.zip" 8f8c16703a8170b235361aacdf0ec97d2445ae4e3e3d127eb1576f498269ef79 || goto error
+call :downloadfile "qtimageformats-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtimageformats-everywhere-src-%QT%.zip" a303149d7b9f087d788135e9733fdac8e4cec694e5afc04bf33e10a516b33282 || goto error
+call :downloadfile "qtsvg-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qtsvg-everywhere-src-%QT%.zip" e07133da0145d8ca87da5567a97c8fc2efd19a41c681d01bfec2ebac772f679c || goto error
+call :downloadfile "qttools-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttools-everywhere-src-%QT%.zip" bc80932ac2da0df129583eae62fa8a3d4b0d43ad9d1676fac9c1922e5958cd81 || goto error
+call :downloadfile "qttranslations-everywhere-src-%QT%.zip" "https://download.qt.io/official_releases/qt/%QTMINOR%/%QT%/submodules/qttranslations-everywhere-src-%QT%.zip" 850bc1b316149086512c17a77da51fec94933846fa84944508feb6dd9cbb35aa || goto error
 call :downloadfile "QtApng-%QTAPNG%.zip" "https://github.com/jurplel/QtApng/archive/refs/tags/%QTAPNG%.zip" 5176082cdd468047a7eb1ec1f106b032f57df207aa318d559b29606b00d159ac || goto error
 
 call :downloadfile "ffmpeg-%FFMPEG%.tar.xz" "https://ffmpeg.org/releases/ffmpeg-%FFMPEG%.tar.xz" cf38e0e28c7e5605942c4a77755349b0145804a397af37eb1fb4c77cb237f635 || goto error
+call :downloadfile "make-%MAKE%-without-guile-w32-bin.zip" "https://sourceforge.net/projects/ezwinports/files/make-%MAKE%-without-guile-w32-bin.zip/download" fb66a02b530f7466f6222ce53c0b602c5288e601547a034e4156a512dd895ee7 || goto error
 call :downloadfile "meson-%MESON%.tar.gz" "https://github.com/mesonbuild/meson/releases/download/%MESON%/meson-%MESON%.tar.gz" 7890287d911dd4ee1ebd0efb61ed0321bfcd87c725df923a837cf90c6508f96b || goto error
 call :downloadfile "pkgconf-pkgconf-%PKGCONF%.zip" "https://github.com/pkgconf/pkgconf/archive/refs/tags/pkgconf-%PKGCONF%.zip" c5b5f88a2ca2324dc5d857e35bb145e24290e326357ea94a86d47b8d7fa15477 || goto error
 call :downloadfile "amf-headers-v%AMF%.tar.gz" "https://github.com/GPUOpen-LibrariesAndSDKs/AMF/releases/download/v%AMF%/AMF-headers-v%AMF%.tar.gz" d3c12eb324edf05e214608b6a395a51dd95770ed9d45520185d6c3a206811c99 || goto error
@@ -124,7 +120,7 @@ call :downloadfile "lpng%LIBPNG%-apng.patch.gz" https://download.sourceforge.net
 call :downloadfile "libjpeg-turbo-%LIBJPEGTURBO%.tar.gz" "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/%LIBJPEGTURBO%/libjpeg-turbo-%LIBJPEGTURBO%.tar.gz" 6f30092cef9fb839779646608f4ee14ae3cbac989c47fa05e841b0841f09878e || goto error
 call :downloadfile "libusb-%LIBUSB%.tar.bz2" "https://github.com/libusb/libusb/releases/download/v%LIBUSB%/libusb-%LIBUSB%.tar.bz2" 12ce7a61fc9854d1d2a1ffe095f7b5fac19ddba095c259e6067a46500381b5a5 || goto error
 call :downloadfile "libwebp-%WEBP%.tar.gz" "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-%WEBP%.tar.gz" e4ab7009bf0629fd11982d4c2aa83964cf244cffba7347ecd39019a9e38c4564 || goto error
-call :downloadfile "%SDL%.zip" "https://libsdl.org/release/%SDL%.zip" 3d4de8967a49c0451e775a0c1e9022092c19fdef41ba38a83fcf031c5a6496e2 || goto error
+call :downloadfile "%SDL%.zip" "https://libsdl.org/release/%SDL%.zip" 5f399fdfbc040169ef4418a3cb99ccc5a0641681f7ccc1da66eeec3c97fa4076 || goto error
 call :downloadfile "lz4-%LZ4%.zip" "https://github.com/lz4/lz4/archive/refs/tags/v%LZ4%.zip" 3224b4c80f351f194984526ef396f6079bd6332dd9825c72ac0d7a37b3cdc565 || goto error
 call :downloadfile "zlib%ZLIBSHORT%.zip" "https://github.com/madler/zlib/releases/download/v%ZLIB%/zlib%ZLIBSHORT%.zip" e8bf55f3017aa181690990cb58a994e77885da140609fc8f94abe9b65d2cae28 || goto error
 call :downloadfile "zstd-%ZSTD%.zip" "https://github.com/facebook/zstd/archive/refs/tags/v%ZSTD%.zip" 7897bc5d620580d9b7cd3539c44b59d78f3657d33663fe97a145e07b4ebd69a4 || goto error
@@ -148,138 +144,141 @@ if %DEBUG%==1 (
 
 set FORCEPDB=-DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/DEBUG" -DCMAKE_MODULE_LINKER_FLAGS_RELEASE="/DEBUG" -DCMAKE_SHARED_LINKER_FLAGS_MINSIZEREL="/DEBUG" -DCMAKE_MODULE_LINKER_FLAGS_MINSIZEREL="/DEBUG"
 
-if %BUILD_FFMPEG%==1 (
-  if not "%INSTALLDIR%"=="%INSTALLDIR: =%" (
-    echo FFmpeg does not support building in paths with spaces.
-    goto error
-  )
-
-  where nasm /q
-  set FOUND_NASM=0
-  if !ERRORLEVEL!==0 (
-    set FOUND_NASM=1
-  )
-
-  echo "Installing AMF headers"
-  rmdir /S /Q "amf-headers-v%AMF%"
-  tar -xf "amf-headers-v%AMF%.tar.gz" || goto error
-  xcopy "%BUILDDIR%\amf-headers-v%AMF%\AMF" "%INSTALLDIR%\include\AMF\" /y /s || goto error
-  echo.
-
-  echo "Installing libvpl"
-  rmdir /S /Q "libvpl-%LIBVPL%"
-  %SEVENZIP% x "libvpl-%LIBVPL%.zip" || goto error
-  cd "libvpl-%LIBVPL%" || goto error
-  cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DINSTALL_EXAMPLES=OFF -DINSTALL_LIB=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja || goto error
-  cmake --build build --parallel || goto error
-  ninja -C build install || goto error
-  cd .. || goto error
-
-  echo "Installing libopus"
-  rmdir /S /Q "opus-%LIBOPUS%"
-  tar -xf "opus-%LIBOPUS%.tar.gz" || goto error
-  cd "opus-%LIBOPUS%" || goto error
-  cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja || goto error
-  cmake --build build --parallel || goto error
-  ninja -C build install || goto error
-  cd .. || goto error
-
-  echo "Installing libsvtav1"
-  rmdir /S /Q "SVT-AV1-v%LIBSVTAV1%"
-  tar -xf "SVT-AV1-v%LIBSVTAV1%.zip" || goto error
-  cd "SVT-AV1-v%LIBSVTAV1%" || goto error
-  if !FOUND_NASM!==0 (
-    set LIBSTVAV1_NASM=-DCOMPILE_C_ONLY=ON
-  )
-  cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_APPS=OFF -DSVT_AV1_LTO=ON !LIBSTVAV1_NASM! -B build -G Ninja || goto error
-  cmake --build build --parallel || goto error
-  ninja -C build install || goto error
-  cd .. || goto error
-
-  echo "Extracting meson"
-  rmdir /S /Q "meson-%MESON%"
-  tar xf "meson-%MESON%.tar.gz" || goto error
-  set MASON_PY=python "%BUILDDIR%\meson-%MESON%\meson.py"
-  !MASON_PY! -v || goto error
-  echo.
-
-  rem Alternatively we could grab pkg-config-lite from chocolatey or WinGet.
-  echo "Installing pkgconf"
-  rmdir /S /Q "pkgconf-pkgconf-%PKGCONF%"
-  %SEVENZIP% x "pkgconf-pkgconf-%PKGCONF%.zip" || goto error
-  cd "pkgconf-pkgconf-%PKGCONF%" || goto error
-  !MASON_PY! setup --buildtype=release --prefix="%INSTALLDIR%" -Dtests=disabled build --backend=ninja || goto error
-  !MASON_PY! compile -C build || goto error
-  ninja -C build install || goto error
-  set PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
-  set PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
-  Set "PKG_CONFIG_PATH=%INSTALLDIR%\lib\pkgconfig"
-  cd .. || goto error
-
-  set "OLD_PATH=%PATH%"
-  set "PATH=%PATH%;%UNIX_TOOLS%"
-
-  echo "Installing nvenc headers..."
-  rmdir /S /Q "nv-codec-headers-%NVENC%"
-  tar xf "nv-codec-headers-%NVENC%.tar.gz" || goto error
-  make -C "nv-codec-headers-%NVENC%" PREFIX="%INSTALLDIR%" install || goto error
-  echo.
-
-  set CC=cl
-  set CXX=cl
-
-  echo "Installing libx264"
-  rmdir /S /Q "x264-%LIBX264%"
-  %SEVENZIP% x "x264-%LIBX264%.zip" || goto error
-  cd "x264-%LIBX264%" || goto error
-  if !FOUND_NASM!==0 (
-    set LIBX264_NASM=--disable-asm
-  )
-  %BASH% configure --prefix="%INSTALLDIR%" --disable-cli --enable-static --extra-cflags="-MD -w -Os -GL" !LIBX264_NASM! || goto error
-  make -j%NUMBER_OF_PROCESSORS% || goto error
-  make install || goto error
-  cd .. || goto error
-  echo.
-
-  echo "Installing FFmpeg..."
-  rmdir /S /Q "ffmpeg-%FFMPEG%"
-  tar xf "ffmpeg-%FFMPEG%.tar.xz" || goto error
-  cd "ffmpeg-%FFMPEG%"
-  %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-configure-escape.patch" || goto error
-  if not !FOUND_NASM!==1 (
-    rem MSVC LTO gives linker errors when building without nasm.
-    rem The following patches fixes that issue.
-    %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-no-nasm-fix-avc-air.patch" || goto error
-    %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-no-nasm-fix-swc-air.patch" || goto error
-    set FFMPEG_NASM=--disable-x86asm
-  )
-  rem FFmpeg's build seems to choke when extra-cflags contain `\`, so use `/` as the path separator.
-  set VULKAN_INCLUDE=%INSTALLDIR:\=/%/../3rdparty/vulkan/include
-  rem libvpl needs to have advapi32.lib & ole32.lib added as extra libs.
-  rem For some reason QSV requires the hevc parser on windows.
-  rem --enable-small removes the display names of codecs, so instead we specify optflag for minsize
-  %BASH% configure --prefix="%INSTALLDIR%" --disable-all --disable-autodetect --disable-static --enable-shared --disable-debug ^
-    --toolchain=msvc --extra-ldflags="-LTCG" --extra-libs="advapi32.lib ole32.lib" !FFMPEG_NASM! --pkg-config="%INSTALLDIR%\bin\pkgconf.exe" ^
-    --extra-cflags="-MD -GL -I!VULKAN_INCLUDE!" --extra-cxxflags="-MD -GL -I!VULKAN_INCLUDE!" --optflags="-O1" ^
-    --enable-avcodec --enable-avformat --enable-avutil --enable-swresample --enable-swscale ^
-    --enable-gpl --enable-libx264 --enable-libsvtav1 --enable-libopus --enable-vulkan --enable-ffnvcodec --enable-nvenc --enable-libvpl --enable-amf ^
-    --enable-d3d11va --enable-mediafoundation ^
-    --enable-encoder=ffv1,qtrle,libx264*,libsvtav1,aac,flac,libopus,pcm_s16be,pcm_s16le ^
-    --enable-encoder=h264_qsv,hevc_qsv,av1_qsv ^
-    --enable-encoder=h264_nvenc,hevc_nvenc,av1_nvenc ^
-    --enable-encoder=h264_amf,hevc_amf,av1_amf ^
-    --enable-encoder=h264_vulkan,hevc_vulkan,av1_vulkan ^
-    --enable-encoder=h264_mf,hevc_mf,av1_mf ^
-    --enable-parser=hevc ^
-    --enable-muxer=avi,matroska,mov,mp3,mp4,wav ^
-    --enable-protocol=file || goto error
-  make -j%NUMBER_OF_PROCESSORS% || goto error
-  make install || goto error
-  cd ..
-  echo.
-
-  set "PATH=!OLD_PATH!"
+if not "%INSTALLDIR%"=="%INSTALLDIR: =%" (
+  echo FFmpeg does not support building in paths with spaces.
+  goto error
 )
+
+where nasm /q
+set FOUND_NASM=0
+if !ERRORLEVEL!==0 (
+  set FOUND_NASM=1
+)
+
+echo "Installing AMF headers"
+rmdir /S /Q "amf-headers-v%AMF%"
+tar -xf "amf-headers-v%AMF%.tar.gz" || goto error
+xcopy "%BUILDDIR%\amf-headers-v%AMF%\AMF" "%INSTALLDIR%\include\AMF\" /y /s || goto error
+echo.
+
+echo "Installing libvpl"
+rmdir /S /Q "libvpl-%LIBVPL%"
+%SEVENZIP% x "libvpl-%LIBVPL%.zip" || goto error
+cd "libvpl-%LIBVPL%" || goto error
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DINSTALL_EXAMPLES=OFF -DINSTALL_LIB=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja || goto error
+cmake --build build --parallel || goto error
+ninja -C build install || goto error
+cd .. || goto error
+
+echo "Installing libopus"
+rmdir /S /Q "opus-%LIBOPUS%"
+tar -xf "opus-%LIBOPUS%.tar.gz" || goto error
+cd "opus-%LIBOPUS%" || goto error
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON -B build -G Ninja || goto error
+cmake --build build --parallel || goto error
+ninja -C build install || goto error
+cd .. || goto error
+
+echo "Installing libsvtav1"
+rmdir /S /Q "SVT-AV1-v%LIBSVTAV1%"
+tar -xf "SVT-AV1-v%LIBSVTAV1%.zip" || goto error
+cd "SVT-AV1-v%LIBSVTAV1%" || goto error
+if !FOUND_NASM!==0 (
+  set LIBSTVAV1_NASM=-DCOMPILE_C_ONLY=ON
+)
+cmake -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_PREFIX_PATH="%INSTALLDIR%" -DCMAKE_INSTALL_PREFIX="%INSTALLDIR%" -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DBUILD_APPS=OFF -DSVT_AV1_LTO=ON !LIBSTVAV1_NASM! -B build -G Ninja || goto error
+cmake --build build --parallel || goto error
+ninja -C build install || goto error
+cd .. || goto error
+
+echo "Extracting meson"
+rmdir /S /Q "meson-%MESON%"
+tar xf "meson-%MESON%.tar.gz" || goto error
+set MASON_PY=python "%BUILDDIR%\meson-%MESON%\meson.py"
+!MASON_PY! -v || goto error
+echo.
+
+rem Alternatively we could grab pkg-config-lite from chocolatey or WinGet.
+echo "Installing pkgconf"
+rmdir /S /Q "pkgconf-pkgconf-%PKGCONF%"
+%SEVENZIP% x "pkgconf-pkgconf-%PKGCONF%.zip" || goto error
+cd "pkgconf-pkgconf-%PKGCONF%" || goto error
+!MASON_PY! setup --buildtype=release --prefix="%INSTALLDIR%" -Dtests=disabled build --backend=ninja || goto error
+!MASON_PY! compile -C build || goto error
+ninja -C build install || goto error
+set PKG_CONFIG_ALLOW_SYSTEM_CFLAGS=1
+set PKG_CONFIG_ALLOW_SYSTEM_LIBS=1
+Set "PKG_CONFIG_PATH=%INSTALLDIR%\lib\pkgconfig"
+cd .. || goto error
+
+echo "Extracting make"
+%SEVENZIP% e "make-%MAKE%-without-guile-w32-bin.zip" "bin\make.exe" -o"%INSTALLDIR%\bin\" -aoa || goto error
+set MAKE_EXE="%INSTALLDIR%\bin\make.exe"
+echo.
+
+set "OLD_PATH=%PATH%"
+set "PATH=%PATH%;%UNIX_TOOLS%"
+
+echo "Installing nvenc headers..."
+rmdir /S /Q "nv-codec-headers-%NVENC%"
+tar xf "nv-codec-headers-%NVENC%.tar.gz" || goto error
+!MAKE_EXE! -C "nv-codec-headers-%NVENC%" PREFIX="%INSTALLDIR%" install || goto error
+echo.
+
+set CC=cl
+set CXX=cl
+
+echo "Installing libx264"
+rmdir /S /Q "x264-%LIBX264%"
+%SEVENZIP% x "x264-%LIBX264%.zip" || goto error
+cd "x264-%LIBX264%" || goto error
+if !FOUND_NASM!==0 (
+  set LIBX264_NASM=--disable-asm
+)
+%BASH% configure --prefix="%INSTALLDIR%" --disable-cli --enable-static --extra-cflags="-MD -w -Os -GL" !LIBX264_NASM! || goto error
+!MAKE_EXE! -j%NUMBER_OF_PROCESSORS% || goto error
+!MAKE_EXE! install || goto error
+cd .. || goto error
+echo.
+
+echo "Installing FFmpeg..."
+rmdir /S /Q "ffmpeg-%FFMPEG%"
+tar xf "ffmpeg-%FFMPEG%.tar.xz" || goto error
+cd "ffmpeg-%FFMPEG%"
+%PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-configure-escape.patch" || goto error
+if not !FOUND_NASM!==1 (
+  rem MSVC LTO gives linker errors when building without nasm.
+  rem The following patches fixes that issue.
+  %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-no-nasm-fix-avc-air.patch" || goto error
+  %PATCH% -p1 < "%SCRIPTDIR%\ffmpeg-no-nasm-fix-swc-air.patch" || goto error
+  set FFMPEG_NASM=--disable-x86asm
+)
+rem FFmpeg's build seems to choke when extra-cflags contain `\`, so use `/` as the path separator.
+set VULKAN_INCLUDE=%INSTALLDIR:\=/%/../3rdparty/vulkan/include
+rem libvpl needs to have advapi32.lib & ole32.lib added as extra libs.
+rem For some reason QSV requires the hevc parser on windows.
+rem --enable-small removes the display names of codecs, so instead we specify optflag for minsize
+%BASH% configure --prefix="%INSTALLDIR%" --disable-all --disable-autodetect --disable-static --enable-shared --disable-debug ^
+  --toolchain=msvc --extra-ldflags="-LTCG" --extra-libs="advapi32.lib ole32.lib" !FFMPEG_NASM! --pkg-config="%INSTALLDIR%\bin\pkgconf.exe" ^
+  --extra-cflags="-MD -GL -I!VULKAN_INCLUDE!" --extra-cxxflags="-MD -GL -I!VULKAN_INCLUDE!" --optflags="-O1" ^
+  --enable-avcodec --enable-avformat --enable-avutil --enable-swresample --enable-swscale ^
+  --enable-gpl --enable-libx264 --enable-libsvtav1 --enable-libopus --enable-vulkan --enable-ffnvcodec --enable-nvenc --enable-libvpl --enable-amf ^
+  --enable-d3d11va --enable-mediafoundation ^
+  --enable-encoder=ffv1,qtrle,libx264*,libsvtav1,aac,flac,libopus,pcm_s16be,pcm_s16le ^
+  --enable-encoder=h264_qsv,hevc_qsv,av1_qsv ^
+  --enable-encoder=h264_nvenc,hevc_nvenc,av1_nvenc ^
+  --enable-encoder=h264_amf,hevc_amf,av1_amf ^
+  --enable-encoder=h264_vulkan,hevc_vulkan,av1_vulkan ^
+  --enable-encoder=h264_mf,hevc_mf,av1_mf ^
+  --enable-parser=hevc ^
+  --enable-muxer=avi,matroska,mov,mp3,mp4,wav ^
+  --enable-protocol=file || goto error
+!MAKE_EXE! -j%NUMBER_OF_PROCESSORS% || goto error
+!MAKE_EXE! install || goto error
+cd ..
+echo.
+
+set "PATH=!OLD_PATH!"
 
 echo Building Zlib...
 rmdir /S /Q "zlib-%ZLIB%"

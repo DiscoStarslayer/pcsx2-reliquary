@@ -4,7 +4,6 @@
 #include "Common.h"
 #include "R5900OpcodeTables.h"
 #include "iR5900.h"
-#include "iFPU.h"
 #include "microVU_SoftFloatTables.h"
 #include "SoftFloatEmitter.h"
 

@@ -451,7 +451,7 @@ bool GameList::GetIsoSerialAndCRC(const std::string& path, s32* disc_type, std::
 	}
 	else
 	{
-		cdvdGetDiscInfo(serial, nullptr, nullptr, crc, nullptr);
+		cdvdGetDiscInfo(serial, nullptr, nullptr, nullptr, crc, nullptr);
 	}
 	DoCDVDclose();
 	return true;

@@ -1632,7 +1632,7 @@ void GSRendererPGS::render_ui_flush(CommandBuffer &cmd)
 	auto height = cmd.get_device().get_swapchain_view().get_view_height();
 	cmd.set_viewport({ 0, 0, float(width), float(height), 0, 1 });
 
-	for (int n = 0; n < draw_data->CmdListsCount; n++)
+	for (int n = 0; n < draw_data->CmdLists.Size; n++)
 	{
 		const ImDrawList *cmd_list = draw_data->CmdLists[n];
 		memcpy(cmd.allocate_vertex_data(0, cmd_list->VtxBuffer.Size * sizeof(ImDrawVert), sizeof(ImDrawVert)),
