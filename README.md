@@ -19,19 +19,21 @@ PCSX2 Reliquary is an experimental fork of [PCSX2](https://github.com/PCSX2/pcsx
 
 ## Feature overview
 
-| Area                                | Status                                                                                                                      |
-|-------------------------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| Retail PS2 emulation                | Synced monthly with upstream PCSX2                                                                                          |
-| Accurate soft-float recompiler      | Optional EE FPU, VU0, and VU1 soft-float recompilers                                                                        |
-| ParaLLEl-GS                         | Experimental Vulkan-based GS renderer with supersampling and analog-display emulation, targeting software renderer accuracy |
-| Low-Latency Audio                   | New low latency sync mode, WASAPI Exclusive and WASAPI IAudioClient3 drivers. Support for sub-frame audio latency ~10ms.    |
-| Optional Mechacon security paths    | Selectable retail, development, prototype, and arcade key-store modes, skipped if not provided                              |
-| DVD Player Support                  | Requires properly setup mechacon keys, NVRAM and ROM1 dump                                                                  |
-| HDD Install Disks and Game Installs | Requires properly setup mechacon keys as well as valid NVRAM and Mech Version file                                          |
-| FireWire integration                | Foundational FireWire emulation unlocks titles relying on initalization                                                     |
-| Konami Python 1                     | `.py1` game entries, P1IO/FireWire emulation, HDD/CF media, dongles, and memory card authentication                         |
-| Konami Python 2                     | `.py2` game entries, P2IO emulation, HDD security, dongles, e-amuse cards, and game-specific configuration                  |
-| CHD-backed HDD and CF media         | Full CHD image support for HDD and CF card images                                                                           |
+| Feature                               | Description                                                                                                                                          |
+|---------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Retail PS2 emulation                  | Synced monthly with upstream PCSX2                                                                                                                   |
+| Accurate soft-float recompiler        | Optional EE FPU, VU0, and VU1 soft-float recompilers                                                                                                 |
+| ParaLLEl-GS                           | Experimental Vulkan-based GS renderer with supersampling and analog-display emulation, targeting software renderer accuracy                          |
+| Low-Latency Audio                     | New low latency sync mode, WASAPI Exclusive and WASAPI IAudioClient3 drivers. Support for sub-frame audio latency ~10ms.                             |
+| Optional Mechacon security paths      | Selectable retail, development, prototype, and arcade key-store modes, skipped if not provided                                                       |
+| DVD Player Support                    | Requires properly setup mechacon keys, NVRAM and ROM1 dump                                                                                           |
+| CUE File Support                      | Prioritize CUE in game list over BIN. Allows proper loading of titles dependent on CUE files as well as music CD playback                            |
+| HDD Install Disks and Game Installs   | Requires properly setup mechacon keys as well as valid NVRAM and Mech Version file                                                                   |
+| FireWire integration                  | Foundational FireWire emulation unlocks titles relying on initalization                                                                              |
+| Konami Python 1                       | `.py1` game entries, P1IO/FireWire emulation, HDD/CF media, dongles, and memory card authentication                                                  |
+| Konami Python 2                       | `.py2` game entries, P2IO emulation, HDD security, dongles, e-amuse cards, and game-specific configuration                                           |
+| BTools ddrio.dll and minimaid support | Bring your own `ddrio.dll` or `mmmagic64.dll` for Python 2 DDR titles for real hardware IO support on boards like [Snek](https://icedragon.io/snek/) |
+| CHD-backed HDD and CF media           | Full CHD image support for HDD and CF card images                                                                                                    |
 
 ## Getting started
 
