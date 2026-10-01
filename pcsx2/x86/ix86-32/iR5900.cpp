@@ -12,6 +12,7 @@
 #include "R3000A.h"
 #include "R5900OpcodeTables.h"
 #include "VMManager.h"
+#include "Vif_Dma.h"
 #include "vtlb.h"
 #include "x86/BaseblockEx.h"
 #include "x86/iR5900.h"
@@ -396,13 +397,18 @@ static const void* UnmappedRecLUTPage = nullptr;
 
 static void recEventTest()
 {
-	_cpuEventTest_Shared();
-
-	if (eeRecExitRequested)
+	do
 	{
-		eeRecExitRequested = false;
-		recExitExecution();
-	}
+		_cpuEventTest_Shared();
+
+		if (eeRecExitRequested)
+		{
+			eeRecExitRequested = false;
+			recExitExecution();
+		}
+		if (vif1CpuFifoBusBlocked())
+			cpuRegs.cycle = std::max(cpuRegs.cycle + 1, cpuRegs.nextEventCycle);
+	} while (vif1CpuFifoBusBlocked());
 }
 
 // The address for all cleared blocks.  It recompiles the current pc and then
@@ -1840,6 +1846,15 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 		//If the COP0 DIE bit is disabled, cycles should be doubled.
 		s_nBlockCycles += opcode.cycles * (2 - ((cpuRegs.CP0.n.Config >> 18) & 0x1));
 		opcode.recompile();
+		// Only 128-bit EE stores (SQ/SQC2) can enter WriteFIFO_VIF1. They
+		// need an event boundary if a full device FIFO holds the bus write;
+		// splitting after unrelated stores also changes EE/VU timing.
+		if (!delayslot && (opcode.flags & IS_STORE) &&
+			(opcode.flags & MEMTYPE_MASK) == MEMTYPE_QWORD && vif1CpuFifoEnabled())
+		{
+			iFlushCall(FLUSH_INTERPRETER);
+			g_branch = 2;
+		}
 	}
 
 	if (!swapped_delay_slot)

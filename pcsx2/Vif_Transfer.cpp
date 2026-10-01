@@ -46,6 +46,11 @@ _vifT void vifTransferLoop(u32* &data) {
 		ret = vifCmdHandler[idx][vifX.cmd & 0x7f](vifX.pass, data);
 		data   += ret;
 		pSize  -= ret;
+		if constexpr (idx == 1)
+		{
+			if (vif1CpuFifoActive() && (ret == 0 || vif1.waitforvu || vif1Regs.stat.VGW))
+				break;
+		}
 		if (vifX.vifstalled.enabled)
 		{
 			int current_STR = idx ? vif1ch.chcr.STR : vif0ch.chcr.STR;

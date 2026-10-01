@@ -10,6 +10,7 @@
 #include "R3000A.h"
 #include "ps2/pgif.h" // pgif init
 #include "VUmicro.h"
+#include "Vif_Dma.h"
 #include "COP0.h"
 #include "MTVU.h"
 #include "VMManager.h"
@@ -377,7 +378,7 @@ __fi void _cpuEventTest_Shared()
 	// be able to read the value before the exception handler clears it).
 
 	uint mask = intcInterrupt() | dmacInterrupt();
-	if (cpuIntsEnabled(mask))
+	if (!vif1CpuFifoBusBlocked() && cpuIntsEnabled(mask))
 		cpuException(mask, cpuRegs.branch);
 
 	// ---- IOP -------------
@@ -414,7 +415,8 @@ __fi void _cpuEventTest_Shared()
 		_cpuTestPERF();
 	}
 
-	_cpuTestTIMR();
+	if (!vif1CpuFifoBusBlocked())
+		_cpuTestTIMR();
 
 	// ---- Interrupts -------------
 	// These are basically just DMAC-related events, which also piggy-back the same bits as

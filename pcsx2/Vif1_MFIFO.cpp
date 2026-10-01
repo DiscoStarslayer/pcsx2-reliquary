@@ -261,6 +261,16 @@ void mfifoVIF1transfer()
 
 void vifMFIFOInterrupt()
 {
+	if (vif1CpuFifoPending())
+	{
+		vif1CpuFifoDrain();
+		if (vif1CpuFifoPending())
+		{
+			CPU_SET_DMASTALL(DMAC_MFIFO_VIF, true);
+			CPU_INT(DMAC_MFIFO_VIF, 128);
+			return;
+		}
+	}
 	g_vif1Cycles = 0;
 	VIF_LOG("vif mfifo interrupt");
 

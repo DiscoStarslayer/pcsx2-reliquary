@@ -1569,6 +1569,7 @@ static const char* const tbl_GamefixNames[] =
 		"BlitInternalFPS",
 		"FullVU0Sync",
 		"MixSpdifAnalog",
+		"VUCommunication",
 };
 
 const char* Pcsx2Config::GamefixOptions::GetGameFixName(GamefixId id)
@@ -1612,6 +1613,7 @@ void Pcsx2Config::GamefixOptions::Set(GamefixId id, bool enabled)
 		case Fix_BlitInternalFPS:     BlitInternalFPSHack     = enabled; break;
 		case Fix_FullVU0Sync:         FullVU0SyncHack         = enabled; break;
 		case Fix_MixSpdifAnalog:      MixSpdifAnalogHack      = enabled; break;
+		case Fix_VUCommunication:     VUCommunicationHack     = enabled; break;
 		default:                                                         break;
 			// clang-format on
 	}
@@ -1651,6 +1653,7 @@ bool Pcsx2Config::GamefixOptions::Get(GamefixId id) const
 		case Fix_BlitInternalFPS:     return BlitInternalFPSHack;
 		case Fix_FullVU0Sync:         return FullVU0SyncHack;
 		case Fix_MixSpdifAnalog:      return MixSpdifAnalogHack;
+		case Fix_VUCommunication:     return VUCommunicationHack;
 		default:                      return false;
 			// clang-format on
 	}
@@ -1680,6 +1683,7 @@ void Pcsx2Config::GamefixOptions::LoadSave(SettingsWrapper& wrap)
 	SettingsWrapBitBool(BlitInternalFPSHack);
 	SettingsWrapBitBool(FullVU0SyncHack);
 	SettingsWrapBitBool(MixSpdifAnalogHack);
+	SettingsWrapBitBool(VUCommunicationHack);
 }
 
 const char* Pcsx2Config::DebugAnalysisOptions::RunConditionNames[] = {
