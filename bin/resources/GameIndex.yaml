@@ -24130,6 +24130,8 @@ SLES-53585:
   name: "Marvel Nemesis - Rise of the Imperfects"
   region: "PAL-M4"
   compat: 3
+  gameFixes:
+    - VUCommunicationHack # Preserve EE/VU and shared VU register ordering.
 SLES-53587:
   name: "Garfield - Saving Arlene"
   region: "PAL-M5"
