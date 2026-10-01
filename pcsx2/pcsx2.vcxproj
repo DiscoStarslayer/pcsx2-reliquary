@@ -997,6 +997,7 @@
     <ClInclude Include="MTVU.h" />
     <ClInclude Include="VU.h" />
     <ClInclude Include="VUmicro.h" />
+    <ClInclude Include="VUCommunication.h" />
     <ClInclude Include="x86\iR5900Analysis.h" />
     <ClInclude Include="x86\microVU.h" />
     <ClInclude Include="x86\microVU_IR.h" />

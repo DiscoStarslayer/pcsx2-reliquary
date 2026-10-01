@@ -11,6 +11,7 @@
 #include <memory>
 #include "Common.h"
 #include "VU.h"
+#include "VUCommunication.h"
 #include "MTVU.h"
 #include "GS.h"
 #include "Gif_Unit.h"
@@ -329,6 +330,7 @@ mVUop(mVUopL);
 extern void mVUcacheProg(microVU& mVU, microProgram& prog);
 extern void mVUdeleteProg(microVU& mVU, microProgram*& prog);
 _mVUt extern void* mVUsearchProg(u32 startPC, uptr pState);
+extern void* g_mvuPreparedEntry[2];
 extern void* mVUexecuteVU0(u32 startPC, u32 cycles);
 extern void* mVUexecuteVU1(u32 startPC, u32 cycles);
 // recCall Function Pointer

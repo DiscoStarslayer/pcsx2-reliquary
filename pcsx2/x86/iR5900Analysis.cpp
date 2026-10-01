@@ -227,7 +227,7 @@ void COP2MicroFinishPass::Run(u32 start, u32 end, EEINST* inst_cache)
 {
 	bool needs_vu0_sync = true;
 	bool needs_vu0_finish = true;
-	bool block_interlocked = CHECK_FULLVU0SYNCHACK;
+	bool block_interlocked = CHECK_FULLVU0SYNCHACK || EmuConfig.Gamefixes.VUCommunicationHack;
 
 	// First pass through the block to find out if it's interlocked or not. If it is, we need to use tighter
 	// synchronization on all COP2 instructions, otherwise Crash Twinsanity breaks.

@@ -17,6 +17,8 @@ static const uint VU0_PROGMASK	= VU0_PROGSIZE-1;
 static const uint VU1_MEMMASK	= VU1_MEMSIZE-1;
 static const uint VU1_PROGMASK	= VU1_PROGSIZE-1;
 
+bool vuRunInterleaved(u32 unit, u32 cycles);
+
 #define vu1RunCycles (3000000) // mVU1 uses this for inf loop detection on dev builds
 
 
@@ -61,6 +63,9 @@ public:
 	virtual void Execute(u32 cycles)=0;
 
 	virtual void Step()=0;
+
+	// Execute one communication quantum, preserving the normal pipeline state.
+	virtual void ExecuteQuantum();
 	virtual void Clear(u32 Addr, u32 Size)=0;
 
 	// Executes a Block based on EE delta time (see VUmicro.cpp)
@@ -134,6 +139,7 @@ public:
 
 	void Reset() override;
 	void Step() override;
+	void ExecuteQuantum() override;
 	void SetStartPC(u32 startPC) override;
 	void Execute(u32 cycles) override;
 	void Clear(u32 addr, u32 size) override;
@@ -152,6 +158,7 @@ public:
 	void Shutdown() override;
 	void Reset() override;
 	void Step() override;
+	void ExecuteQuantum() override;
 	void SetStartPC(u32 startPC) override;
 	void Execute(u32 cycles) override;
 	void Clear(u32 addr, u32 size) override;

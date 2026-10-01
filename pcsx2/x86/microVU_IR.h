@@ -75,6 +75,7 @@ struct alignas(16) microBlock
 	microRegInfo    pState;      // Detailed State of Pipeline
 	microRegInfo    pStateEnd;   // Detailed State of Pipeline at End of Block (needed by JR/JALR opcodes)
 	u8*             x86ptrStart; // Start of code (Entry point for block)
+	u32 cycles; // Compiled quantum cost, including stalls and terminal drain.
 	microJumpCache* jumpCache;   // Will point to an array of entry points of size [16k/8] if block ends in JR/JALR
 };
 
@@ -178,6 +179,8 @@ struct microOp
 	int  writeQ;         // Q instance for writing
 	int  readP;          // P instance for reading
 	int  writeP;         // P instance for writing
+	u32 matureFlagSlots;
+	u8 matureFlagValidMask;
 	microFlagInst sFlag; // Status Flag Instance Info
 	microFlagInst mFlag; // Mac    Flag Instance Info
 	microFlagInst cFlag; // Clip   Flag Instance Info

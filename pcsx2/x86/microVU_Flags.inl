@@ -113,6 +113,21 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 	u32 aCount = 0; // Amount of instructions needed to get valid mac flag instances for block linking
 	//bool writeProtect = false;
 
+	if (!isCOP2 && EmuConfig.Gamefixes.VUCommunicationHack)
+	{
+		iPC = mVUstartPC;
+		for (u32 pair = 0; pair < mVUcount; pair++, iPC = ((iPC + 2) & mVU.progMemMask))
+		{
+			if (!sFLAG.doFlag)
+				continue;
+			// EE and the other VU can observe mature flags at every pair boundary.
+			sFLAG.doNonSticky = true;
+			sFLAG.doValue = true;
+			mFLAG.doFlag = true;
+		}
+		iPC = endPC;
+	}
+
 	// Ensure last ~4+ instructions update mac/status flags (if next block's first 4 instructions will read them)
 	for (int i = mVUcount; i > 0; i--, aCount++)
 	{
@@ -194,6 +209,19 @@ __fi void mVUsetFlags(mV, microFlagCycles& mFC)
 				mVUstatusFlagOp(mVU);
 		}
 		mFC.cycles += mVUstall;
+
+		mVUinfo.matureFlagValidMask = 0;
+		mVUinfo.matureFlagSlots = 0;
+		const int* timelines[] = {mFC.xStatus, mFC.xMac, mFC.xClip};
+		for (u32 type = 0; type < 3; type++)
+		{
+			const int slot = VUCommunication::FindMatureFlagSlot(timelines[type], mFC.cycles);
+			if (slot >= 0)
+			{
+				mVUinfo.matureFlagSlots |= static_cast<u32>(slot) << (type * 8);
+				mVUinfo.matureFlagValidMask |= 1u << type;
+			}
+		}
 
 		sFLAG.read = doSFlagInsts ? findFlagInst(mFC.xStatus, mFC.cycles) : 0;
 		mFLAG.read = doMFlagInsts ? findFlagInst(mFC.xMac,    mFC.cycles) : 0;

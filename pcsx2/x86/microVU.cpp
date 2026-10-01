@@ -7,6 +7,8 @@
 
 #include "common/AlignedMalloc.h"
 
+void* g_mvuPreparedEntry[2] = {};
+
 static constexpr size_t mVUsoftDivCapTailReserve = 256;
 
 //------------------------------------------------------------------
@@ -391,6 +393,45 @@ void recMicroVU1::Reset()
 	mVUreset(microVU1);
 }
 
+static void mVUexecuteQuantum(microVU& mVU)
+{
+	VURegs& vu = mVU.regs();
+	const u32 pc = (vu.VI[REG_TPC].UL << 3) & (mVU.microMemSize - 8);
+	const microRegInfo entry = mVU.prog.lpState;
+	// Lookup can compile and temporarily change lpState. Restore the input
+	// pipeline before entering the ordinary dispatcher with the measured cost.
+	void* code = mVU.index ? mVUexecute<1>(pc, 0) : mVUexecute<0>(pc, 0);
+	mVU.prog.x86ptr = xGetPtr();
+	mVU.prog.lpState = entry;
+	const microBlock* block = mVU.prog.cur->block[pc / 8]->search(mVU, &mVU.prog.lpState);
+	pxAssert(block && block->cycles);
+	const u32 cost = block->cycles;
+	// Consumed exactly once by the dispatcher. No guest execution or cache
+	// invalidation is allowed between this lookup and entry.
+	g_mvuPreparedEntry[mVU.index] = code;
+	if (!mVU.index)
+		vu.flags &= ~VUFLAG_MFLAGSET;
+	vu.VI[REG_TPC].UL = pc;
+	((mVUrecCall)mVU.startFunct)(pc, cost);
+	vu.VI[REG_TPC].UL >>= 3;
+	pxAssert(!g_mvuPreparedEntry[mVU.index]);
+	if (vu.flags & VUFLAG_INTCINTERRUPT)
+	{
+		vu.flags &= ~VUFLAG_INTCINTERRUPT;
+		hwIntcIrq(mVU.index ? 7 : 6);
+	}
+}
+
+void recMicroVU0::ExecuteQuantum()
+{
+	mVUexecuteQuantum(microVU0);
+}
+
+void recMicroVU1::ExecuteQuantum()
+{
+	mVUexecuteQuantum(microVU1);
+}
+
 void recMicroVU0::SetStartPC(u32 startPC)
 {
 	VU0.start_pc = startPC;
@@ -398,6 +439,8 @@ void recMicroVU0::SetStartPC(u32 startPC)
 
 void recMicroVU0::Execute(u32 cycles)
 {
+	if (vuRunInterleaved(0, cycles))
+		return;
 	VU0.flags &= ~VUFLAG_MFLAGSET;
 
 	if (!(VU0.VI[REG_VPU_STAT].UL & 1))
@@ -424,6 +467,8 @@ void recMicroVU1::Step()
 
 void recMicroVU1::Execute(u32 cycles)
 {
+	if (vuRunInterleaved(1, cycles))
+		return;
 	if (!THREAD_VU1)
 	{
 		if (!(VU0.VI[REG_VPU_STAT].UL & 0x100))

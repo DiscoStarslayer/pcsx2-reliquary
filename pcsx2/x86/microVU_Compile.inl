@@ -703,7 +703,8 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVU.regAlloc->reset(false);          // Reset regAlloc
 	mVUinitFirstPass(mVU, pState, thisPtr);
 	mVUbranch = 0;
-	for (int branch = 0; mVUcount < endCount;)
+	int branch = 0;
+	for (; mVUcount < endCount;)
 	{
 		incPC(1);
 		startLoop(mVU);
@@ -800,6 +801,14 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 		mVUinfo.readP = mVU.p && isVU1;
 		mVUinfo.writeP = !mVU.p && isVU1;
 		mVUcount++;
+		if (!isCOP2 && EmuConfig.Gamefixes.VUCommunicationHack)
+		{
+			// A branch/E-bit and its delay pair retain ordinary control flow.
+			// Linear pairs become independent blocks; fusion cannot cross them.
+			mVUregs.needExactMatch |= 7;
+			if (!branch && !mVUbranch && !mVUup.eBit)
+				mVUinfo.isEOB = true;
+		}
 
 		if (branch >= 2)
 		{
@@ -859,8 +868,22 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 	mVUregs.vi15 = (doConstProp && mVUconstReg[15].isValid) ? (u16)mVUconstReg[15].regValue : 0;
 	mVUregs.vi15v = (doConstProp && mVUconstReg[15].isValid) ? 1 : 0;
 	mVUsetFlags(mVU, mFC);           // Sets Up Flag instances
+	u32 drain = 0;
+	const bool terminal = branch >= 2 && !mVUinfo.isBdelay;
+	if (!isCOP2 && EmuConfig.Gamefixes.VUCommunicationHack && terminal)
+	{
+		// Capture actual residual deadlines before optimizeReg drops age one.
+		// End-program's advance100 materializes values without charging time.
+		drain = std::max<u32>(mVUregs.q, mVUregs.p);
+		for (u32 r = 1; r < 32; r++)
+			drain = std::max(drain, static_cast<u32>(std::max({mVUregs.VF[r].x, mVUregs.VF[r].y, mVUregs.VF[r].z, mVUregs.VF[r].w})));
+		for (u32 r = 1; r < 16; r++)
+			drain = std::max<u32>(drain, mVUregs.VI[r]);
+	}
 	mVUoptimizePipeState(mVU);       // Optimize the End Pipeline State for nicer Block Linking
 	mVUdebugPrintBlocks(mVU, false); // Prints Start/End PC of blocks executed, for debugging...
+	mVUcycles += drain;
+	mVUpBlock->cycles = mVUcycles;
 	mVUtestCycles(mVU, mFC);         // Update VU Cycles and Exit Early if Necessary
 
 	// Second Pass
@@ -888,7 +911,29 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 			mVU_XGKICK_SYNC(mVU, false);
 		}
 
+		if (!isCOP2 && EmuConfig.Gamefixes.VUCommunicationHack)
+		{
+			// The current upper can reuse the only mature physical flag slot.
+			// Publish before that overwrite, never from the pending write slot.
+			const u32 slots = mVUinfo.matureFlagSlots;
+			if (mVUinfo.matureFlagValidMask & 1)
+			{
+				mVUallocSFLAGc(gprT1, gprT2, slots & 3);
+				xMOV(ptr32[&mVU.regs().VI[REG_STATUS_FLAG].UL], gprT1);
+			}
+			if (mVUinfo.matureFlagValidMask & 2)
+			{
+				mVUallocMFLAGa(mVU, gprT1, (slots >> 8) & 3);
+				xMOV(ptr32[&mVU.regs().VI[REG_MAC_FLAG].UL], gprT1);
+			}
+			if (mVUinfo.matureFlagValidMask & 4)
+			{
+				mVUallocCFLAGa(mVU, gprT1, (slots >> 16) & 3);
+				xMOV(ptr32[&mVU.regs().VI[REG_CLIP_FLAG].UL], gprT1);
+			}
+		}
 		mVUexecuteInstruction(mVU);
+
 		if (!mVUinfo.isBdelay && !mVUlow.branch) //T/D Bit on branch is handled after the branch, branch delay slots are executed.
 		{
 			if (mVUup.tBit)
@@ -928,6 +973,15 @@ void* mVUcompile(microVU& mVU, u32 startPC, uptr pState)
 			mVU_XGKICK_DELAY(mVU);
 		}
 
+		if (!isCOP2 && EmuConfig.Gamefixes.VUCommunicationHack && !terminal &&
+			mVUinfo.isEOB && !mVUinfo.isBdelay && !mVUup.eBit && !mVUinfo.isBadOp)
+		{
+			mVUsetupRange(mVU, xPC + 8, false);
+			memcpy(&mVUpBlock->pStateEnd, &mVUregs, sizeof(microRegInfo));
+			mVUsetupBranch(mVU, mFC);
+			normBranchCompile(mVU, (xPC + 8) & (mVU.microMemSize - 8));
+			goto perf_and_return;
+		}
 		if (isEvilBlock)
 		{
 			mVUsetupRange(mVU, xPC + 8, false);

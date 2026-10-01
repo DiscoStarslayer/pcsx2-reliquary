@@ -253,6 +253,8 @@ void InterpVU1::Step()
 
 void InterpVU1::Execute(u32 cycles)
 {
+	if (vuRunInterleaved(1, cycles))
+		return;
 	const FPControlRegisterBackup fpcr_backup(EmuConfig.Cpu.VU1FPCR);
 
 	VU1.VI[REG_TPC].UL <<= 3;
