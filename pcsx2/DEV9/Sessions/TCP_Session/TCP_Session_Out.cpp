@@ -303,8 +303,6 @@ namespace Sessions
 			}
 		}
 
-		windowSize.store(tcp->windowSize << windowScale);
-
 		const NumCheckResult Result = CheckNumbers(tcp);
 
 		if (Result == NumCheckResult::Bad)
@@ -416,32 +414,27 @@ namespace Sessions
 	TCP_Session::NumCheckResult TCP_Session::CheckNumbers(TCP_Packet* tcp, bool rejectOldSeq)
 	{
 		u32 seqNum;
-		std::vector<u32> oldSeqNums;
-		std::tie(seqNum, oldSeqNums) = GetAllMyNumbers();
+		u32 oldestAck;
+		std::tie(oldestAck, seqNum) = GetAckRange();
 
 		//DevCon.WriteLn("DEV9: TCP: CHECK_NUMBERS");
 		//DevCon.WriteLn("DEV9: TCP: [SRV] CurrSeqNumber = %u [PS2] Ack number = %u", seqNum, tcp->acknowledgementNumber);
 		//DevCon.WriteLn("DEV9: TCP: [SRV] CurrAckNumber = %u [PS2] Seq number = %u", expectedSeqNumber, tcp->sequenceNumber);
 		//DevCon.WriteLn("DEV9: TCP: [PS2] Data length = %u",  tcp->GetPayload()->GetLength());
 
-		if (tcp->acknowledgementNumber != seqNum)
+		if (GetDelta(tcp->acknowledgementNumber, seqNum) > 0 || GetDelta(tcp->acknowledgementNumber, oldestAck) < 0)
 		{
-			//DevCon.WriteLn("DEV9: TCP: [PS2] Sent outdated acknowledgement number, got %u expected %u", tcp->acknowledgementNumber, seqNum);
-
-			// Check if oldSeqNums contains tcp->acknowledgementNumber
-			if (std::find(oldSeqNums.begin(), oldSeqNums.end(), tcp->acknowledgementNumber) == oldSeqNums.end())
-			{
-				Console.Error("DEV9: TCP: [PS2] Sent unexpected acknowledgement number, did not match old numbers, got %u expected %u", tcp->acknowledgementNumber, seqNum);
-				return NumCheckResult::Bad;
-			}
+			Console.Error("DEV9: TCP: [PS2] Sent acknowledgement outside the valid range, got %u expected %u..%u", tcp->acknowledgementNumber, oldestAck, seqNum);
+			return NumCheckResult::Bad;
 		}
-		else
+		windowSize.store(tcp->windowSize << windowScale);
+		if (tcp->acknowledgementNumber == seqNum)
 		{
 			//DevCon.WriteLn("[PS2] CurrSeqNumber acknowledged by PS2");
 			myNumberACKed.store(true);
 		}
 
-		UpdateReceivedAckNumber(tcp->acknowledgementNumber);
+		UpdateReceivedAckNumber(tcp);
 
 		if (tcp->sequenceNumber != expectedSeqNumber)
 		{
@@ -449,7 +442,7 @@ namespace Sessions
 			{
 				Console.Error("DEV9: TCP: [PS2] Sent unexpected sequence number, got %u expected %u", tcp->sequenceNumber, expectedSeqNumber);
 				return NumCheckResult::Bad;
-			} 
+			}
 			else if (tcp->GetPayload()->GetLength() == 0)
 			{
 				Console.Error("DEV9: TCP: [PS2] Sent unexpected sequence number in a empty packet, got %u expected %u", tcp->sequenceNumber, expectedSeqNumber);

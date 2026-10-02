@@ -4,6 +4,7 @@
 #pragma once
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <mutex>
 #include <tuple>
 #include <vector>
@@ -74,6 +75,21 @@ namespace Sessions
 		u32 _ReceivedAckNumber = 1;
 		std::atomic<bool> myNumberACKed{true};
 
+		// Retain host bytes until the guest cumulatively acknowledges them.
+		struct SentData
+		{
+			u32 sequence;
+			std::vector<u8> bytes;
+			size_t offset = 0;
+		};
+		std::deque<SentData> sentData;
+		int lastAckWindow = 0;
+		int duplicateACKs = 0;
+		bool dataRecoveryActive = false;
+		bool retransmitRequested = false;
+		std::chrono::seconds retransmitTimeout{1};
+		std::chrono::steady_clock::time_point retransmitDeadline;
+
 	public:
 		TCP_Session(ConnectionKey parKey, PacketReader::IP::IP_Address parAdapterIP);
 
@@ -88,12 +104,14 @@ namespace Sessions
 		void PushRecvBuff(ReceivedPayload tcp);
 		std::optional<ReceivedPayload> PopRecvBuff();
 
-		void IncrementMyNumber(u32 amount);
-		void UpdateReceivedAckNumber(u32 ack);
+		void IncrementMyNumber(u32 amount, const u8* data = nullptr);
+		void UpdateReceivedAckNumber(const PacketReader::IP::TCP::TCP_Packet* tcp);
+		void AcknowledgeSentData(u32 ack);
+		std::optional<ReceivedPayload> RecvDataRetransmission(bool& waiting);
 		u32 GetMyNumber();
 		u32 GetOutstandingSequenceLength();
 		bool ShouldWaitForAck();
-		std::tuple<u32, std::vector<u32>> GetAllMyNumbers();
+		std::tuple<u32, u32> GetAckRange();
 		void ResetMyNumbers();
 
 		NumCheckResult CheckRepeatSYNNumbers(PacketReader::IP::TCP::TCP_Packet* tcp);

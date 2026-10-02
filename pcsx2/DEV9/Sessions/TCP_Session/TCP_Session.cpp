@@ -3,6 +3,7 @@
 
 #include "TCP_Session.h"
 
+#include <algorithm>
 #include <thread>
 
 #ifdef _WIN32
@@ -31,19 +32,120 @@ namespace Sessions
 			return std::nullopt;
 	}
 
-	void TCP_Session::IncrementMyNumber(u32 amount)
+	void TCP_Session::IncrementMyNumber(u32 amount, const u8* data)
 	{
 		std::lock_guard numberlock(myNumberSentry);
+		if (data && amount != 0)
+		{
+			if (sentData.empty())
+			{
+				retransmitTimeout = std::chrono::seconds(1);
+				retransmitDeadline = std::chrono::steady_clock::now() + retransmitTimeout;
+			}
+			sentData.push_back({_MySequenceNumber, std::vector<u8>(data, data + amount)});
+		}
 		_OldMyNumbers.push_back(_MySequenceNumber);
 		_OldMyNumbers.erase(_OldMyNumbers.begin());
 
 		_MySequenceNumber += amount;
 	}
-	void TCP_Session::UpdateReceivedAckNumber(u32 ack)
+	void TCP_Session::AcknowledgeSentData(u32 ack)
+	{
+		while (!sentData.empty())
+		{
+			SentData& first = sentData.front();
+			const int acknowledged = GetDelta(ack, first.sequence);
+			if (acknowledged < 0)
+				break;
+			if (static_cast<size_t>(acknowledged) < first.bytes.size())
+			{
+				first.offset = static_cast<size_t>(acknowledged);
+				break;
+			}
+			sentData.pop_front();
+		}
+	}
+	void TCP_Session::UpdateReceivedAckNumber(const TCP_Packet* tcp)
 	{
 		std::lock_guard numberlock(myNumberSentry);
-		if (GetDelta(ack, _ReceivedAckNumber) > 0)
+		const u32 ack = tcp->acknowledgementNumber;
+		const int delta = GetDelta(ack, _ReceivedAckNumber);
+		if (delta < 0)
+			return;
+
+		const int window = windowSize.load();
+		const int previousWindow = lastAckWindow;
+		lastAckWindow = window;
+		if (delta > 0)
+		{
 			_ReceivedAckNumber = ack;
+			duplicateACKs = 0;
+			retransmitTimeout = std::chrono::seconds(1);
+			retransmitDeadline = std::chrono::steady_clock::now() + retransmitTimeout;
+			AcknowledgeSentData(ack);
+			if (dataRecoveryActive)
+				retransmitRequested = true;
+		}
+		else if (!sentData.empty() && window > 0 && window == previousWindow &&
+				 tcp->GetACK() && !tcp->GetSYN() && !tcp->GetFIN() && tcp->GetPayload()->GetLength() == 0)
+		{
+			if (++duplicateACKs == 3)
+				retransmitRequested = true;
+		}
+		else
+			duplicateACKs = 0;
+
+		if (sentData.empty())
+		{
+			dataRecoveryActive = false;
+			retransmitRequested = false;
+			duplicateACKs = 0;
+			return;
+		}
+		if (previousWindow == 0 && window > 0)
+			retransmitRequested = true;
+		if (retransmitRequested)
+			dataRecoveryActive = true;
+	}
+
+	std::optional<ReceivedPayload> TCP_Session::RecvDataRetransmission(bool& waiting)
+	{
+		std::unique_ptr<PayloadData> data;
+		u32 sequence;
+		waiting = false;
+		{
+			std::lock_guard numberlock(myNumberSentry);
+			if (sentData.empty())
+				return std::nullopt;
+			waiting = dataRecoveryActive;
+			const auto now = std::chrono::steady_clock::now();
+			if (!retransmitRequested && now < retransmitDeadline)
+				return std::nullopt;
+
+			dataRecoveryActive = true;
+			waiting = true;
+			const int window = windowSize.load();
+			const SentData& first = sentData.front();
+			const int length = std::min({static_cast<int>(first.bytes.size() - first.offset),
+				window, maxSegmentSize - (sendTimeStamps ? 12 : 0)});
+			if (length <= 0)
+				return std::nullopt;
+
+			if (!retransmitRequested)
+				retransmitTimeout = std::min(retransmitTimeout * 2, std::chrono::seconds(60));
+			data = std::make_unique<PayloadData>(length);
+			memcpy(data->data.get(), first.bytes.data() + first.offset, length);
+			sequence = first.sequence + static_cast<u32>(first.offset);
+			retransmitRequested = false;
+			retransmitDeadline = now + retransmitTimeout;
+		}
+
+		// Retransmissions reuse sequence numbers and never read the host socket.
+		std::unique_ptr<TCP_Packet> packet = CreateBasePacket(data.release());
+		packet->sequenceNumber = sequence;
+		packet->SetACK(true);
+		packet->SetPSH(true);
+		return ReceivedPayload{destIP, std::move(packet)};
 	}
 	u32 TCP_Session::GetMyNumber()
 	{
@@ -58,22 +160,24 @@ namespace Sessions
 	bool TCP_Session::ShouldWaitForAck()
 	{
 		std::lock_guard numberlock(myNumberSentry);
-		return _OldMyNumbers[0] == _ReceivedAckNumber;
+		return GetDelta(_ReceivedAckNumber, _OldMyNumbers[0]) <= 0;
 	}
-	std::tuple<u32, std::vector<u32>> TCP_Session::GetAllMyNumbers()
+	std::tuple<u32, u32> TCP_Session::GetAckRange()
 	{
 		std::lock_guard numberlock(myNumberSentry);
-
-		std::vector<u32> old;
-		old.reserve(_OldMyNumbers.size());
-		old.insert(old.end(), _OldMyNumbers.begin(), _OldMyNumbers.end());
-
-		return {_MySequenceNumber, old};
+		const u32 oldestAck = GetDelta(_ReceivedAckNumber, _OldMyNumbers.front()) < 0 ? _ReceivedAckNumber : _OldMyNumbers.front();
+		return {oldestAck, _MySequenceNumber};
 	}
 	void TCP_Session::ResetMyNumbers()
 	{
 		std::lock_guard numberlock(myNumberSentry);
 		_MySequenceNumber = 1;
+		_ReceivedAckNumber = 1;
+		sentData.clear();
+		dataRecoveryActive = false;
+		retransmitRequested = false;
+		duplicateACKs = 0;
+		lastAckWindow = 0;
 		_OldMyNumbers.clear();
 		for (int i = 0; i < oldMyNumCount; i++)
 			_OldMyNumbers.push_back(1);

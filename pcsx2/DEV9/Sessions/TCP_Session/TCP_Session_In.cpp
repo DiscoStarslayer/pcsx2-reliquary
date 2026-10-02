@@ -63,8 +63,19 @@ namespace Sessions
 				return std::nullopt;
 			case TCP_State::Connected:
 			case TCP_State::Closing_ClosedByPS2:
-				// Only accept data in above two states
+			case TCP_State::Closing_ClosedByRemote:
+			case TCP_State::Closing_ClosedByRemoteThenPS2_WaitingForAck:
+			case TCP_State::Closing_ClosedByPS2ThenRemote_WaitingForAck:
+			{
+				bool waiting;
+				ret = RecvDataRetransmission(waiting);
+				if (ret.has_value() || waiting)
+					return ret;
+				// Only read new host data while the receive side is open.
+				if (state != TCP_State::Connected && state != TCP_State::Closing_ClosedByPS2)
+					return std::nullopt;
 				break;
+			}
 			default:
 				return std::nullopt;
 		}
@@ -169,7 +180,7 @@ namespace Sessions
 				memcpy(recivedData->data.get(), buffer.get(), recived);
 
 				std::unique_ptr<TCP_Packet> iRet = CreateBasePacket(recivedData);
-				IncrementMyNumber(static_cast<u32>(recived));
+				IncrementMyNumber(static_cast<u32>(recived), recivedData->data.get());
 
 				iRet->SetACK(true);
 				iRet->SetPSH(true);
