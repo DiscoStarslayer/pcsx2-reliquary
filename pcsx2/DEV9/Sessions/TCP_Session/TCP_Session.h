@@ -4,6 +4,7 @@
 #pragma once
 #include <atomic>
 #include <chrono>
+#include <deque>
 #include <mutex>
 #include <tuple>
 #include <vector>
@@ -42,6 +43,13 @@ namespace Sessions
 			Bad
 		};
 
+		enum struct DataRecoveryState
+		{
+			None,
+			WaitingForAck,
+			RetransmitPending
+		};
+
 		SimpleQueue<ReceivedPayload> _recvBuff;
 
 #ifdef _WIN32
@@ -59,9 +67,9 @@ namespace Sessions
 		int windowScale = 0;
 		std::atomic<int> windowSize{1460};
 
-		u32 lastRecivedTimeStamp; // Accesed by both in and out threads
-		std::chrono::steady_clock::time_point timeStampStart; // Set by in thread on connect, read by in and out threads
-		bool sendTimeStamps = false; // Accesed by out thread only
+		u32 lastReceivedTimeStamp;
+		std::chrono::steady_clock::time_point timeStampStart;
+		bool sendTimeStamps = false;
 
 		const int receivedPS2SeqNumberCount = 5;
 		u32 expectedSeqNumber; // Accesed by out thread only
@@ -70,9 +78,25 @@ namespace Sessions
 		std::mutex myNumberSentry;
 		const int oldMyNumCount = 64;
 		u32 _MySequenceNumber = 1;
-		std::vector<u32> _OldMyNumbers;
+		std::deque<u32> _OldMyNumbers;
 		u32 _ReceivedAckNumber = 1;
 		std::atomic<bool> myNumberACKed{true};
+
+		struct SentData
+		{
+			u32 sequence;
+			std::vector<u8> bytes;
+			size_t offset = 0;
+		};
+
+		std::deque<SentData> sentData;
+
+		int lastAckWindow = 0;
+		int duplicateACKs = 0;
+		DataRecoveryState dataRecoveryState = DataRecoveryState::None;
+
+		std::chrono::seconds retransmitTimeout{1};
+		std::chrono::steady_clock::time_point retransmitDeadline;
 
 	public:
 		TCP_Session(ConnectionKey parKey, PacketReader::IP::IP_Address parAdapterIP);
@@ -88,18 +112,20 @@ namespace Sessions
 		void PushRecvBuff(ReceivedPayload tcp);
 		std::optional<ReceivedPayload> PopRecvBuff();
 
-		void IncrementMyNumber(u32 amount);
-		void UpdateReceivedAckNumber(u32 ack);
+		void IncrementMyNumber(u32 amount, const u8* data = nullptr);
+		void UpdateReceivedAckNumber(const PacketReader::IP::TCP::TCP_Packet* tcp);
+		void AcknowledgeSentData(u32 ack);
+		std::optional<ReceivedPayload> RecvDataRetransmission();
+
 		u32 GetMyNumber();
-		u32 GetOutstandingSequenceLength();
-		bool ShouldWaitForAck();
-		std::tuple<u32, std::vector<u32>> GetAllMyNumbers();
+		int GetReceiveSize();
+		std::tuple<u32, u32> GetAckRange();
 		void ResetMyNumbers();
 
 		NumCheckResult CheckRepeatSYNNumbers(PacketReader::IP::TCP::TCP_Packet* tcp);
 		NumCheckResult CheckNumbers(PacketReader::IP::TCP::TCP_Packet* tcp, bool rejectOldSeq = false);
 		// Returns a - b, accounting for overflow
-		s32 GetDelta(u32 a, u32 b);
+		static s32 GetDelta(u32 a, u32 b);
 		// Returns true if errored
 		bool ValidateEmptyPacket(PacketReader::IP::TCP::TCP_Packet* tcp, bool ignoreOld = true);
 
@@ -138,6 +164,9 @@ namespace Sessions
 
 		// Error on sending data
 		void CloseByRemoteRST();
+
+		void UpdateTimeStamp(const PacketReader::IP::TCP::TCP_Packet* tcp);
+		void AddTimeStampOption(PacketReader::IP::TCP::TCP_Packet* tcp);
 
 		// Returned TCP_Packet takes ownership of data
 		std::unique_ptr<PacketReader::IP::TCP::TCP_Packet> CreateBasePacket(PacketReader::PayloadData* data = nullptr);
