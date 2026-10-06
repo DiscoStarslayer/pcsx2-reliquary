@@ -180,6 +180,12 @@ namespace PacketReader::IP::TCP
 			options.push_back(original.options[i]->Clone());
 	}
 
+	TCP_Packet::~TCP_Packet()
+	{
+		for (BaseOption* option : options)
+			delete option;
+	}
+
 	Payload* TCP_Packet::GetPayload() const
 	{
 		return payload.get();

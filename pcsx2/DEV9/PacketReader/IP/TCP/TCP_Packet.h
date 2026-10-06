@@ -69,6 +69,7 @@ namespace PacketReader::IP::TCP
 		TCP_Packet(Payload* data);
 		TCP_Packet(const u8* buffer, int bufferSize);
 		TCP_Packet(const TCP_Packet&);
+		~TCP_Packet();
 
 		Payload* GetPayload() const;
 
