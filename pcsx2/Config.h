@@ -708,6 +708,8 @@ struct Pcsx2Config
 		BITFIELD32()
 		bool
 			ExtraMemory : 1,
+			EnableEERAMReadTiming : 1,
+			EnableEEInstructionCacheTiming : 1,
 			FPUSoftFloat : 1,
 			VU0SoftFloat : 1,
 			VU1SoftFloat : 1;

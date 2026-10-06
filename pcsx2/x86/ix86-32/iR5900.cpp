@@ -5,6 +5,7 @@
 #include "CDVD/CDVD.h"
 #include "DebugTools/Breakpoints.h"
 #include "Elfheader.h"
+#include "EEMemoryTiming.h"
 #include "GS.h"
 #include "Host.h"
 #include "Memory.h"
@@ -98,11 +99,24 @@ static u32 s_saveHasConstReg = 0, s_saveFlushedConstReg = 0;
 static EEINST* s_psaveInstInfo = nullptr;
 
 static u32 s_savenBlockCycles = 0;
+static u32 s_instructionCacheBlockPC;
 
 static void iBranchTest(u32 newpc = 0xffffffff);
 static void ClearRecLUT(BASEBLOCK* base, int count);
 static u32 scaleblockcycles();
 static void recExitExecution();
+
+static void BeginInstructionCacheBlock()
+{
+	// Physical blocks can be shared by virtual aliases with different cache modes.
+	s_instructionCacheBlockPC = cpuRegs.pc;
+	cpuRegs.cycle += EEMemoryTiming::FetchInstruction(cpuRegs.pc);
+}
+
+static void FetchInstructionCacheLine(u32 offset)
+{
+	cpuRegs.cycle += EEMemoryTiming::FetchInstruction(s_instructionCacheBlockPC + offset);
+}
 
 #ifdef TRACE_BLOCKS
 static void pauseAAA()
@@ -781,8 +795,8 @@ void R5900::Dynarec::OpcodeImpl::recSYSCALL()
 	EE::Profiler.EmitOp(eeOpcode::SYSCALL);
 	if (GPR_IS_CONST1(3))
 	{
-		// If it's FlushCache or iFlushCache, we can skip it since we don't support cache in the JIT.
-		if (g_cpuConstRegs[3].UC[0] == 0x64 || g_cpuConstRegs[3].UC[0] == 0x68)
+		if (!EmuConfig.Cpu.EnableEEInstructionCacheTiming &&
+			(g_cpuConstRegs[3].UC[0] == 0x64 || g_cpuConstRegs[3].UC[0] == 0x68))
 		{
 			// Emulate the amount of cycles it takes for the exception handlers to run
 			// This number was found by using github.com/F0bes/flushcache-cycles
@@ -936,6 +950,9 @@ u8* recEndThunk()
 
 bool TrySwapDelaySlot(u32 rs, u32 rt, u32 rd, bool allow_loadstore)
 {
+	// Preserve instruction-fetch order across cache lines.
+	if (EmuConfig.Cpu.EnableEEInstructionCacheTiming)
+		return false;
 #if 1
 	if (g_recompilingDelaySlot)
 		return false;
@@ -1678,6 +1695,12 @@ void recompileNextInstruction(bool delayslot, bool swapped_delay_slot)
 {
 	if (EmuConfig.EnablePatches)
 		Patch::ApplyDynamicPatches(pc);
+
+	if (EmuConfig.Cpu.EnableEEInstructionCacheTiming && (pc & (EEMemoryTiming::INSTRUCTION_CACHE_LINE_SIZE - 1)) == 0 && HWADDR(pc) != s_pCurBlockEx->startpc)
+	{
+		iFlushCall(FLUSH_EVERYTHING);
+		xFastCall((void*)FetchInstructionCacheLine, HWADDR(pc) - s_pCurBlockEx->startpc);
+	}
 
 	// add breakpoint
 	if (!delayslot)
@@ -2603,6 +2626,11 @@ StartRecomp:
 
 	// Detect and handle self-modified code
 	memory_protect_recompiled_code(startpc, (s_nEndBlock - startpc) >> 2);
+	if (EmuConfig.Cpu.EnableEEInstructionCacheTiming)
+	{
+		iFlushCall(FLUSH_EVERYTHING);
+		xFastCall((void*)BeginInstructionCacheBlock);
+	}
 
 	// Skip Recompilation if sceMpegIsEnd Pattern detected
 	const bool doRecompilation = !skipMPEG_By_Pattern(startpc) && !recSkipTimeoutLoop(timeout_reg, is_timeout_loop);

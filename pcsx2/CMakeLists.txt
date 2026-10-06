@@ -65,6 +65,7 @@ set(pcsx2Sources
 	COP2.cpp
 	Counters.cpp
 	Dmac.cpp
+	EEMemoryTiming.cpp
 	GameDatabase.cpp
 	Elfheader.cpp
 	FireWire/FireWire.cpp
@@ -159,6 +160,7 @@ set(pcsx2Headers
 	COP0.h
 	Counters.h
 	Dmac.h
+	EEMemoryTiming.h
 	FireWire/FireWire.h
 	FireWire/FireWireDevice.h
 	FireWire/deviceproxy.h

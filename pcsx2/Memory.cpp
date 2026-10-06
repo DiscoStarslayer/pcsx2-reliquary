@@ -23,6 +23,7 @@ BIOS
 */
 
 #include "DEV9/DEV9.h"
+#include "EEMemoryTiming.h"
 #include "IopHw.h"
 #include "GS/Renderers/Common/GSFunctionMap.h"
 #include "GS.h"
@@ -458,6 +459,11 @@ void memMapKernelMem()
 	vtlb_VMap(0x80000000, 0x00000000, _1mb*512);
 	//0xa* mirror
 	vtlb_VMap(0xA0000000, 0x00000000, _1mb*512);
+	for (u32 addr = 0; addr < Ps2MemSize::ExposedRam; addr += EEMemoryTiming::PAGE_SIZE)
+	{
+		EEMemoryTiming::SetPage(0x80000000 + addr, addr, EEMemoryTiming::KSEG0_CACHE_MODE);
+		EEMemoryTiming::SetPage(0xA0000000 + addr, addr, 2);
+	}
 }
 
 //what do do with these ?
@@ -1033,6 +1039,8 @@ void memReset()
 	// we opt for the hard/safe version.
 
 	pxAssume( eeMem );
+	// Keep timing mappings current even when disabled, for runtime settings changes.
+	EEMemoryTiming::Reset(cpuRegs.CP0.n.Config, Ps2MemSize::ExposedRam);
 
 #ifdef ENABLECACHE
 	memset(pCache,0,sizeof(_cacheS)*64);
@@ -1142,6 +1150,8 @@ void memReset()
 
 	vtlb_VMap(0x00000000,0x00000000,0x20000000);
 	vtlb_VMapUnmap(0x20000000,0x60000000);
+	for (u32 addr = 0; addr < Ps2MemSize::ExposedRam; addr += EEMemoryTiming::PAGE_SIZE)
+		EEMemoryTiming::SetPage(addr, addr, 3);
 
 	std::memset(s_ba, 0, sizeof(s_ba));
 

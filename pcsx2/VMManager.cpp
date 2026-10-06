@@ -10,6 +10,7 @@
 #include "DebugTools/DebugInterface.h"
 #include "DebugTools/SymbolImporter.h"
 #include "Elfheader.h"
+#include "EEMemoryTiming.h"
 #include "FireWire/FireWire.h"
 #include "GS.h"
 #include "GS/Renderers/HW/GSTextureReplacements.h"
@@ -3152,6 +3153,8 @@ void VMManager::CheckForCPUConfigChanges(const Pcsx2Config& old_config)
 	}
 
 	Console.WriteLn("Updating CPU configuration...");
+	if (EmuConfig.Cpu.EnableEEInstructionCacheTiming != old_config.Cpu.EnableEEInstructionCacheTiming)
+		EEMemoryTiming::ResetInstructionCache();
 	FPControlRegister::SetCurrent(EmuConfig.Cpu.FPUFPCR);
 	if (EmuConfig.Cpu.VU0SoftFloat != old_config.Cpu.VU0SoftFloat)
 		VU0.accflag = 0;

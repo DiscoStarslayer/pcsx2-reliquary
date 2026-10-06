@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0+
 
 #include "Common.h"
+#include "EEMemoryTiming.h"
 #include "iR5900.h"
 #include "R5900OpcodeTables.h"
 
@@ -196,14 +197,13 @@ void recCOP1_Unknown()
 *
 **********************************************************/
 
-// Suikoden 3 uses it a lot
-void recCACHE() //Interpreter only!
+void recCACHE()
 {
-	//xMOV(ptr32[&cpuRegs.code], (u32)cpuRegs.code );
-	//xMOV(ptr32[&cpuRegs.pc], (u32)pc );
-	//iFlushCall(FLUSH_EVERYTHING);
-	//xFastCall((void*)(uptr)R5900::Interpreter::OpcodeImpl::CACHE );
-	//branch = 2;
+	if (EmuConfig.Cpu.EnableEEInstructionCacheTiming && EEMemoryTiming::IsInstructionCacheOperation(_Rt_))
+	{
+		iFlushCall(FLUSH_EVERYTHING | FLUSH_CODE);
+		xFastCall((void*)R5900::Interpreter::OpcodeImpl::CACHE);
+	}
 }
 
 void recTGE()

@@ -3,6 +3,7 @@
 
 #include "Common.h"
 #include "Cache.h"
+#include "EEMemoryTiming.h"
 #include "vtlb.h"
 
 using namespace R5900;
@@ -385,6 +386,11 @@ namespace R5900
 			void CACHE()
 			{
 				u32 addr = cpuRegs.GPR.r[_Rs_].UL[0] + _Imm_;
+				if (EmuConfig.Cpu.EnableEEInstructionCacheTiming && EEMemoryTiming::IsInstructionCacheOperation(_Rt_))
+				{
+					cpuRegs.cycle += EEMemoryTiming::ExecuteInstructionCacheOperation(_Rt_, addr, cpuRegs.CP0.n.TagLo);
+					return;
+				}
 				// CACHE_LOG("cpuRegs.GPR.r[_Rs_].UL[0] = %x, IMM = %x RT = %x", cpuRegs.GPR.r[_Rs_].UL[0], _Imm_, _Rt_);
 
 				switch (_Rt_)

@@ -180,6 +180,20 @@
           </property>
          </widget>
         </item>
+        <item row="4" column="0">
+         <widget class="QCheckBox" name="eeRAMReadTiming">
+          <property name="text">
+           <string>Enable RAM Read Timing</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="QCheckBox" name="eeInstructionCacheTiming">
+          <property name="text">
+           <string>Enable Instruction Cache Timing</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
       <item row="3" column="0" colspan="2">
@@ -766,6 +780,8 @@
   <tabstop>eeFastmem</tabstop>
   <tabstop>pauseOnTLBMiss</tabstop>
   <tabstop>extraMemory</tabstop>
+  <tabstop>eeRAMReadTiming</tabstop>
+  <tabstop>eeInstructionCacheTiming</tabstop>
   <tabstop>vu0RoundingMode</tabstop>
   <tabstop>vu0ClampMode</tabstop>
   <tabstop>vu1RoundingMode</tabstop>

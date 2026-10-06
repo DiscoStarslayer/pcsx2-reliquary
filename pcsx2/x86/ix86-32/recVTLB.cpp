@@ -3,6 +3,8 @@
 
 #include "Common.h"
 #include "vtlb.h"
+#include "EEMemoryTiming.h"
+#include "R5900OpcodeTables.h"
 #include "x86/iCore.h"
 #include "x86/iR5900.h"
 
@@ -13,6 +15,30 @@ using namespace x86Emitter;
 
 // we need enough for a 32-bit jump forwards (5 bytes)
 static constexpr u32 LOADSTORE_PADDING = 5;
+
+static void EmitRAMReadWait(int addr_reg)
+{
+	if (!EmuConfig.Cpu.EnableEERAMReadTiming || !(R5900::GetCurrentInstruction().flags & IS_LOAD))
+		return;
+	pxAssert(addr_reg == arg1reg.GetId());
+	_freeX86reg(eax);
+	_freeX86reg(edx);
+	xMOV(eax, xRegister32(addr_reg));
+	xSHR(eax, EEMemoryTiming::PAGE_BITS);
+	xLEA(rdx, ptr[EEMemoryTiming::ReadWaitCycles.data()]);
+	xMOVZX(eax, ptr8[rdx + rax]);
+	xADD(ptr64[&cpuRegs.cycle], rax);
+}
+
+static void EmitRAMReadWait_Const(u32 addr_const)
+{
+	if (!EmuConfig.Cpu.EnableEERAMReadTiming || !(R5900::GetCurrentInstruction().flags & IS_LOAD))
+		return;
+	_freeX86reg(eax);
+	// Read at runtime: remapping the data page need not invalidate its caller.
+	xMOVZX(eax, ptr8[&EEMemoryTiming::ReadWaitCycles[addr_const >> EEMemoryTiming::PAGE_BITS]]);
+	xADD(ptr64[&cpuRegs.cycle], rax);
+}
 
 //#define LOG_STORES
 
@@ -366,6 +392,7 @@ void vtlb_DynGenDispatchers()
 int vtlb_DynGenReadNonQuad(u32 bits, bool sign, bool xmm, int addr_reg, vtlb_ReadRegAllocCallback dest_reg_alloc)
 {
 	pxAssume(bits <= 64);
+	EmitRAMReadWait(addr_reg);
 
 	int x86_dest_reg;
 	if (!CHECK_FASTMEM || vtlb_IsFaultingPC(pc))
@@ -449,6 +476,7 @@ int vtlb_DynGenReadNonQuad(u32 bits, bool sign, bool xmm, int addr_reg, vtlb_Rea
 int vtlb_DynGenReadNonQuad_Const(u32 bits, bool sign, bool xmm, u32 addr_const, vtlb_ReadRegAllocCallback dest_reg_alloc)
 {
 	EE::Profiler.EmitConstMem(addr_const);
+	EmitRAMReadWait_Const(addr_const);
 
 	int x86_dest_reg;
 	auto vmv = vtlbdata.vmap[addr_const >> VTLB_PAGE_BITS];
@@ -555,6 +583,7 @@ int vtlb_DynGenReadNonQuad_Const(u32 bits, bool sign, bool xmm, u32 addr_const, 
 int vtlb_DynGenReadQuad(u32 bits, int addr_reg, vtlb_ReadRegAllocCallback dest_reg_alloc)
 {
 	pxAssume(bits == 128);
+	EmitRAMReadWait(addr_reg);
 
 	if (!CHECK_FASTMEM || vtlb_IsFaultingPC(pc))
 	{
@@ -596,6 +625,7 @@ int vtlb_DynGenReadQuad_Const(u32 bits, u32 addr_const, vtlb_ReadRegAllocCallbac
 	pxAssert(bits == 128);
 
 	EE::Profiler.EmitConstMem(addr_const);
+	EmitRAMReadWait_Const(addr_const);
 
 	int reg;
 	auto vmv = vtlbdata.vmap[addr_const >> VTLB_PAGE_BITS];

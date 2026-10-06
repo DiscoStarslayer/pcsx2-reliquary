@@ -590,7 +590,8 @@ bool Pcsx2Config::CpuOptions::operator!=(const CpuOptions& right) const
 
 bool Pcsx2Config::CpuOptions::operator==(const CpuOptions& right) const
 {
-	return OpEqu(FPUSoftFloat) && OpEqu(VU0SoftFloat) && OpEqu(VU1SoftFloat) &&
+	return OpEqu(EnableEERAMReadTiming) && OpEqu(EnableEEInstructionCacheTiming) &&
+	       OpEqu(FPUSoftFloat) && OpEqu(VU0SoftFloat) && OpEqu(VU1SoftFloat) &&
 	       OpEqu(FPUFPCR) && OpEqu(FPUDivFPCR) && OpEqu(VU0FPCR) && OpEqu(VU1FPCR) &&
 	       OpEqu(Recompiler);
 }
@@ -598,6 +599,8 @@ bool Pcsx2Config::CpuOptions::operator==(const CpuOptions& right) const
 Pcsx2Config::CpuOptions::CpuOptions()
 {
 	ExtraMemory = false;
+	EnableEERAMReadTiming = false;
+	EnableEEInstructionCacheTiming = false;
 	FPUSoftFloat = false;
 	VU0SoftFloat = false;
 	VU1SoftFloat = false;
@@ -638,6 +641,8 @@ void Pcsx2Config::CpuOptions::LoadSave(SettingsWrapper& wrap)
 	read_fpcr(VU1FPCR, "VU1");
 
 	SettingsWrapBitBool(ExtraMemory);
+	SettingsWrapBitBool(EnableEERAMReadTiming);
+	SettingsWrapBitBool(EnableEEInstructionCacheTiming);
 	SettingsWrapBitBoolEx(FPUSoftFloat, "FPU.SoftFloat");
 	SettingsWrapBitBoolEx(VU0SoftFloat, "VU0.SoftFloat");
 	SettingsWrapBitBoolEx(VU1SoftFloat, "VU1.SoftFloat");

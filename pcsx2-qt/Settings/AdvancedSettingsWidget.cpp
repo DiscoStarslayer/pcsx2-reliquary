@@ -18,6 +18,8 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* settings_dialog, 
 
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeRecompiler, "EmuCore/CPU/Recompiler", "EnableEE", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeCache, "EmuCore/CPU/Recompiler", "EnableEECache", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeRAMReadTiming, "EmuCore/CPU", "EnableEERAMReadTiming", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeInstructionCacheTiming, "EmuCore/CPU", "EnableEEInstructionCacheTiming", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeINTCSpinDetection, "EmuCore/Speedhacks", "IntcStat", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeWaitLoopDetection, "EmuCore/Speedhacks", "WaitLoop", true);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.eeFastmem, "EmuCore/CPU/Recompiler", "EnableFastmem", true);
@@ -107,6 +109,13 @@ AdvancedSettingsWidget::AdvancedSettingsWidget(SettingsWindow* settings_dialog, 
 
 	dialog()->registerWidgetHelp(m_ui.eeCache, tr("Enable Cache (Slow)"), tr("Unchecked"),
 		tr("Enables emulation of the EE's hardware cache. Interpreter only, provided for diagnostics."));
+
+	dialog()->registerWidgetHelp(m_ui.eeRAMReadTiming, tr("Enable RAM Read Timing"), tr("Unchecked"),
+		tr("Emulates wait cycles for uncached EE main-memory reads using timings measured on a PS2. "
+		   "Works with both the interpreter and recompiler. Experimental; may affect game timing and performance."));
+	dialog()->registerWidgetHelp(m_ui.eeInstructionCacheTiming, tr("Enable Instruction Cache Timing"), tr("Unchecked"),
+		tr("Emulates EE instruction-cache misses and their wait cycles using timings measured on a PS2. "
+		   "Works with both the interpreter and recompiler. Experimental; may affect game timing and performance."));
 
 	//: INTC = Name of a PS2 register, leave as-is. "spin" = to make a cpu (or gpu) actively do nothing while you wait for something.  Like spinning in a circle, you're moving but not actually going anywhere.
 	dialog()->registerWidgetHelp(m_ui.eeINTCSpinDetection, tr("INTC Spin Detection"), tr("Checked"),

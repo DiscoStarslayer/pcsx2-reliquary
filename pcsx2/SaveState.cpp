@@ -11,6 +11,7 @@
 #include "DebugTools/Breakpoints.h"
 #include "DebugTools/SymbolImporter.h"
 #include "Elfheader.h"
+#include "EEMemoryTiming.h"
 #include "FireWire/FireWire.h"
 #include "GS.h"
 #include "GS/GS.h"
@@ -68,7 +69,8 @@ static void PreLoadPrep()
 static void PostLoadPrep()
 {
 	resetCache();
-//	WriteCP0Status(cpuRegs.CP0.n.Status.val);
+	EEMemoryTiming::UpdateConfig(cpuRegs.CP0.n.Config);
+	EEMemoryTiming::ResetInstructionCache();
 	for (int i = 0; i < 48; i++)
 	{
 		if (std::memcmp(&s_tlb_backup[i], &tlb[i], sizeof(tlbs)) != 0)

@@ -3,6 +3,7 @@
 
 #include "Common.h"
 #include "COP0.h"
+#include "EEMemoryTiming.h"
 
 // Updates the CPU's mode of operation (either, Kernel, Supervisor, or User modes).
 // Currently the different modes are not implemented.
@@ -32,6 +33,7 @@ void WriteCP0Config(u32 value)
 	// Protect the read-only ICacheSize (IC) and DataCacheSize (DC) bits
 	cpuRegs.CP0.n.Config = value & ~0xFC0;
 	cpuRegs.CP0.n.Config |= 0x440;
+	EEMemoryTiming::UpdateConfig(cpuRegs.CP0.n.Config);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +245,8 @@ void MapTLB(const tlbs& t, int i)
 			Console.Warning("COP0: Mapping Scratchpad to non-default address 0x%08X", t.VPN2());
 
 		vtlb_VMapBuffer(t.VPN2(), eeMem->Scratch, Ps2MemSize::Scratch);
+		for (u32 offset = 0; offset < Ps2MemSize::Scratch; offset += EEMemoryTiming::PAGE_SIZE)
+			EEMemoryTiming::ClearPage(t.VPN2() + offset);
 	}
 	else
 	{
@@ -255,8 +259,9 @@ void MapTLB(const tlbs& t, int i)
 			for (addr = saddr; addr < eaddr; addr++)
 			{
 				if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-				{ //match
+				{
 					memSetPageAddr(addr << 12, t.PFN0() + ((addr - saddr) << 12));
+					EEMemoryTiming::SetPage(addr << 12, t.PFN0() + ((addr - saddr) << 12), t.EntryLo0.C);
 					Cpu->Clear(addr << 12, 0x400);
 				}
 			}
@@ -271,8 +276,9 @@ void MapTLB(const tlbs& t, int i)
 			for (addr = saddr; addr < eaddr; addr++)
 			{
 				if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-				{ //match
+				{
 					memSetPageAddr(addr << 12, t.PFN1() + ((addr - saddr) << 12));
+					EEMemoryTiming::SetPage(addr << 12, t.PFN1() + ((addr - saddr) << 12), t.EntryLo1.C);
 					Cpu->Clear(addr << 12, 0x400);
 				}
 			}
@@ -291,13 +297,14 @@ __inline u32 ConvertPageMask(const u32 PageMask)
 
 void UnmapTLB(const tlbs& t, int i)
 {
-	//Console.WriteLn("Clear TLB %d: %08x-> [%08x %08x] S=%d G=%d ASID=%d Mask= %03X", i,t.VPN2,t.PFN0,t.PFN1,t.S,t.G,t.ASID,t.Mask);
 	u32 mask, addr;
 	u32 saddr, eaddr;
 
 	if (t.isSPR())
 	{
-		vtlb_VMapUnmap(t.VPN2(), 0x4000);
+		vtlb_VMapUnmap(t.VPN2(), Ps2MemSize::Scratch);
+		for (u32 offset = 0; offset < Ps2MemSize::Scratch; offset += EEMemoryTiming::PAGE_SIZE)
+			EEMemoryTiming::ClearPage(t.VPN2() + offset);
 		return;
 	}
 
@@ -306,12 +313,13 @@ void UnmapTLB(const tlbs& t, int i)
 		mask = ((~t.Mask()) << 1) & 0xfffff;
 		saddr = t.VPN2() >> 12;
 		eaddr = saddr + t.Mask() + 1;
-		//	Console.WriteLn("Clear TLB: %08x ~ %08x",saddr,eaddr-1);
+
 		for (addr = saddr; addr < eaddr; addr++)
 		{
 			if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-			{ //match
+			{
 				memClearPageAddr(addr << 12);
+				EEMemoryTiming::ClearPage(addr << 12);
 				Cpu->Clear(addr << 12, 0x400);
 			}
 		}
@@ -322,12 +330,13 @@ void UnmapTLB(const tlbs& t, int i)
 		mask = ((~t.Mask()) << 1) & 0xfffff;
 		saddr = (t.VPN2() >> 12) + t.Mask() + 1;
 		eaddr = saddr + t.Mask() + 1;
-		//	Console.WriteLn("Clear TLB: %08x ~ %08x",saddr,eaddr-1);
+
 		for (addr = saddr; addr < eaddr; addr++)
 		{
 			if ((addr & mask) == ((t.VPN2() >> 12) & mask))
-			{ //match
+			{
 				memClearPageAddr(addr << 12);
+				EEMemoryTiming::ClearPage(addr << 12);
 				Cpu->Clear(addr << 12, 0x400);
 			}
 		}

@@ -6,6 +6,7 @@
 #include "VMManager.h"
 #include "Elfheader.h"
 #include "Cache.h"
+#include "EEMemoryTiming.h"
 
 #include "DebugTools/Breakpoints.h"
 
@@ -169,6 +170,8 @@ static void execI()
 #endif
 
 	const u32 pc = cpuRegs.pc;
+	if (EmuConfig.Cpu.EnableEEInstructionCacheTiming)
+		cpuRegs.cycle += EEMemoryTiming::FetchInstruction(pc);
 	// We need to increase the pc before executing the memRead32. An exception could appears
 	// and it expects the PC counter to be pre-incremented
 	cpuRegs.pc += 4;
@@ -212,6 +215,11 @@ static void execI()
 
 
 	cpuBlockCycles += opcode.cycles * (2 - ((cpuRegs.CP0.n.Config >> 18) & 0x1));
+	if (EmuConfig.Cpu.EnableEERAMReadTiming && (opcode.flags & IS_LOAD))
+	{
+		const u32 address = cpuRegs.GPR.r[_Rs_].UL[0] + _Imm_;
+		cpuRegs.cycle += EEMemoryTiming::ReadWaitCycles[address >> EEMemoryTiming::PAGE_BITS];
+	}
 
 	opcode.interpret();
 }
