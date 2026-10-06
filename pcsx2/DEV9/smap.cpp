@@ -120,19 +120,25 @@ u32 wswap(u32 d)
 void tx_process()
 {
 	NetPacket pk;
+	const u32 mode1 = wswap(dev9Ru32(SMAP_R_EMAC3_MODE1_L));
+	const bool single_packet = (mode1 & (SMAP_E3_TXREQ0_MULTI | SMAP_E3_TXREQ0_DEPEND)) == SMAP_E3_TXREQ0_SINGLE;
 	// We will loop though TX_BD, sending any that are ready
 	// stopping once we reach one that isn't ready
-	// SMAP_R_TXFIFO_FRAME_CNT is decremented, but otherwise isn't used
+	// SMAP_R_TXFIFO_FRAME_CNT gates queued frames and is decremented for each completed descriptor.
 	// This seems to match HW behaviour
-	u32 cnt = 0;
+	u32 cause = 0;
 	while (true)
 	{
 		smap_bd_t* pbd = ((smap_bd_t*)&dev9.dev9R[SMAP_BD_TX_BASE & 0xffff]) + dev9.txbdi;
 
 		if (!(pbd->ctrl_stat & SMAP_BD_TX_READY))
 		{
+			// TXDNV reasserts after acknowledgment while the request is pending.
+			cause |= SMAP_INTR_TXDNV;
 			break;
 		}
+		if (dev9Ru8(SMAP_R_TXFIFO_FRAME_CNT) == 0)
+			break;
 		if (pbd->length & 3)
 		{
 			//spams// emu_printf("WARN : pbd->length not aligned %u\n",pbd->length);
@@ -156,7 +162,7 @@ void tx_process()
 
 			// SMAP drivers send a very specfic frame during init, then check SPD_R_INTR_STAT for SMAP_INTR_RXEND | SMAP_INTR_TXEND | SMAP_INTR_TXDNV.
 			// SMAP_INTR_TXEND is set normally, SMAP_INTR_RXEND is supposed to be set here, but we currently don't emulate that.
-			// SMAP_INTR_TXDNV is set somewhere, unsure where, we only set it in failure (instead of SMAP_INTR_TXEND), but is included in the hack here.
+			// SMAP_INTR_TXDNV reports descriptor unavailability and is included in the hack here.
 			if (pbd->length == 0x5EA && pbd->pointer == 0x1000)
 			{
 				u32* ptr = (u32*)&dev9.txfifo[base];
@@ -235,18 +241,19 @@ void tx_process()
 
 		//decrease frame count -- this is not thread safe
 		dev9Ru8(SMAP_R_TXFIFO_FRAME_CNT)--;
-		cnt++;
+		cause |= SMAP_INTR_TXEND;
+		if (single_packet)
+		{
+			dev9Ru32(SMAP_R_EMAC3_TxMODE0_L) &= ~wswap(SMAP_E3_TX_GNP_0);
+			break;
+		}
 	}
 
 	// if we actualy send something set TXEND
-	if (cnt != 0)
+	const bool completed = (cause & SMAP_INTR_TXEND) != 0;
+	if (completed || (cause & ~dev9.irqcause))
 	{
-		_DEV9irq(SMAP_INTR_TXEND, 100); //now ? or when the fifo is empty ? i guess now atm
-	}
-	else
-	{
-		Console.Error("DEV9: SMAP: WARN : Current BD_TX was not ready, but packet send request was made");
-		_DEV9irq(SMAP_INTR_TXDNV, 0);
+		_DEV9irq(cause, completed ? 100 : 0); //now ? or when the fifo is empty ? i guess now atm
 	}
 }
 
@@ -258,20 +265,19 @@ void emac3_write(u32 addr)
 	{
 		case SMAP_R_EMAC3_MODE0_L:
 			//DevCon.WriteLn("DEV9: SMAP: SMAP_R_EMAC3_MODE0 write %x", value);
+			if (value & SMAP_E3_SOFT_RESET)
+				dev9Ru32(SMAP_R_EMAC3_TxMODE0_L) = 0;
 			value = (value & (~SMAP_E3_SOFT_RESET)) | SMAP_E3_TXMAC_IDLE | SMAP_E3_RXMAC_IDLE;
 			dev9Ru16(SMAP_R_EMAC3_STA_CTRL_H) |= SMAP_E3_PHY_OP_COMP;
 			break;
 		case SMAP_R_EMAC3_TxMODE0_L:
 			//DevCon.WriteLn("DEV9: SMAP: SMAP_R_EMAC3_TxMODE0_L write %x", value);
 			//Process TX  here ?
-			if (!(value & SMAP_E3_TX_GNP_0))
-				Console.Error("DEV9: SMAP_R_EMAC3_TxMODE0_L: SMAP_E3_TX_GNP_0 not set");
-
-			tx_process();
-			value = value & ~SMAP_E3_TX_GNP_0;
-			if (value)
+			if (value & ~SMAP_E3_TX_GNP_0)
 				Console.Error("DEV9: SMAP_R_EMAC3_TxMODE0_L: extra bits set !");
-			break;
+			if (value & SMAP_E3_TX_GNP_0)
+				tx_process();
+			return;
 		case SMAP_R_EMAC3_TxMODE1_L:
 			//DevCon.WriteLn("DEV9: SMAP_R_EMAC3_TxMODE1_L 32bit write %x", value);
 			break;
@@ -609,6 +615,10 @@ void smap_write8(u32 addr, u8 value)
 
 void smap_write16(u32 addr, u16 value)
 {
+	// GNP is a command latch; writing zero does not cancel a pending request.
+	if (addr == SMAP_R_EMAC3_TxMODE0_L)
+		value |= dev9Ru16(addr) & (SMAP_E3_TX_GNP_0 >> 16);
+
 	if (addr >= SMAP_BD_TX_BASE && addr < (SMAP_BD_TX_BASE + SMAP_BD_SIZE))
 	{
 		if (dev9.bd_swap)
@@ -861,6 +871,8 @@ void smap_writeDMA8Mem(u32* pMem, int size)
 
 void smap_async(u32 cycles)
 {
+	if (wswap(dev9Ru32(SMAP_R_EMAC3_TxMODE0_L)) & SMAP_E3_TX_GNP_0)
+		tx_process();
 	if (fireIntR)
 	{
 		fireIntR = false;
