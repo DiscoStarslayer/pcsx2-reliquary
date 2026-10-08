@@ -35,6 +35,7 @@ GameFixSettingsWidget::GameFixSettingsWidget(SettingsWindow* settings_dialog, QW
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.VUOverflowHack, "EmuCore/Gamefixes", "VUOverflowHack", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.XgKickHack, "EmuCore/Gamefixes", "XgKickHack", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.BlitInternalFPSHack, "EmuCore/Gamefixes", "BlitInternalFPSHack", false);
+	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.VUCommunicationHack, "EmuCore/Gamefixes", "VUCommunicationHack", false);
 	SettingWidgetBinder::BindWidgetToBoolSetting(sif, m_ui.MixSpdifAnalogHack, "EmuCore/Gamefixes", "MixSpdifAnalogHack", false);
 
 	dialog()->registerWidgetHelp(m_ui.FpuMulHack, tr("FPU Multiply Hack"), tr("Unchecked"), tr("For Tales of Destiny."));
@@ -55,6 +56,8 @@ GameFixSettingsWidget::GameFixSettingsWidget(SettingsWindow* settings_dialog, QW
 	dialog()->registerWidgetHelp(m_ui.VUOverflowHack, tr("VU Overflow Hack"), tr("Unchecked"), tr("To check for possible float overflows (Superman Returns)."));
 	dialog()->registerWidgetHelp(m_ui.XgKickHack, tr("VU XGKick Sync"), tr("Unchecked"), tr("Use accurate timing for VU XGKicks (slower)."));
 	dialog()->registerWidgetHelp(m_ui.BlitInternalFPSHack, tr("Force Blit Internal FPS Detection"), tr("Unchecked"), tr("Use alternative method to calculate internal FPS to avoid false readings in some games."));
+	dialog()->registerWidgetHelp(m_ui.VUCommunicationHack, tr("VU Communication Synchronization"), tr("Unchecked"),
+		tr("Preserves communication boundaries between the EE and both VUs. Disables MTVU, Instant VU1, and EE cycle rate/skip. May significantly reduce performance."));
 	dialog()->registerWidgetHelp(m_ui.MixSpdifAnalogHack, tr("Mix SPDIF and Analogue Audio output"), tr("Unchecked"),
 		tr("Mixes S/PDIF bypass PCM with normal analogue SPU2 output. Required for games which route BGM through digital output while sound effects use analogue output."));
 }

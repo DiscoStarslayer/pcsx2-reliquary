@@ -8,6 +8,139 @@
 #include "MTGS.h"
 #include "Vif.h"
 #include "Vif_Dma.h"
+#include <vector>
+
+bool vif1CpuFifoEnabled()
+{
+	// Finish accepted writes even if the compatibility option is changed.
+	return EmuConfig.Gamefixes.VUCommunicationHack || vif1CpuFifoPending();
+}
+
+static std::vector<u32> s_vif1_cpu_words;
+static bool s_vif1_cpu_draining = false;
+// One store may wait on the bus outside the 16-QW device FIFO. Both EE
+// backends must yield after that store, before executing another instruction.
+static mem128_t s_vif1_cpu_store = {};
+static bool s_vif1_cpu_store_pending = false;
+
+bool vif1CpuFifoBusBlocked()
+{
+	return s_vif1_cpu_store_pending;
+}
+
+const bool* vif1CpuFifoBusBlockedAddress()
+{
+	return &s_vif1_cpu_store_pending;
+}
+
+bool vif1CpuFifoActive()
+{
+	return s_vif1_cpu_draining;
+}
+
+bool vif1CpuFifoPending()
+{
+	return !s_vif1_cpu_words.empty();
+}
+
+void vif1CpuFifoReset()
+{
+	s_vif1_cpu_words.clear();
+	s_vif1_cpu_store_pending = false;
+	s_vif1_cpu_store = {};
+}
+
+bool vif1CpuFifoFreeze(SaveStateBase& state)
+{
+	if (state.GetVersion() < 1)
+	{
+		if (state.IsLoading())
+			vif1CpuFifoReset();
+		return state.IsOkay();
+	}
+
+	u32 count = static_cast<u32>(s_vif1_cpu_words.size());
+	state.Freeze(count);
+	// Reject unsupported/corrupt state before allocating beyond the device FIFO.
+	if (!state.IsOkay() || count > 64 || (count && !vif1CpuFifoEnabled()))
+		return false;
+	if (state.IsLoading())
+		s_vif1_cpu_words.resize(count);
+	state.FreezeMem(s_vif1_cpu_words.data(), count * sizeof(u32));
+	state.Freeze(s_vif1_cpu_store_pending);
+	state.Freeze(s_vif1_cpu_store);
+	// A held bus write can exist only while the device FIFO has no room
+	// for another QW. Otherwise a loaded state could block EE forever with
+	// no queued input available to release the write.
+	if (s_vif1_cpu_store_pending && (!vif1CpuFifoEnabled() || count <= 60))
+		return false;
+	return state.IsOkay();
+}
+
+static void vif1UpdateCpuFifoStatus()
+{
+	if (vif1.cmd)
+	{
+		if (vif1.done && !vif1ch.qwc)
+			vif1Regs.stat.VPS = VPS_WAITING;
+	}
+	else
+		vif1Regs.stat.VPS = VPS_IDLE;
+
+	if (gifRegs.stat.APATH == 2 && gifUnit.gifPath[1].isDone())
+	{
+		gifRegs.stat.APATH = 0;
+		gifRegs.stat.OPH = 0;
+		vif1Regs.stat.VGW = false;
+		if (gifUnit.checkPaths(1, 0, 1))
+			gifUnit.Execute(false, true);
+	}
+}
+
+void vif1CpuFifoDrain()
+{
+	if (!vif1CpuFifoEnabled() || s_vif1_cpu_words.empty())
+		return;
+	if (s_vif1_cpu_draining || vif1Regs.stat.FDR ||
+		vif1Regs.stat.test(VIF1_STAT_VSS | VIF1_STAT_VIS | VIF1_STAT_VFS))
+		return;
+	s_vif1_cpu_draining = true;
+	// Pending CPU words precede a newly started DMA. Keep its word offset
+	// separate from the already compacted CPU FIFO input.
+	const tVIF_CTRL dma_offset = vif1.irqoffset;
+	vif1.irqoffset = {};
+	// VSS/VFS/VIS above block until STC. With those flags clear, both a
+	// completed timing wait and a cancelled interrupt stall may resume.
+	vif1.vifstalled.enabled = false;
+	gifUnit.Execute(false, true);
+	const size_t before = s_vif1_cpu_words.size();
+	VIF1transfer(s_vif1_cpu_words.data(), static_cast<int>(before), true);
+	const size_t consumed = before - vif1.vifpacketsize;
+	s_vif1_cpu_words.erase(s_vif1_cpu_words.begin(), s_vif1_cpu_words.begin() + consumed);
+	vif1.irqoffset = dma_offset;
+	if (s_vif1_cpu_store_pending && s_vif1_cpu_words.size() <= 60)
+	{
+		s_vif1_cpu_words.insert(s_vif1_cpu_words.end(), s_vif1_cpu_store._u32, s_vif1_cpu_store._u32 + 4);
+		s_vif1_cpu_store_pending = false;
+	}
+	if (vif1.irq && !vif1.cmd)
+	{
+		if (!vif1Regs.stat.ER1)
+			vif1Regs.stat.INT = true;
+		if (((vif1Regs.code >> 24) & 0x7f) != 0x07)
+			vif1Regs.stat.VIS = true;
+		hwIntcIrq(VIF1intc);
+		--vif1.irq;
+	}
+	vif1Regs.stat.FQC = std::min<u32>(16, static_cast<u32>((s_vif1_cpu_words.size() + 3) / 4));
+	vif1UpdateCpuFifoStatus();
+	if (!s_vif1_cpu_words.empty())
+	{
+		CPU_SET_DMASTALL(VIF_VU1_FINISH, true);
+		CPU_INT(VIF_VU1_FINISH, 128);
+	}
+	s_vif1_cpu_draining = false;
+}
 
 //////////////////////////////////////////////////////////////////////////
 /////////////////////////// Quick & dirty FIFO :D ////////////////////////
@@ -78,6 +211,23 @@ void WriteFIFO_VIF0(const mem128_t* value)
 void WriteFIFO_VIF1(const mem128_t* value)
 {
 	VIF_LOG("WriteFIFO/VIF1 <- 0x%08X.%08X.%08X.%08X", value->_u32[0], value->_u32[1], value->_u32[2], value->_u32[3]);
+	if (vif1CpuFifoEnabled())
+	{
+		pxAssertRel(!s_vif1_cpu_store_pending, "EE executed another store while the VIF1 bus write was blocked");
+		if (s_vif1_cpu_words.size() > 60)
+		{
+			s_vif1_cpu_store = *value;
+			s_vif1_cpu_store_pending = true;
+			CPU_SET_DMASTALL(VIF_VU1_FINISH, true);
+			CPU_INT(VIF_VU1_FINISH, 128);
+			cpuSetEvent();
+			return;
+		}
+		s_vif1_cpu_words.insert(s_vif1_cpu_words.end(), value->_u32, value->_u32 + 4);
+		vif1Regs.stat.FQC = std::min<u32>(16, static_cast<u32>((s_vif1_cpu_words.size() + 3) / 4));
+		vif1CpuFifoDrain();
+		return;
+	}
 
 	if (vif1Regs.stat.FDR)
 	{
@@ -93,24 +243,7 @@ void WriteFIFO_VIF1(const mem128_t* value)
 	}
 
 	[[maybe_unused]] bool ret = VIF1transfer((u32*)value, 4);
-
-	if (vif1.cmd)
-	{
-		if (vif1.done && !vif1ch.qwc)
-			vif1Regs.stat.VPS = VPS_WAITING;
-	}
-	else
-		vif1Regs.stat.VPS = VPS_IDLE;
-
-	if (gifRegs.stat.APATH == 2 && gifUnit.gifPath[1].isDone())
-	{
-		gifRegs.stat.APATH = 0;
-		gifRegs.stat.OPH = 0;
-		vif1Regs.stat.VGW = false; //Let vif continue if it's stuck on a flush
-
-		if (gifUnit.checkPaths(1, 0, 1))
-			gifUnit.Execute(false, true);
-	}
+	vif1UpdateCpuFifoStatus();
 
 	pxAssertMsg(ret, "vif stall code not implemented");
 }

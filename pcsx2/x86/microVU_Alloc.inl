@@ -48,6 +48,17 @@ __fi void mVUallocSFLAGb(const x32& reg, int fInstance)
 __ri void mVUallocSFLAGc(const x32& reg, const x32& regT, int fInstance)
 {
 	mVUallocSFLAGa(regT, fInstance);
+	if (EmuConfig.Gamefixes.VUCommunicationHack)
+	{
+		xAND(regT, 0xffff);
+		xLoadFarAddr(xAddressReg(reg.GetId()), const_cast<u8*>(mVUstatusTable()));
+		xMOVZX(reg, ptr8[xAddressVoid(xAddressReg(reg.GetId()), xAddressReg(regT.GetId()), 1)]);
+		mVUallocSFLAGa(regT, fInstance);
+		xAND(regT, 0xffff0000);
+		xSHR(regT, 14);
+		xOR(reg, regT);
+		return;
+	}
 	xMOV(reg, regT);
 	xAND(reg, 0x7777);
 	xADD(reg, 0x7777);
@@ -82,7 +93,7 @@ __ri void mVUallocSFLAGd(u32* memAddr, const x32& reg = eax, const x32& tmp1 = e
 
 __fi void mVUallocMFLAGa(mV, const x32& reg, int fInstance)
 {
-	xMOVZX(reg, ptr16[&mVU.macFlag[fInstance]]);
+	xMOVZX(reg, ptr16[&mVU.macFlags()[fInstance]]);
 }
 
 __fi void mVUallocMFLAGb(mV, const x32& reg, int fInstance)
@@ -90,7 +101,7 @@ __fi void mVUallocMFLAGb(mV, const x32& reg, int fInstance)
 	//xAND(reg, 0xffff);
 	if (fInstance < 4)
 	{
-		xMOV(ptr32[&mVU.macFlag[fInstance]], reg); // microVU
+		xMOV(ptr32[&mVU.macFlags()[fInstance]], reg); // microVU
 	}
 	else
 	{
@@ -102,13 +113,15 @@ __fi void mVUallocMFLAGb(mV, const x32& reg, int fInstance)
 
 __fi void mVUallocCFLAGa(mV, const x32& reg, int fInstance)
 {
-	if (fInstance < 4) xMOV(reg, ptr32[&mVU.clipFlag[fInstance]]);         // microVU
+	if (fInstance < 4)
+		xMOV(reg, ptr32[&mVU.clipFlags()[fInstance]]); // microVU
 	else               xMOV(reg, ptr32[&mVU.regs().VI[REG_CLIP_FLAG].UL]); // macroVU
 }
 
 __fi void mVUallocCFLAGb(mV, const x32& reg, int fInstance)
 {
-	if (fInstance < 4) xMOV(ptr32[&mVU.clipFlag[fInstance]], reg);         // microVU
+	if (fInstance < 4)
+		xMOV(ptr32[&mVU.clipFlags()[fInstance]], reg); // microVU
 	else               xMOV(ptr32[&mVU.regs().VI[REG_CLIP_FLAG].UL], reg); // macroVU
 }
 

@@ -178,6 +178,7 @@ enum GamefixId
 	Fix_BlitInternalFPS,
 	Fix_FullVU0Sync,
 	Fix_MixSpdifAnalog,
+	Fix_VUCommunication,
 
 	GamefixId_COUNT
 };
@@ -1157,7 +1158,8 @@ struct Pcsx2Config
 			XgKickHack : 1, // Erementar Gerad, adds more delay to VU XGkick instructions. Corrects the color of some graphics, but breaks Tri-ace games and others.
 			BlitInternalFPSHack : 1, // Disables privileged register write-based FPS detection.
 			FullVU0SyncHack : 1, // Forces tight VU0 sync on every COP2 instruction.
-			MixSpdifAnalogHack : 1; // Mixes S/PDIF bypass PCM with normal analogue SPU2 output.
+			MixSpdifAnalogHack : 1, // Mixes S/PDIF bypass PCM with normal analogue SPU2 output.
+			VUCommunicationHack : 1; // Preserve instruction-pair communication boundaries between EE/VU0/VU1.
 		BITFIELD_END
 
 		GamefixOptions();

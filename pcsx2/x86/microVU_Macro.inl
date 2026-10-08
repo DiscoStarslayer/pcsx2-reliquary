@@ -412,6 +412,7 @@ static void COP2_Interlock(bool mBitSync)
 
 static void mVUSyncVU0()
 {
+	const bool precise = EmuConfig.Gamefixes.VUCommunicationHack;
 	iFlushCall(FLUSH_FOR_POSSIBLE_MICRO_EXEC);
 	_freeX86reg(eax);
 	xMOV(rax, ptr64[&cpuRegs.cycle]);
@@ -421,12 +422,12 @@ static void mVUSyncVU0()
 	xTEST(ptr32[&VU0.VI[REG_VPU_STAT].UL], 0x1);
 	xForwardJZ32 skipvuidle;
 	xSUB(rax, ptr64[&VU0.cycle]);
-	if (EmuConfig.Gamefixes.VUSyncHack || EmuConfig.Gamefixes.FullVU0SyncHack)
+	if (!precise && (EmuConfig.Gamefixes.VUSyncHack || EmuConfig.Gamefixes.FullVU0SyncHack))
 		xSUB(rax, ptr64[&VU0.nextBlockCycles]);
-	xCMP(rax, 4);
+	xCMP(rax, precise ? 1 : 4);
 	xForwardJL32 skip;
 	xLoadFarAddr(arg1reg, CpuVU0);
-	xMOV(arg2reg, s_nBlockInterlocked);
+	xMOV(arg2reg, precise || s_nBlockInterlocked);
 	xFastCall((void*)BaseVUmicroCPU::ExecuteBlockJIT, arg1reg, arg2reg);
 	skip.SetTarget();
 	skipvuidle.SetTarget();

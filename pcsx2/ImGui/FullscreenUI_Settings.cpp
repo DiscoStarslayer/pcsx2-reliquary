@@ -5851,6 +5851,9 @@ void FullscreenUI::DrawGameFixesSettingsPage()
 		FSUI_CSTR("Simulate VIF1 FIFO read ahead. Known to affect following games: Test Drive Unlimited, Transformers."), "EmuCore/Gamefixes", "VIFFIFOHack", false);
 	DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_ARROWS_ROTATE, "Full VU0 Synchronization"), FSUI_CSTR("Forces tight VU0 sync on every COP2 instruction."),
 		"EmuCore/Gamefixes", "FullVU0SyncHack", false);
+	DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_ARROWS_ROTATE, "VU Communication Synchronization"),
+		FSUI_CSTR("Preserves communication boundaries between the EE and both VUs. Disables MTVU, Instant VU1, and EE cycle rate/skip. May significantly reduce performance."),
+		"EmuCore/Gamefixes", "VUCommunicationHack", false);
 	DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_MICROCHIP, "VU I Bit Hack"),
 		FSUI_CSTR("Avoids constant recompilation in some games. Known to affect the following games: Scarface The World is Yours, Crash Tag Team Racing."), "EmuCore/Gamefixes", "IbitHack", false);
 	DrawToggleSetting(bsi, FSUI_ICONSTR(ICON_FA_PLUS, "VU Add Hack"),
@@ -6897,6 +6900,8 @@ TRANSLATE_NOOP("FullscreenUI", "DMA Busy Hack");
 TRANSLATE_NOOP("FullscreenUI", "Delay VIF1 Stalls");
 TRANSLATE_NOOP("FullscreenUI", "Emulate VIF FIFO");
 TRANSLATE_NOOP("FullscreenUI", "Full VU0 Synchronization");
+TRANSLATE_NOOP("FullscreenUI", "VU Communication Synchronization");
+TRANSLATE_NOOP("FullscreenUI", "Preserves communication boundaries between the EE and both VUs. Disables MTVU, Instant VU1, and EE cycle rate/skip. May significantly reduce performance.");
 TRANSLATE_NOOP("FullscreenUI", "VU I Bit Hack");
 TRANSLATE_NOOP("FullscreenUI", "VU Add Hack");
 TRANSLATE_NOOP("FullscreenUI", "VU Overflow Hack");

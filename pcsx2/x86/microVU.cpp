@@ -7,6 +7,25 @@
 
 #include "common/AlignedMalloc.h"
 
+#include <array>
+
+void* g_mvuPreparedEntry[2] = {};
+MvuCommunicationRequest g_mvuCommunicationRequest;
+MvuCommunicationHint g_mvuCommunicationHint[2];
+void* g_mvuCommunicationBody[2] = {};
+void* g_mvuCommunicationHotBody[2] = {};
+
+const u8* mVUstatusTable()
+{
+	static const std::array<u8, 65536> table = [] {
+		std::array<u8, 65536> values{};
+		for (u32 raw = 0; raw < values.size(); raw++)
+			values[raw] = VUCommunication::NormalizeStatusLow(static_cast<u16>(raw));
+		return values;
+	}();
+	return table.data();
+}
+
 static constexpr size_t mVUsoftDivCapTailReserve = 256;
 
 //------------------------------------------------------------------
@@ -35,6 +54,8 @@ void mVUinit(microVU& mVU, uint vuIndex)
 // Resets Rec Data
 void mVUreset(microVU& mVU)
 {
+	g_mvuCommunicationHint[mVU.index] = {};
+	g_mvuPreparedEntry[mVU.index] = nullptr;
 	const bool use_soft_float = CHECK_VU_SOFT(mVU.index);
 	const bool use_soft_madd_packed =
 		use_soft_float && g_cpu.vectorISA >= ProcessorFeatures::VectorISA::AVX2;
@@ -131,6 +152,8 @@ void mVUreset(microVU& mVU)
 // Free Allocated Resources
 void mVUclose(microVU& mVU)
 {
+	g_mvuCommunicationHint[mVU.index] = {};
+	g_mvuPreparedEntry[mVU.index] = nullptr;
 	// Delete Programs and Block Managers
 	for (u32 i = 0; i < (mVU.progSize / 2); i++)
 	{
@@ -147,6 +170,8 @@ void mVUclose(microVU& mVU)
 // Clears Block Data in specified range
 __fi void mVUclear(mV, u32 addr, u32 size)
 {
+	g_mvuCommunicationHint[mVU.index] = {};
+	g_mvuPreparedEntry[mVU.index] = nullptr;
 	if (!mVU.prog.cleared)
 	{
 		mVU.prog.cleared = 1; // Next execution searches/creates a new microprogram
@@ -166,6 +191,8 @@ __fi void mVUclear(mV, u32 addr, u32 size)
 // Deletes a program
 __ri void mVUdeleteProg(microVU& mVU, microProgram*& prog)
 {
+	g_mvuCommunicationHint[mVU.index] = {};
+	g_mvuPreparedEntry[mVU.index] = nullptr;
 	for (u32 i = 0; i < (mVU.progSize / 2); i++)
 	{
 		safe_delete(prog->block[i]);
@@ -391,6 +418,143 @@ void recMicroVU1::Reset()
 	mVUreset(microVU1);
 }
 
+__fi static bool mVUequalPipeline(const microRegInfo& a, const microRegInfo& b)
+{
+	static_assert(sizeof(microRegInfo) % sizeof(__m128i) == 0);
+	const auto* lhs = reinterpret_cast<const __m128i*>(&a);
+	const auto* rhs = reinterpret_cast<const __m128i*>(&b);
+	__m128i diff = _mm_xor_si128(_mm_loadu_si128(lhs), _mm_loadu_si128(rhs));
+	if (_mm_movemask_epi8(_mm_cmpeq_epi8(diff, _mm_setzero_si128())) != 0xffff)
+		return false;
+	for (size_t i = 1; i < sizeof(microRegInfo) / sizeof(__m128i); i++)
+		diff = _mm_or_si128(diff, _mm_xor_si128(_mm_loadu_si128(lhs + i), _mm_loadu_si128(rhs + i)));
+	return _mm_movemask_epi8(_mm_cmpeq_epi8(diff, _mm_setzero_si128())) == 0xffff;
+}
+
+static void* mVUprepareCommunication()
+{
+	auto& r = g_mvuCommunicationRequest;
+	const VURegs& requested = vuRegs[r.requestor];
+	const u32 stat = VU0.VI[REG_VPU_STAT].UL;
+	if (!(stat & (r.requestor ? 0x100 : 1)) || requested.cycle >= r.target ||
+		(!r.requestor && (VU0.flags & VUFLAG_MFLAGSET)))
+		return nullptr;
+	const u32 unit = VUCommunication::SelectUnit(stat & 1, stat & 0x100, VU0.cycle, VU1.cycle);
+	VURegs& vu = vuRegs[unit];
+	microVU& mvu = unit ? microVU1 : microVU0;
+	const u32 pc = (vu.VI[REG_TPC].UL << 3) & (mvu.microMemSize - 8);
+	auto& hint = g_mvuCommunicationHint[unit];
+	const microBlock* block = nullptr;
+	void* code;
+	if (hint.block && hint.pc == pc && !mvu.prog.cleared &&
+		hint.program == mvu.prog.cur && hint.program == mvu.prog.quick[vu.start_pc / 8].prog &&
+		mVUequalPipeline(mvu.prog.lpState, hint.block->pState))
+	{
+		block = hint.block;
+		code = block->x86ptrStart;
+		xSetTextPtr(mvu.textPtr());
+		xSetPtr(mvu.prog.x86ptr);
+		mvu.prog.isSame = -1;
+	}
+	else
+	{
+		const microRegInfo entry = mvu.prog.lpState;
+		code = unit ? mVUexecute<1>(pc, 0) : mVUexecute<0>(pc, 0);
+		mvu.prog.x86ptr = xGetPtr();
+		mvu.prog.lpState = entry;
+		block = mvu.prog.cur->block[pc / 8]->search(mvu, &mvu.prog.lpState);
+	}
+	hint = {};
+	pxAssert(block && block->cycles);
+	r.unit = unit;
+	r.pc = pc;
+	r.before = vu.cycle;
+	r.runCycles = block->cycles;
+	g_mvuPreparedEntry[unit] = code;
+	if (!unit)
+		VU0.flags &= ~VUFLAG_MFLAGSET;
+	vu.VI[REG_TPC].UL = pc;
+	return g_mvuCommunicationBody[unit];
+}
+
+void* mVUcommunicationNext(u32 unit)
+{
+	VURegs& vu = vuRegs[unit];
+	pxAssert(g_mvuCommunicationRequest.active && g_mvuCommunicationRequest.unit == unit &&
+			 vu.cycle > g_mvuCommunicationRequest.before);
+	pxAssert(!g_mvuPreparedEntry[unit]);
+	vu.VI[REG_TPC].UL >>= 3;
+	if (vu.flags & VUFLAG_INTCINTERRUPT)
+	{
+		vu.flags &= ~VUFLAG_INTCINTERRUPT;
+		hwIntcIrq(unit ? 7 : 6);
+	}
+	return mVUprepareCommunication();
+}
+
+bool mVUrunCommunication(u32 unit, u32 cycles)
+{
+	if (!EmuConfig.Gamefixes.VUCommunicationHack ||
+		!EmuConfig.Cpu.Recompiler.EnableVU0 || !EmuConfig.Cpu.Recompiler.EnableVU1)
+		return false;
+	pxAssert(!THREAD_VU1 && !g_mvuCommunicationRequest.active);
+	auto& r = g_mvuCommunicationRequest;
+	r = {};
+	r.active = 1;
+	r.requestor = unit;
+	r.target = vuRegs[unit].cycle + cycles;
+	if (!unit)
+		VU0.flags &= ~VUFLAG_MFLAGSET;
+	if (mVUprepareCommunication())
+	{
+		microVU& mvu = r.unit ? microVU1 : microVU0;
+		((mVUrecCall)mvu.startFunct)(r.pc, r.runCycles);
+	}
+	r.active = 0;
+	VU0.nextBlockCycles = static_cast<s32>(VU0.cycle - cpuRegs.cycle) + 1;
+	VU1.nextBlockCycles = static_cast<s32>(VU1.cycle - cpuRegs.cycle) + 1;
+	return true;
+}
+
+static void mVUexecuteQuantum(microVU& mVU)
+{
+	VURegs& vu = mVU.regs();
+	const u32 pc = (vu.VI[REG_TPC].UL << 3) & (mVU.microMemSize - 8);
+	const microRegInfo entry = mVU.prog.lpState;
+	// Lookup can compile and temporarily change lpState. Restore the input
+	// pipeline before entering the ordinary dispatcher with the measured cost.
+	void* code = mVU.index ? mVUexecute<1>(pc, 0) : mVUexecute<0>(pc, 0);
+	mVU.prog.x86ptr = xGetPtr();
+	mVU.prog.lpState = entry;
+	const microBlock* block = mVU.prog.cur->block[pc / 8]->search(mVU, &mVU.prog.lpState);
+	pxAssert(block && block->cycles);
+	const u32 cost = block->cycles;
+	// Consumed exactly once by the dispatcher. No guest execution or cache
+	// invalidation is allowed between this lookup and entry.
+	g_mvuPreparedEntry[mVU.index] = code;
+	if (!mVU.index)
+		vu.flags &= ~VUFLAG_MFLAGSET;
+	vu.VI[REG_TPC].UL = pc;
+	((mVUrecCall)mVU.startFunct)(pc, cost);
+	vu.VI[REG_TPC].UL >>= 3;
+	pxAssert(!g_mvuPreparedEntry[mVU.index]);
+	if (vu.flags & VUFLAG_INTCINTERRUPT)
+	{
+		vu.flags &= ~VUFLAG_INTCINTERRUPT;
+		hwIntcIrq(mVU.index ? 7 : 6);
+	}
+}
+
+void recMicroVU0::ExecuteQuantum()
+{
+	mVUexecuteQuantum(microVU0);
+}
+
+void recMicroVU1::ExecuteQuantum()
+{
+	mVUexecuteQuantum(microVU1);
+}
+
 void recMicroVU0::SetStartPC(u32 startPC)
 {
 	VU0.start_pc = startPC;
@@ -398,6 +562,8 @@ void recMicroVU0::SetStartPC(u32 startPC)
 
 void recMicroVU0::Execute(u32 cycles)
 {
+	if (vuRunInterleaved(0, cycles))
+		return;
 	VU0.flags &= ~VUFLAG_MFLAGSET;
 
 	if (!(VU0.VI[REG_VPU_STAT].UL & 1))
@@ -424,6 +590,8 @@ void recMicroVU1::Step()
 
 void recMicroVU1::Execute(u32 cycles)
 {
+	if (vuRunInterleaved(1, cycles))
+		return;
 	if (!THREAD_VU1)
 	{
 		if (!(VU0.VI[REG_VPU_STAT].UL & 0x100))

@@ -124,6 +124,17 @@ extern void vif1Interrupt();
 extern void vif1VUFinish();
 extern void vif1Reset();
 
+// CPU writes retained across VIF stalls, with EE bus backpressure when full.
+class SaveStateBase;
+bool vif1CpuFifoEnabled();
+bool vif1CpuFifoActive();
+bool vif1CpuFifoPending();
+bool vif1CpuFifoBusBlocked();
+const bool* vif1CpuFifoBusBlockedAddress();
+void vif1CpuFifoDrain();
+void vif1CpuFifoReset();
+bool vif1CpuFifoFreeze(SaveStateBase& state);
+
 typedef int FnType_VifCmdHandler(int pass, const u32 *data);
 typedef FnType_VifCmdHandler* Fnptr_VifCmdHandler;
 

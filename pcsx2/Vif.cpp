@@ -23,6 +23,7 @@ void vif0Reset()
 
 void vif1Reset()
 {
+	vif1CpuFifoReset();
 	/* Reset the whole VIF, meaning the internal pcsx2 vars, and all the registers */
 	std::memset(&vif1, 0, sizeof(vif1));
 	std::memset(&vif1Regs, 0, sizeof(vif1Regs));
@@ -56,6 +57,8 @@ bool SaveStateBase::vif1Freeze()
 
 	Freeze(nVif[1].bSize);
 	FreezeMem(nVif[1].buffer, nVif[1].bSize);
+	if (!vif1CpuFifoFreeze(*this))
+		return false;
 
 	return IsOkay();
 }
@@ -208,6 +211,7 @@ __fi void vif1FBRST(u32 value)
 
 	if (FBRST(value).RST) // Reset Vif.
 	{
+		vif1CpuFifoReset();
 		u128 SaveCol;
 		u128 SaveRow;
 		//if(vif1ch.chcr.STR) DevCon.Warning("FBRST While Vif1 active");
@@ -232,6 +236,11 @@ __fi void vif1FBRST(u32 value)
 		vif1.cmd = 0;
 		vif1.vifstalled.enabled = false;
 		vif1Regs.stat._u32 = 0;
+	}
+	else if (FBRST(value).STC && vif1CpuFifoPending())
+	{
+		CPU_SET_DMASTALL(VIF_VU1_FINISH, true);
+		CPU_INT(VIF_VU1_FINISH, 128);
 	}
 }
 
@@ -289,6 +298,11 @@ __fi void vif1STAT(u32 value)
 		vif1Regs.stat.FQC = 0;
 		if (vif1ch.chcr.STR)
 			CPU_INT(DMAC_VIF1, 0);
+		if (vif1CpuFifoPending())
+		{
+			CPU_SET_DMASTALL(VIF_VU1_FINISH, true);
+			CPU_INT(VIF_VU1_FINISH, 128);
+		}
 	}
 }
 

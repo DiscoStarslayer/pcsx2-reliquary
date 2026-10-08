@@ -114,6 +114,7 @@
               "VuAddSubHack",
               "VUOverflowHack",
               "FullVU0SyncHack",
+              "VUCommunicationHack",
               "VUSyncHack",
               "XGKickHack"
             ]

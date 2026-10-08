@@ -3,15 +3,69 @@
 
 #include "Common.h"
 #include "VUmicro.h"
+#include "VUCommunication.h"
 #include "MTVU.h"
 #include "GS.h"
 #include "Gif_Unit.h"
 
+#ifdef _M_X86
+extern bool mVUrunCommunication(u32 unit, u32 cycles);
+#endif
+
 BaseVUmicroCPU* CpuVU0 = nullptr;
 BaseVUmicroCPU* CpuVU1 = nullptr;
 
+void BaseVUmicroCPU::ExecuteQuantum()
+{
+	VURegs& vu = vuRegs[m_Idx];
+	const FPControlRegisterBackup fpcr(m_Idx ? EmuConfig.Cpu.VU1FPCR : EmuConfig.Cpu.VU0FPCR);
+	vu.VI[REG_TPC].UL <<= 3;
+	Step();
+	if (!(VU0.VI[REG_VPU_STAT].UL & (m_Idx ? 0x100 : 1)) && (m_Idx ? vu.branch == 1 : vu.branch != 0))
+	{
+		vu.VI[REG_TPC].UL = vu.branchpc;
+		vu.branch = 0;
+	}
+	vu.VI[REG_TPC].UL >>= 3;
+}
+
+bool vuRunInterleaved(u32 unit, u32 cycles)
+{
+	if (!EmuConfig.Gamefixes.VUCommunicationHack)
+		return false;
+
+	pxAssert(!THREAD_VU1);
+#ifdef _M_X86
+	if (mVUrunCommunication(unit, cycles))
+		return true;
+#endif
+	VURegs& requested = vuRegs[unit];
+	const u64 target = requested.cycle + cycles;
+	const u32 mask = unit ? 0x100 : 1;
+	if (!unit)
+		VU0.flags &= ~VUFLAG_MFLAGSET;
+
+	while ((VU0.VI[REG_VPU_STAT].UL & mask) && requested.cycle < target)
+	{
+		const bool active0 = (VU0.VI[REG_VPU_STAT].UL & 1) != 0;
+		const bool active1 = (VU0.VI[REG_VPU_STAT].UL & 0x100) != 0;
+		// At a tie VU0 accesses the shared register file before VU1 admits its pair.
+		const u32 next = VUCommunication::SelectUnit(active0, active1, VU0.cycle, VU1.cycle);
+		[[maybe_unused]] const u64 before = vuRegs[next].cycle;
+		(next ? CpuVU1 : CpuVU0)->ExecuteQuantum();
+		pxAssert(vuRegs[next].cycle > before);
+		if (!unit && (VU0.flags & VUFLAG_MFLAGSET))
+			break;
+	}
+	VU0.nextBlockCycles = static_cast<s32>(VU0.cycle - cpuRegs.cycle) + 1;
+	VU1.nextBlockCycles = static_cast<s32>(VU1.cycle - cpuRegs.cycle) + 1;
+	return true;
+}
+
 __inline u32 CalculateMinRunCycles(u32 cycles, bool requiresAccurateCycles)
 {
+	if (EmuConfig.Gamefixes.VUCommunicationHack)
+		return std::max(1U, cycles);
 	// If we're running an interlocked COP2 operation
 	// run for an exact amount of cycles
 	if(requiresAccurateCycles)

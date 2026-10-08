@@ -74,7 +74,10 @@ __fi void _vu0run(bool breakOnMbit, bool addCycles, bool sync_only) {
 	// Add cycles if called from EE's COP2
 	if (addCycles)
 	{
-		cpuRegs.cycle += (VU0.cycle - startcycle);
+		if (EmuConfig.Gamefixes.VUCommunicationHack)
+			cpuRegs.cycle = std::max(cpuRegs.cycle, VU0.cycle);
+		else
+			cpuRegs.cycle += (VU0.cycle - startcycle);
 		CpuVU1->ExecuteBlock(0); // Catch up VU1 as it's likely fallen behind
 
 		if(VU0.VI[REG_VPU_STAT].UL & 1)

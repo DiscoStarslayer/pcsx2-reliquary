@@ -11,6 +11,7 @@
 #include <memory>
 #include "Common.h"
 #include "VU.h"
+#include "VUCommunication.h"
 #include "MTVU.h"
 #include "GS.h"
 #include "Gif_Unit.h"
@@ -179,6 +180,8 @@ struct microVU
 	s32 cycles;       // Cycles Counter
 
 	VURegs& regs() const { return ::vuRegs[index]; }
+	u32* macFlags() { return EmuConfig.Gamefixes.VUCommunicationHack && !cop2 ? regs().micro_macflags : macFlag; }
+	u32* clipFlags() { return EmuConfig.Gamefixes.VUCommunicationHack && !cop2 ? regs().micro_clipflags : clipFlag; }
 	void* textPtr() const { return (index && THREAD_VU1) ? (void*)&regs().VF[9] : (void*)R5900_TEXTPTR; }
 
 	__fi REG_VI& getVI(uint reg) const { return regs().VI[reg]; }
@@ -329,6 +332,30 @@ mVUop(mVUopL);
 extern void mVUcacheProg(microVU& mVU, microProgram& prog);
 extern void mVUdeleteProg(microVU& mVU, microProgram*& prog);
 _mVUt extern void* mVUsearchProg(u32 startPC, uptr pState);
+extern const u8* mVUstatusTable();
+extern void* g_mvuPreparedEntry[2];
+struct MvuCommunicationRequest
+{
+	u32 active = 0;
+	u32 requestor = 0;
+	u32 unit = 0;
+	u32 pc = 0;
+	u32 runCycles = 0;
+	u64 target = 0;
+	u64 before = 0;
+};
+struct MvuCommunicationHint
+{
+	microProgram* program = nullptr;
+	microBlock* block = nullptr;
+	u32 pc = 0;
+};
+extern MvuCommunicationRequest g_mvuCommunicationRequest;
+extern MvuCommunicationHint g_mvuCommunicationHint[2];
+extern void* g_mvuCommunicationBody[2];
+extern void* g_mvuCommunicationHotBody[2];
+bool mVUrunCommunication(u32 unit, u32 cycles);
+void* mVUcommunicationNext(u32 unit);
 extern void* mVUexecuteVU0(u32 startPC, u32 cycles);
 extern void* mVUexecuteVU1(u32 startPC, u32 cycles);
 // recCall Function Pointer

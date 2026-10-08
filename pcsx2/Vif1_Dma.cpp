@@ -219,6 +219,8 @@ __fi void vif1SetupTransfer()
 
 __fi void vif1VUFinish()
 {
+	if (vif1CpuFifoEnabled())
+		vif1CpuFifoDrain();
 	// Sync up VU1 so we don't errantly wait.
 	while (!THREAD_VU1 && (VU0.VI[REG_VPU_STAT].UL & 0x100))
 	{
@@ -276,6 +278,16 @@ __fi void vif1VUFinish()
 
 __fi void vif1Interrupt()
 {
+	if (vif1CpuFifoPending())
+	{
+		vif1CpuFifoDrain();
+		if (vif1CpuFifoPending())
+		{
+			CPU_SET_DMASTALL(DMAC_VIF1, true);
+			CPU_INT(DMAC_VIF1, 128);
+			return;
+		}
+	}
 	VIF_LOG("vif1Interrupt: %8.8llx chcr %x, done %x, qwc %x", cpuRegs.cycle, vif1ch.chcr._u32, vif1.done, vif1ch.qwc);
 
 	g_vif1Cycles = 0;

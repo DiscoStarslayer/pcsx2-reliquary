@@ -315,9 +315,10 @@ void memSavingState::FreezeMem(void* data, int size)
 // --------------------------------------------------------------------------------------
 //  memLoadingState  (implementations)
 // --------------------------------------------------------------------------------------
-memLoadingState::memLoadingState(const VmStateBuffer& load_from)
+memLoadingState::memLoadingState(const VmStateBuffer& load_from, u32 version)
 	: SaveStateBase(const_cast<VmStateBuffer&>(load_from))
 {
+	m_version = version;
 }
 
 // Loading of state data from a memory buffer...
@@ -1094,9 +1095,8 @@ bool SaveState_ReadScreenshot(const std::string& filename, u32* out_width, u32* 
 	return SaveState_ReadScreenshot(zf.get(), out_width, out_height, out_pixels);
 }
 
-static bool CheckVersion(const std::string& filename, zip_t* zf, Error* error)
+static bool CheckVersion(const std::string& filename, zip_t* zf, u32& savever, Error* error)
 {
-	u32 savever;
 
 	auto zff = zip_fopen_managed(zf, EntryFilename_StateVersion, 0);
 	if (!zff || zip_fread(zff.get(), &savever, sizeof(savever)) != sizeof(savever))
@@ -1150,7 +1150,7 @@ static zip_int64_t CheckFileExistsInState(zip_t* zf, const char* name, bool requ
 	return index;
 }
 
-static bool LoadInternalStructuresState(zip_t* zf, s64 index, Error* error)
+static bool LoadInternalStructuresState(zip_t* zf, s64 index, u32 version, Error* error)
 {
 	zip_stat_t zst;
 	if (zip_stat_index(zf, index, 0, &zst) != 0 || zst.size > std::numeric_limits<int>::max())
@@ -1165,7 +1165,7 @@ static bool LoadInternalStructuresState(zip_t* zf, s64 index, Error* error)
 	if (zip_fread(zff.get(), buffer.data(), buffer.size()) != static_cast<zip_int64_t>(buffer.size()))
 		return false;
 
-	memLoadingState state(buffer);
+	memLoadingState state(buffer, version);
 	if (!state.FreezeBios())
 		return false;
 	
@@ -1191,7 +1191,8 @@ bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 	}
 
 	// look for version and screenshot information in the zip stream:
-	if (!CheckVersion(filename, zf.get(), error))
+	u32 version;
+	if (!CheckVersion(filename, zf.get(), version, error))
 		return false;
 
 	// check that all parts are included
@@ -1218,7 +1219,7 @@ bool SaveState_UnzipFromDisk(const std::string& filename, Error* error)
 
 	PreLoadPrep();
 
-	if (!LoadInternalStructuresState(zf.get(), internal_index, error))
+	if (!LoadInternalStructuresState(zf.get(), internal_index, version, error))
 	{
 		if (!error->IsValid())
 			Error::SetString(error, "Save state corruption in internal structures.");

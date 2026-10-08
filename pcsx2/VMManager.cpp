@@ -746,6 +746,15 @@ void VMManager::WarnAboutUnconfiguredController()
 
 void VMManager::ApplyGameFixes()
 {
+	const auto enforce_communication_options = [] {
+		if (!EmuConfig.Gamefixes.VUCommunicationHack)
+			return;
+		EmuConfig.Speedhacks.vuThread = false;
+		EmuConfig.Speedhacks.vu1Instant = false;
+		EmuConfig.Speedhacks.EECycleRate = 0;
+		EmuConfig.Speedhacks.EECycleSkip = 0;
+	};
+	enforce_communication_options();
 	if (!HasBootedELF() && !GSDumpReplayer::IsReplayingDump())
 	{
 		// Instant DMA needs to be on for this BIOS (font rendering is broken without it, possible cache issues).
@@ -761,6 +770,7 @@ void VMManager::ApplyGameFixes()
 		return;
 
 	game->applyGameFixes(EmuConfig, EmuConfig.EnableGameFixes);
+	enforce_communication_options();
 	game->applyGSHardwareFixes(EmuConfig.GS);
 
 	// Re-remove upscaling fixes, make sure they don't apply at native res.

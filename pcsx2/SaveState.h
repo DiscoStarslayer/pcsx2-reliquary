@@ -26,7 +26,7 @@ enum class FreezeAction
 // [SAVEVERSION+]
 // This informs the auto updater that the users savestates will be invalidated.
 
-static const u32 g_SaveVersion = (0x9A59 << 16) | 0x0000;
+static const u32 g_SaveVersion = (0x9A59 << 16) | 0x0001;
 
 
 // the freezing data between submodules and core
@@ -350,7 +350,7 @@ public:
 class memLoadingState final : public SaveStateBase
 {
 public:
-	memLoadingState(const VmStateBuffer& load_from);
+	memLoadingState(const VmStateBuffer& load_from, u32 version = g_SaveVersion);
 	~memLoadingState() override = default;
 
 	void FreezeMem(void* data, int size) override;

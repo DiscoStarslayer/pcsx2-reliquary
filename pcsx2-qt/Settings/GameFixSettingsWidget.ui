@@ -144,6 +144,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QCheckBox" name="VUCommunicationHack">
+        <property name="text">
+         <string>VU Communication Synchronization</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QCheckBox" name="MixSpdifAnalogHack">
         <property name="text">
          <string>Mix SPDIF and Analogue Audio output</string>
@@ -187,6 +194,7 @@
   <tabstop>VUSyncHack</tabstop>
   <tabstop>XgKickHack</tabstop>
   <tabstop>BlitInternalFPSHack</tabstop>
+  <tabstop>VUCommunicationHack</tabstop>
   <tabstop>MixSpdifAnalogHack</tabstop>
  </tabstops>
  <resources>

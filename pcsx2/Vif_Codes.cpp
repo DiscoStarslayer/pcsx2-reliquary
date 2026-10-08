@@ -170,7 +170,9 @@ __fi int _vifCode_Direct(int pass, const u8* data, bool isDirectHL)
 			vif1.vifstalled.enabled = VifStallEnable(vif1ch);
 			vif1.vifstalled.value = VIF_TIMING_BREAK;
 			vif1Regs.stat.VGW = true;
-			return 0;
+			// A CPU FIFO owns its unconsumed suffix. Do not replay words which
+			// the GIF has already accepted during this partial DIRECT transfer.
+			return vif1CpuFifoActive() ? ret / 4 : 0;
 		}
 		if (vif1.tag.size == 0)
 		{

@@ -6,6 +6,7 @@
 #include "VMManager.h"
 #include "Elfheader.h"
 #include "Cache.h"
+#include "Vif_Dma.h"
 
 #include "DebugTools/Breakpoints.h"
 
@@ -214,6 +215,11 @@ static void execI()
 	cpuBlockCycles += opcode.cycles * (2 - ((cpuRegs.CP0.n.Config >> 18) & 0x1));
 
 	opcode.interpret();
+	if (!cpuRegs.branch && vif1CpuFifoBusBlocked())
+	{
+		intUpdateCPUCycles();
+		intEventTest();
+	}
 }
 
 static __fi void _doBranch_shared(u32 tar)
@@ -555,16 +561,21 @@ static void intReset()
 
 void intEventTest()
 {
-	// Perform counters, ints, and IOP updates:
-	_cpuEventTest_Shared();
-
-	if (intExitExecution)
+	do
 	{
-		intExitExecution = false;
-		if (CHECK_EEREC)
-			writebackCache();
-		fastjmp_jmp(&intJmpBuf, 1);
-	}
+		// A full FIFO stalls EE instructions, while devices and host events run.
+		_cpuEventTest_Shared();
+
+		if (intExitExecution)
+		{
+			intExitExecution = false;
+			if (CHECK_EEREC)
+				writebackCache();
+			fastjmp_jmp(&intJmpBuf, 1);
+		}
+		if (vif1CpuFifoBusBlocked())
+			cpuRegs.cycle = std::max(cpuRegs.cycle + 1, cpuRegs.nextEventCycle);
+	} while (vif1CpuFifoBusBlocked());
 }
 
 static void intSafeExitExecution()
