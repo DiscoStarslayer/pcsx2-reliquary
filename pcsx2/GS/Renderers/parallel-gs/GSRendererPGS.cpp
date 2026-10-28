@@ -729,6 +729,12 @@ void GSRendererPGS::VSync(u32 field, bool registers_written, bool refresh_frame)
 
 	if (vsync.image)
 	{
+		// CRT emulation reconstructs interlaced frames from field images during presentation.
+		last_presentation_size = GSVector2i(static_cast<int>(vsync.image->get_width()), static_cast<int>(vsync.image->get_height()));
+
+		if (vsync.interlaced && vsync.image->get_height() == vsync.internal_height)
+			last_presentation_size.y *= 2;
+
 		last_internal_width = vsync.internal_width;
 		last_internal_height = vsync.internal_height;
 		if (vsync.high_resolution_scanout)
@@ -737,6 +743,8 @@ void GSRendererPGS::VSync(u32 field, bool registers_written, bool refresh_frame)
 			last_internal_height *= 2;
 		}
 	}
+
+	const GSVector2i source_size = GetPresentationSourceSize();
 
 	CRTFilter::FilterOptions crt_filter_options = {};
 
@@ -928,39 +936,55 @@ void GSRendererPGS::VSync(u32 field, bool registers_written, bool refresh_frame)
 
 		if (vsync.image)
 		{
-			uint32_t new_width = output_width;
-			uint32_t new_height = output_height;
-
-			float display_aspect = float(output_width) / float(output_height);
-			float game_aspect = GetCurrentAspectRatioFloat(priv->smode1.CMOD == 0);
-
-			float horizontal_scanout_ratio = float(vsync.internal_width) / float(vsync.mode_width);
-			float vertical_scanout_ratio = float(vsync.internal_height) / float(vsync.mode_height);
-			game_aspect *= horizontal_scanout_ratio / vertical_scanout_ratio;
-			last_display_aspect_ratio = game_aspect;
-
-			if (display_aspect > game_aspect)
-				new_width = uint32_t(std::round(float(output_height) * game_aspect));
-			else
-				new_height = uint32_t(std::round(float(output_width) / game_aspect));
-
-			if (GSConfig.IntegerScaling)
+			if (EmuConfig.CurrentAspectRatio == AspectRatioType::SquarePixels)
 			{
-				const float scale = (vsync.image->get_width() >= vsync.image->get_height()) ?
-				                        static_cast<float>(new_width) / vsync.image->get_width() :
-				                        static_cast<float>(new_height) / vsync.image->get_height();
-				if (scale > 1.0f)
-				{
-					const float adjust = std::floor(scale) / scale;
-					new_width = std::max(1u, static_cast<uint32_t>(std::round(new_width * adjust)));
-					new_height = std::max(1u, static_cast<uint32_t>(std::round(new_height * adjust)));
-				}
-			}
+				const GSVector2i window_size(static_cast<int>(output_width), static_cast<int>(output_height));
+				const GSVector4 rect = GSCalculateSquarePixelRect(window_size, source_size, GSDisplayAlignment::Center, false);
 
-			vp_offset_x = std::round(0.5f * float(output_width - new_width));
-			output_width = new_width;
-			vp_offset_y = std::round(0.5f * float(output_height - new_height));
-			output_height = new_height;
+				last_display_aspect_ratio = GSGetCurrentAspectRatio();
+
+				vp_offset_x = rect.x;
+				vp_offset_y = rect.y;
+
+				output_width = static_cast<uint32_t>(rect.z - rect.x);
+				output_height = static_cast<uint32_t>(rect.w - rect.y);
+			}
+			else
+			{
+				uint32_t new_width = output_width;
+				uint32_t new_height = output_height;
+
+				float display_aspect = float(output_width) / float(output_height);
+				float game_aspect = GSGetCurrentAspectRatio();
+
+				float horizontal_scanout_ratio = float(vsync.internal_width) / float(vsync.mode_width);
+				float vertical_scanout_ratio = float(vsync.internal_height) / float(vsync.mode_height);
+				game_aspect *= horizontal_scanout_ratio / vertical_scanout_ratio;
+				last_display_aspect_ratio = game_aspect;
+
+				if (display_aspect > game_aspect)
+					new_width = uint32_t(std::round(float(output_height) * game_aspect));
+				else
+					new_height = uint32_t(std::round(float(output_width) / game_aspect));
+
+				if (GSConfig.IntegerScaling)
+				{
+					const float scale = (vsync.image->get_width() >= vsync.image->get_height()) ?
+											static_cast<float>(new_width) / vsync.image->get_width() :
+											static_cast<float>(new_height) / vsync.image->get_height();
+					if (scale > 1.0f)
+					{
+						const float adjust = std::floor(scale) / scale;
+						new_width = std::max(1u, static_cast<uint32_t>(std::round(new_width * adjust)));
+						new_height = std::max(1u, static_cast<uint32_t>(std::round(new_height * adjust)));
+					}
+				}
+
+				vp_offset_x = std::round(0.5f * float(output_width - new_width));
+				output_width = new_width;
+				vp_offset_y = std::round(0.5f * float(output_height - new_height));
+				output_height = new_height;
+			}
 
 			// Safeguard against ridiculous situations.
 			if (!output_width)
@@ -1088,7 +1112,7 @@ void GSRendererPGS::VSync(u32 field, bool registers_written, bool refresh_frame)
 			crt_filter_options.bloom_strength = 1.2f * float(GSConfig.PGSPhosphorBloom) / 100.0f;
 
 			// For wide-screen, assume a more HD CRT TV style with far higher TVL.
-			float game_aspect = GetCurrentAspectRatioFloat(priv->smode1.CMOD == 0);
+			float game_aspect = GSGetCurrentAspectRatio();
 			crt_filter_options.tvl = uint32_t(480.0f * game_aspect);
 
 			crt_filter.run_filter_prepass(*cmd,
@@ -1110,6 +1134,13 @@ void GSRendererPGS::VSync(u32 field, bool registers_written, bool refresh_frame)
 		{
 			screenshot_width = static_cast<u32>(std::max(1.0f, std::round(vp_width)));
 			screenshot_height = static_cast<u32>(std::max(1.0f, std::round(vp_height)));
+
+			if (EmuConfig.CurrentAspectRatio == AspectRatioType::SquarePixels && GSConfig.ScreenshotSize >= GSScreenshotSize::InternalResolution)
+			{
+				screenshot_width = static_cast<u32>(source_size.x);
+				screenshot_height = static_cast<u32>(source_size.y);
+			}
+
 			const VkFormat screenshot_format =
 				wsi.get_backbuffer_format() == BackbufferFormat::sRGB ? VK_FORMAT_R8G8B8A8_SRGB : VK_FORMAT_R8G8B8A8_UNORM;
 			auto screenshot_info = ImageCreateInfo::render_target(

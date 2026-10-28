@@ -18,6 +18,7 @@ std::unique_ptr<GSRendererPGS> g_pgs_renderer;
 #include "GS/GSLzma.h"
 #include "GS/GSPerfMon.h"
 #include "GS/GSUtil.h"
+#include "GS/GSVector.h"
 #include "GS/MultiISA.h"
 #include "GS/GSPerfMon.h"
 #include "Host.h"
@@ -60,6 +61,8 @@ std::unique_ptr<GSRendererPGS> g_pgs_renderer;
 
 #include "fmt/format.h"
 
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 
 Pcsx2Config::GSOptions GSConfig;
@@ -1023,14 +1026,168 @@ void GSgetInternalResolution(int* width, int* height)
 	*height = res.y;
 }
 
-float GSGetDisplayAspectRatio()
+static float GetAspectRatio(AspectRatioType mode, bool is_progressive, float custom_aspect, const GSVector2i& source_size)
 {
+	switch (mode)
+	{
+		case AspectRatioType::SquarePixels:
+			if (source_size.x > 0 && source_size.y > 0)
+				return static_cast<float>(source_size.x) / static_cast<float>(source_size.y);
+
+			break;
+
+		case AspectRatioType::R4_3:
+			return 4.0f / 3.0f;
+
+		case AspectRatioType::R16_9:
+			return 16.0f / 9.0f;
+
+		case AspectRatioType::R10_7:
+			return 10.0f / 7.0f;
+
+		default:
+			if (custom_aspect > 0.0f)
+				return custom_aspect;
+
+			break;
+	}
+
+	if (is_progressive)
+		return 3.0f / 2.0f;
+
+	return 4.0f / 3.0f;
+}
+
+float GSGetCurrentAspectRatio()
+{
+	GSVector2i source_size(0, 0);
+	bool is_progressive = false;
+
+	if (g_gs_renderer)
+	{
+		source_size = g_gs_renderer->GetInternalResolution();
+		is_progressive = (g_gs_renderer->GetVideoMode() == GSVideoMode::SDTV_480P);
+	}
+
 #ifdef HAVE_PARALLEL_GS
 	if (g_pgs_renderer)
-		return g_pgs_renderer->GetDisplayAspectRatio();
+	{
+		source_size = g_pgs_renderer->GetPresentationSourceSize();
+		is_progressive = g_pgs_renderer->IsProgressive();
+	}
 #endif
 
-	return 0.0f;
+	return GetAspectRatio(EmuConfig.CurrentAspectRatio, is_progressive,
+		EmuConfig.CurrentCustomAspectRatio, source_size);
+}
+
+GSVector2i GSGetDisplaySize(float scale)
+{
+	const bool square_pixels = (EmuConfig.CurrentAspectRatio == AspectRatioType::SquarePixels);
+
+	GSVector2i size(0, 0);
+	float upscale = GSConfig.UpscaleMultiplier;
+	float renderer_aspect = 0.0f;
+
+	if (g_gs_renderer)
+	{
+		if (square_pixels)
+		{
+			size = g_gs_renderer->GetPresentationSourceSize();
+			upscale = g_gs_renderer->GetUpscaleMultiplier();
+		}
+		else
+		{
+			size = g_gs_renderer->GetInternalResolution();
+		}
+	}
+
+#ifdef HAVE_PARALLEL_GS
+	if (g_pgs_renderer)
+	{
+		if (square_pixels)
+		{
+			size = g_pgs_renderer->GetPresentationSourceSize();
+			upscale = 1.0f;
+		}
+		else
+		{
+			g_pgs_renderer->GetInternalResolution(&size.x, &size.y);
+			renderer_aspect = g_pgs_renderer->GetDisplayAspectRatio();
+		}
+	}
+#endif
+
+	if (size.x <= 0 || size.y <= 0)
+		return GSVector2i(0, 0);
+
+	float x_scale = 1.0f;
+
+	if (!square_pixels)
+	{
+		const float internal_aspect = static_cast<float>(size.x) / static_cast<float>(size.y);
+
+		if (renderer_aspect > 0.0f)
+			x_scale = renderer_aspect / internal_aspect;
+		else if (GSConfig.AspectRatio != AspectRatioType::Stretch)
+		{
+			const float aspect = GetAspectRatio(GSConfig.AspectRatio, GSgetDisplayMode() == GSVideoMode::SDTV_480P,
+				EmuConfig.CurrentCustomAspectRatio, size);
+
+			x_scale = aspect / internal_aspect;
+		}
+	}
+
+	float width = static_cast<float>(size.x) * x_scale;
+	float height = static_cast<float>(size.y);
+
+	if (scale != 0.0f)
+	{
+		scale /= upscale;
+
+		width *= scale;
+		height *= scale;
+	}
+
+	return GSVector2i(std::max(static_cast<int>(std::lroundf(width)), 1),
+		std::max(static_cast<int>(std::lroundf(height)), 1));
+}
+
+GSVector4 GSCalculateSquarePixelRect(const GSVector2i& window_size, const GSVector2i& source_size,
+	GSDisplayAlignment alignment, bool flip_y)
+{
+	if (window_size.x <= 0 || window_size.y <= 0 || source_size.x <= 0 || source_size.y <= 0)
+		return GSVector4::zero();
+
+	double scale = std::min(static_cast<double>(window_size.x) / source_size.x,
+		static_cast<double>(window_size.y) / source_size.y);
+
+	if (GSConfig.IntegerScaling && scale >= 1.0)
+		scale = std::floor(scale);
+
+	const float width = static_cast<float>(std::max(1.0, std::round(source_size.x * scale)));
+	const float height = static_cast<float>(std::max(1.0, std::round(source_size.y * scale * GSConfig.StretchY / 100.0)));
+
+	const float f_width = static_cast<float>(window_size.x);
+	const float f_height = static_cast<float>(window_size.y);
+
+	float x = 0.0f;
+	float y = 0.0f;
+
+	if (width >= f_width || alignment == GSDisplayAlignment::Center)
+		x = std::floor((f_width - width) * 0.5f);
+	else if (alignment == GSDisplayAlignment::RightOrBottom)
+		x = f_width - width;
+
+	if (height >= f_height || alignment == GSDisplayAlignment::Center)
+		y = std::floor((f_height - height) * 0.5f);
+	else if (alignment == GSDisplayAlignment::RightOrBottom)
+		y = f_height - height;
+
+	if (flip_y)
+		y = f_height - y - height;
+
+	return GSVector4(x, y, x + width, y + height);
 }
 
 void GSgetStats(SmallStringBase& info)

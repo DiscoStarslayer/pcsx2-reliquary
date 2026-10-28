@@ -260,6 +260,13 @@ GSVector2i GSRenderer::GetInternalResolution()
 	return m_real_size;
 }
 
+GSVector2i GSRenderer::GetPresentationSourceSize()
+{
+	const GSVector4i rect = CalculateDrawSrcRect(m_real_size);
+
+	return GSVector2i(std::max(0, rect.width()), std::max(0, rect.height()));
+}
+
 float GSRenderer::GetModXYOffset()
 {
 	if (GSConfig.UserHacks_HalfPixelOffset == GSHalfPixelOffset::Normal)
@@ -280,103 +287,73 @@ float GSRenderer::GetModXYOffset()
 	return 0.0f;
 }
 
-float GetCurrentAspectRatioFloat(bool is_progressive)
+GSVector4 GSRenderer::CalculateDrawDstRect(s32 window_width, s32 window_height, const GSVector4i& src_rect,
+	const GSVector2i& src_size, GSDisplayAlignment alignment, bool flip_y)
 {
-	switch (GSConfig.AspectRatio)
+	if (EmuConfig.CurrentAspectRatio == AspectRatioType::SquarePixels)
 	{
-		default:
-		// We don't know the AR of the display here, nor we care about it
-		case AspectRatioType::Stretch:
-		case AspectRatioType::RAuto4_3_3_2:
-			if (EmuConfig.CurrentCustomAspectRatio > 0.f)
-				return EmuConfig.CurrentCustomAspectRatio;
-			else if (is_progressive)
-				return 3.0f / 2.0f;
-			else
-				return 4.0f / 3.0f;
-		case AspectRatioType::R4_3:
-			return 4.0f / 3.0f;
-		case AspectRatioType::R16_9:
-			return 16.0f / 9.0f;
-		case AspectRatioType::R10_7:
-			return 10.0f / 7.0f;
+		// Use the output grid before Bilinear Sharp or CAS resizes the texture.
+		return GSCalculateSquarePixelRect(GSVector2i(window_width, window_height), GetPresentationSourceSize(),
+			alignment, flip_y);
 	}
-}
 
-static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const GSVector4i& src_rect, const GSVector2i& src_size, GSDisplayAlignment alignment, bool flip_y, bool is_progressive)
-{
 	const float f_width = static_cast<float>(window_width);
 	const float f_height = static_cast<float>(window_height);
-	const float clientAr = f_width / f_height;
+	const float client_aspect = f_width / f_height;
 
-	float targetAr = clientAr;
-	if (EmuConfig.CurrentAspectRatio == AspectRatioType::RAuto4_3_3_2)
-	{
-		if (is_progressive)
-			targetAr = 3.0f / 2.0f;
-		else
-			targetAr = 4.0f / 3.0f;
-		// Fall back on the custom aspect ratio set by patches (e.g. 16:9, 21:9)
-		if (EmuConfig.CurrentCustomAspectRatio > 0.f)
-			targetAr = EmuConfig.CurrentCustomAspectRatio;
-	}
-	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R4_3)
-	{
-		targetAr = 4.0f / 3.0f;
-	}
-	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R16_9)
-	{
-		targetAr = 16.0f / 9.0f;
-	}
-	else if (EmuConfig.CurrentAspectRatio == AspectRatioType::R10_7)
-	{
-		targetAr = 10.0f / 7.0f;
-	}
+	float target_aspect = client_aspect;
+
+	if (EmuConfig.CurrentAspectRatio != AspectRatioType::Stretch)
+		target_aspect = GSGetCurrentAspectRatio();
 
 	const float crop_adjust = (static_cast<float>(src_rect.width()) / static_cast<float>(src_size.x)) /
 		(static_cast<float>(src_rect.height()) / static_cast<float>(src_size.y));
 
-	const double arr = (targetAr * crop_adjust) / clientAr;
+	const double aspect_scale = (target_aspect * crop_adjust) / client_aspect;
+
 	float target_width = f_width;
 	float target_height = f_height;
-	if (arr < 1)
-		target_width = std::floor(f_width * arr + 0.5f);
-	else if (arr > 1)
-		target_height = std::floor(f_height / arr + 0.5f);
+
+	if (aspect_scale < 1.0)
+		target_width = std::floor(f_width * aspect_scale + 0.5f);
+	else if (aspect_scale > 1.0)
+		target_height = std::floor(f_height / aspect_scale + 0.5f);
 
 	target_height *= GSConfig.StretchY / 100.0f;
 
 	if (GSConfig.IntegerScaling)
 	{
 		// make target width/height an integer multiple of the texture width/height
-		float t_width = static_cast<double>(src_rect.width());
-		float t_height = static_cast<double>(src_rect.height());
+		float t_width = static_cast<float>(src_rect.width());
+		float t_height = static_cast<float>(src_rect.height());
 
 		// If using Bilinear (Shape) the image will be prescaled to larger than the window, so we need to unscale it.
 		if (GSConfig.LinearPresent == GSPostBilinearMode::BilinearSharp && src_rect.width() > 0 && src_rect.height() > 0)
 		{
-			const GSVector2i resolution = g_gs_renderer->PCRTCDisplays.GetResolution();
-			const GSVector2i fs = GSVector2i(static_cast<int>(static_cast<float>(resolution.x) * g_gs_renderer->GetUpscaleMultiplier()),
-				static_cast<int>(static_cast<float>(resolution.y) * g_gs_renderer->GetUpscaleMultiplier()));
+			const GSVector2i resolution = PCRTCDisplays.GetResolution();
+			const GSVector2i fs = GSVector2i(static_cast<int>(static_cast<float>(resolution.x) * GetUpscaleMultiplier()),
+				static_cast<int>(static_cast<float>(resolution.y) * GetUpscaleMultiplier()));
 
 			if (g_gs_device->GetWindowWidth() > fs.x || g_gs_device->GetWindowHeight() > fs.y)
 			{
-				t_width *= static_cast<float>(fs.x) / src_rect.width();
-				t_height *= static_cast<float>(fs.y) / src_rect.height();
+				t_width *= static_cast<float>(fs.x) / static_cast<float>(src_rect.width());
+				t_height *= static_cast<float>(fs.y) / static_cast<float>(src_rect.height());
 			}
 		}
 
 		float scale;
-		if ((t_width / t_height) >= 1.0)
+
+		if ((t_width / t_height) >= 1.0f)
 			scale = target_width / t_width;
 		else
 			scale = target_height / t_height;
 
-		if (scale > 1.0)
+		if (scale > 1.0f)
 		{
 			const float adjust = std::floor(scale) / scale;
-			target_width = target_width * adjust;
-			target_height = target_height * adjust;
+
+			target_width *= adjust;
+			target_height *= adjust;
 		}
 	}
 
@@ -434,15 +411,19 @@ static GSVector4 CalculateDrawDstRect(s32 window_width, s32 window_height, const
 	return ret;
 }
 
-static GSVector4i CalculateDrawSrcRect(const GSTexture* src, const GSVector2i real_size)
+GSVector4i GSRenderer::CalculateDrawSrcRect(const GSVector2i& size)
 {
-	const GSVector2i size(src->GetSize());
-	const GSVector2 scale = GSVector2(size.x, size.y) / GSVector2(real_size.x, real_size.y).max(GSVector2(0.1f, 0.1f));
-	const float upscale = GSIsHardwareRenderer() ? GSConfig.UpscaleMultiplier : 1;
-	const int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0] * scale.x) * upscale);
-	const int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1] * scale.y) * upscale);
-	const int right =  size.x - static_cast<int>(static_cast<float>(GSConfig.Crop[2] * scale.x) * upscale);
-	const int bottom = size.y - static_cast<int>(static_cast<float>(GSConfig.Crop[3] * scale.y) * upscale);
+	const GSVector2 src_size(static_cast<float>(size.x), static_cast<float>(size.y));
+	const GSVector2 real_size(static_cast<float>(m_real_size.x), static_cast<float>(m_real_size.y));
+
+	const GSVector2 scale = src_size / real_size.max(GSVector2(0.1f, 0.1f));
+	const float upscale = GetUpscaleMultiplier();
+
+	const int left = static_cast<int>(static_cast<float>(GSConfig.Crop[0]) * scale.x * upscale);
+	const int top = static_cast<int>(static_cast<float>(GSConfig.Crop[1]) * scale.y * upscale);
+	const int right = size.x - static_cast<int>(static_cast<float>(GSConfig.Crop[2]) * scale.x * upscale);
+	const int bottom = size.y - static_cast<int>(static_cast<float>(GSConfig.Crop[3]) * scale.y * upscale);
+
 	return GSVector4i(left, top, right, bottom);
 }
 
@@ -586,14 +567,16 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
 		GSTexture* current = g_gs_device->GetCurrent();
 		if (current && !blank_frame)
 		{
-			src_rect = CalculateDrawSrcRect(current, m_real_size);
+			src_rect = CalculateDrawSrcRect(current->GetSize());
 			src_uv = GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy();
 			draw_rect = CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
-				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
-				GetVideoMode() == GSVideoMode::SDTV_480P);
+				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin());
 			s_last_draw_rect = draw_rect;
 
-			if (GSConfig.CASMode != GSCASMode::Disabled)
+			if (draw_rect.z <= draw_rect.x || draw_rect.w <= draw_rect.y)
+				current = nullptr;
+
+			if (current && GSConfig.CASMode != GSCASMode::Disabled)
 			{
 				static bool cas_log_once = false;
 				if (g_gs_device->Features().cas_sharpening)
@@ -916,11 +899,10 @@ void GSRenderer::PresentCurrentFrame()
 		GSTexture* current = g_gs_device->GetCurrent();
 		if (current)
 		{
-			const GSVector4i src_rect(CalculateDrawSrcRect(current, m_real_size));
+			const GSVector4i src_rect(CalculateDrawSrcRect(current->GetSize()));
 			const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
 			const GSVector4 draw_rect(CalculateDrawDstRect(g_gs_device->GetWindowWidth(), g_gs_device->GetWindowHeight(),
-				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin(),
-				GetVideoMode() == GSVideoMode::SDTV_480P));
+				src_rect, current->GetSize(), s_display_alignment, g_gs_device->UsesLowerLeftOrigin()));
 			s_last_draw_rect = draw_rect;
 
 			const u64 current_time = Common::Timer::GetCurrentValue();
@@ -965,7 +947,7 @@ bool GSRenderer::BeginCapture(std::string filename, const GSVector2i& size)
 													  GSVector2i(GSConfig.VideoCaptureWidth, GSConfig.VideoCaptureHeight));
 
 	return GSCapture::BeginCapture(GetTvRefreshRate(), capture_resolution,
-		GetCurrentAspectRatioFloat(GetVideoMode() == GSVideoMode::SDTV_480P),
+		GSGetCurrentAspectRatio(),
 		std::move(filename));
 }
 
@@ -996,17 +978,24 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 		return false;
 	}
 
-	const GSVector4i src_rect(CalculateDrawSrcRect(current, m_real_size));
+	const bool square_pixels = (EmuConfig.CurrentAspectRatio == AspectRatioType::SquarePixels);
+
+	const GSVector4i src_rect(CalculateDrawSrcRect(current->GetSize()));
 	const GSVector4 src_uv(GSVector4(src_rect) / GSVector4(current->GetSize()).xyxy());
 
-	const bool is_progressive = (GetVideoMode() == GSVideoMode::SDTV_480P);
 	GSVector4 draw_rect;
 	if (window_width == 0 || window_height == 0)
 	{
-		if (apply_aspect)
+		if (square_pixels)
+		{
+			const GSVector2i presentation_size = GetPresentationSourceSize();
+
+			draw_rect = GSVector4(0.0f, 0.0f, static_cast<float>(presentation_size.x), static_cast<float>(presentation_size.y));
+		}
+		else if (apply_aspect)
 		{
 			// use internal resolution of the texture
-			const float aspect = GetCurrentAspectRatioFloat(is_progressive);
+			const float aspect = GSGetCurrentAspectRatio();
 			const int tex_width = current->GetWidth();
 			const int tex_height = current->GetHeight();
 
@@ -1026,7 +1015,7 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 	else
 	{
 		draw_rect = CalculateDrawDstRect(window_width, window_height, src_rect, current->GetSize(),
-			GSDisplayAlignment::LeftOrTop, false, is_progressive);
+			GSDisplayAlignment::LeftOrTop, false);
 	}
 	const u32 draw_width = static_cast<u32>(draw_rect.z - draw_rect.x);
 	const u32 draw_height = static_cast<u32>(draw_rect.w - draw_rect.y);
@@ -1040,8 +1029,13 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 		std::unique_ptr<GSDownloadTexture> dl(g_gs_device->CreateDownloadTexture(draw_width, draw_height, GSTexture::Format::Color));
 		if (dl)
 		{
+			Filter filter = Biln;
+
+			if (square_pixels)
+				filter = BilnIf(GSConfig.LinearPresent != GSPostBilinearMode::Off);
+
 			const GSVector4i rc(0, 0, draw_width, draw_height);
-			g_gs_device->StretchRect(current, src_uv, rt, GSVector4(rc), ShaderConvert::TRANSPARENCY_FILTER, Biln);
+			g_gs_device->StretchRect(current, src_uv, rt, GSVector4(rc), ShaderConvert::TRANSPARENCY_FILTER, filter);
 			dl->CopyFromTexture(rc, rt, rc, 0);
 			dl->Flush();
 
@@ -1049,7 +1043,7 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 			{
 				const u32 pad_x = (image_width - draw_width) / 2;
 				const u32 pad_y = (image_height - draw_height) / 2;
-				pixels->clear();
+
 				pixels->resize(image_width * image_height, 0);
 				*width = image_width;
 				*height = image_height;
@@ -1064,9 +1058,6 @@ bool GSRenderer::SaveSnapshotToMemory(u32 window_width, u32 window_height, bool 
 		g_gs_device->Recycle(rt);
 	}
 
-	*width = 0;
-	*height = 0;
-	pixels->clear();
 	return false;
 }
 

@@ -3198,7 +3198,8 @@ void FullscreenUI::DrawGraphicsSettingsPage(SettingsInterface* bsi, bool show_ad
 		"Renderer", "-1", s_renderer_names, s_renderer_values, std::size(s_renderer_names), true);
 
 	MenuHeading(FSUI_CSTR("Display"));
-	DrawStringListSetting(bsi, FSUI_ICONSTR(ICON_FA_COMPRESS, "Aspect Ratio"), FSUI_CSTR("Selects the aspect ratio to display the game content at."),
+	DrawStringListSetting(bsi, FSUI_ICONSTR(ICON_FA_COMPRESS, "Aspect Ratio"),
+		FSUI_CSTR("Selects the aspect ratio to display the game content at. Square Pixels uses the output resolution's aspect ratio. For exact pixel scaling, enable Integer Scaling, disable Bilinear Filtering, and keep Vertical Stretch at 100%."),
 		"EmuCore/GS", "AspectRatio", "Auto 4:3/3:2", Pcsx2Config::GSOptions::AspectRatioNames, Pcsx2Config::GSOptions::AspectRatioNames, 0,
 		false);
 	DrawStringListSetting(bsi, FSUI_ICONSTR(ICON_FA_VIDEO, "FMV Aspect Ratio Override"),
@@ -6210,7 +6211,7 @@ TRANSLATE_NOOP("FullscreenUI", "Disables PCSX2's internal frame timing, and uses
 TRANSLATE_NOOP("FullscreenUI", "Graphics API");
 TRANSLATE_NOOP("FullscreenUI", "Selects the API used to render the emulated GS.");
 TRANSLATE_NOOP("FullscreenUI", "Display");
-TRANSLATE_NOOP("FullscreenUI", "Selects the aspect ratio to display the game content at.");
+TRANSLATE_NOOP("FullscreenUI", "Selects the aspect ratio to display the game content at. Square Pixels uses the output resolution's aspect ratio. For exact pixel scaling, enable Integer Scaling, disable Bilinear Filtering, and keep Vertical Stretch at 100%.");
 TRANSLATE_NOOP("FullscreenUI", "Selects the aspect ratio for display when a FMV is detected as playing.");
 TRANSLATE_NOOP("FullscreenUI", "Determines the deinterlacing method to be used on the interlaced screen of the emulated console.\nAutomatic should be able to correctly deinterlace most games, but if you see visibly shaky graphics, try one of the other options.");
 TRANSLATE_NOOP("FullscreenUI", "Disables interlacing offset which may reduce blurring in some situations.");
@@ -6846,6 +6847,7 @@ TRANSLATE_NOOP("FullscreenUI", "Vertical Sync (VSync)");
 TRANSLATE_NOOP("FullscreenUI", "Sync to Host Refresh Rate");
 TRANSLATE_NOOP("FullscreenUI", "Use Host VSync Timing");
 TRANSLATE_NOOP("FullscreenUI", "Aspect Ratio");
+TRANSLATE_NOOP("FullscreenUI", "Square Pixels");
 TRANSLATE_NOOP("FullscreenUI", "FMV Aspect Ratio Override");
 TRANSLATE_NOOP("FullscreenUI", "Deinterlacing");
 TRANSLATE_NOOP("FullscreenUI", "Disable Interlace Offset");

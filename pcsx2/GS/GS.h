@@ -51,6 +51,10 @@ struct GSAdapterInfo
 };
 
 class SmallStringBase;
+class GSVector4;
+template <class T>
+class GSVector2T;
+typedef GSVector2T<int> GSVector2i;
 
 // Returns the ID for the specified function, otherwise -1.
 s16 GSLookupGetSkipCountFunctionId(const std::string_view name);
@@ -103,7 +107,7 @@ std::vector<GSAdapterInfo> GSGetAdapterInfo(GSRendererType renderer);
 u32 GSGetMaxUpscaleMultiplier(u32 max_texture_size);
 GSVideoMode GSgetDisplayMode();
 void GSgetInternalResolution(int* width, int* height);
-float GSGetDisplayAspectRatio();
+GSVector2i GSGetDisplaySize(float scale);
 void GSgetStats(SmallStringBase& info);
 void GSgetMemoryStats(SmallStringBase& info);
 void GSgetTitleStats(std::string& info);
@@ -118,7 +122,9 @@ bool GSSaveSnapshotToMemory(u32 window_width, u32 window_height, bool apply_aspe
 	u32* width, u32* height, std::vector<u32>* pixels);
 void GSJoinSnapshotThreads();
 
-float GetCurrentAspectRatioFloat(bool is_progressive);
+float GSGetCurrentAspectRatio();
+GSVector4 GSCalculateSquarePixelRect(const GSVector2i& window_size, const GSVector2i& source_size,
+	GSDisplayAlignment alignment, bool flip_y);
 
 namespace Host
 {
