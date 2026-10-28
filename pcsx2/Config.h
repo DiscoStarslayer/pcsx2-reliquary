@@ -232,6 +232,7 @@ enum class AspectRatioType : u8
 	R4_3,
 	R16_9,
 	R10_7,
+	SquarePixels,
 	MaxCount
 };
 
