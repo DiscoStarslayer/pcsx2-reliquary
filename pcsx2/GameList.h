@@ -32,6 +32,7 @@ namespace GameList
 		Python2,
 		Invalid,
 		DVDVideo,
+		AudioCD,
 		Count
 	};
 
@@ -105,7 +106,7 @@ namespace GameList
 
 		CompatibilityRating compatibility_rating = CompatibilityRating::Unknown;
 
-		__fi bool IsDisc() const { return (type == EntryType::PS1Disc || type == EntryType::PS2Disc || type == EntryType::DVDVideo); }
+		__fi bool IsDisc() const { return (type == EntryType::PS1Disc || type == EntryType::PS2Disc || type == EntryType::DVDVideo || type == EntryType::AudioCD); }
 	};
 
 	const char* EntryTypeToString(EntryType type, bool translate);
@@ -139,6 +140,7 @@ namespace GameList
 	/// Looks up the serial and CRC for a game in the most efficient manner possible (i.e. cache or scan).
 	bool GetSerialAndCRCForFilename(const char* filename, std::string* serial, u32* crc);
 	void GetDVDVideoSerialAndCRCForPath(const std::string_view path, std::string* serial, u32* crc);
+	void GetAudioCDSerialAndCRCForPath(const std::string_view path, std::string* serial, u32* crc);
 
 	/// Add played time for the specified serial.
 	void AddPlayedTimeForSerial(const std::string& serial, std::time_t last_time, std::time_t add_time);
