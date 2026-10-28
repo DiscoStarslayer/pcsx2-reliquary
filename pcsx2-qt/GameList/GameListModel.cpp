@@ -520,6 +520,7 @@ QIcon GameListModel::getIconForType(const GameList::EntryType type)
 		case GameList::EntryType::PS2Disc:
 		case GameList::EntryType::PS1Disc:
 		case GameList::EntryType::DVDVideo:
+		case GameList::EntryType::AudioCD:
 			return QIcon::fromTheme("disc-2-line");
 
 		case GameList::EntryType::ELF:

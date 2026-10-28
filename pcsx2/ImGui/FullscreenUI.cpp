@@ -3373,6 +3373,7 @@ GSTexture* FullscreenUI::GetTextureForGameListEntryType(GameList::EntryType type
 		case GameList::EntryType::PS1Disc:
 		case GameList::EntryType::PS2Disc:
 		case GameList::EntryType::DVDVideo:
+		case GameList::EntryType::AudioCD:
 		default:
 			return GetCachedSvgTexture("fullscreenui/media-cdrom.svg", size, mode);
 	}

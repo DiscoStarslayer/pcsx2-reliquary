@@ -1050,12 +1050,23 @@ void VMManager::UpdateDiscDetails(bool booting)
 		}
 		else if (CDVDsys_GetSourceType() != CDVD_SourceType::NoDisc)
 		{
-			cdvdGetDiscInfo(&s_disc_serial, &s_disc_elf, &s_disc_version, &s_cur_region, &s_disc_crc, nullptr);
-
-			if (cdvd.DiscType == CDVD_TYPE_DVDV && s_disc_serial.empty())
+			if (cdvd.DiscType == CDVD_TYPE_CDDA)
 			{
-				GameList::GetDVDVideoSerialAndCRCForPath(CDVDsys_GetFile(CDVDsys_GetSourceType()), &s_disc_serial, &s_disc_crc);
+				GameList::GetAudioCDSerialAndCRCForPath(CDVDsys_GetFile(CDVDsys_GetSourceType()), &s_disc_serial, &s_disc_crc);
+				s_disc_elf.clear();
+				s_disc_version.clear();
+				s_cur_region.clear();
 				title = Path::GetFileTitle(CDVDsys_GetFile(CDVDsys_GetSourceType()));
+			}
+			else
+			{
+				cdvdGetDiscInfo(&s_disc_serial, &s_disc_elf, &s_disc_version, &s_cur_region, &s_disc_crc, nullptr);
+
+				if (cdvd.DiscType == CDVD_TYPE_DVDV && s_disc_serial.empty())
+				{
+					GameList::GetDVDVideoSerialAndCRCForPath(CDVDsys_GetFile(CDVDsys_GetSourceType()), &s_disc_serial, &s_disc_crc);
+					title = Path::GetFileTitle(CDVDsys_GetFile(CDVDsys_GetSourceType()));
+				}
 			}
 			serial_is_valid = !s_disc_serial.empty();
 		}
@@ -1639,6 +1650,7 @@ VMBootResult VMManager::Initialize(const VMBootParameters& boot_params, Error* e
 	s_fast_boot_requested =
 		(boot_params.fast_boot.value_or(static_cast<bool>(EmuConfig.EnableFastBoot)) || !s_elf_override.empty()) &&
 		(CDVDsys_GetSourceType() != CDVD_SourceType::NoDisc || !s_elf_override.empty()) &&
+		(cdvd.DiscType != CDVD_TYPE_CDDA || !s_elf_override.empty()) &&
 		!GSDumpReplayer::IsReplayingDump();
 
 	if (!s_elf_override.empty())
@@ -2062,6 +2074,8 @@ std::string VMManager::GetCurrentSaveStateFileName(s32 slot, bool backup)
 	u32 crc = s_disc_crc;
 	if (serial.empty() && cdvd.DiscType == CDVD_TYPE_DVDV && CDVDsys_GetSourceType() != CDVD_SourceType::NoDisc)
 		GameList::GetDVDVideoSerialAndCRCForPath(CDVDsys_GetFile(CDVDsys_GetSourceType()), &serial, &crc);
+	else if (serial.empty() && cdvd.DiscType == CDVD_TYPE_CDDA && CDVDsys_GetSourceType() != CDVD_SourceType::NoDisc)
+		GameList::GetAudioCDSerialAndCRCForPath(CDVDsys_GetFile(CDVDsys_GetSourceType()), &serial, &crc);
 
 	return GetSaveStateFileName(serial.c_str(), crc, slot, backup);
 }

@@ -305,7 +305,7 @@ void GameListWidget::initialize()
 		if (type != static_cast<u32>(GameList::EntryType::Invalid))
 		{
 			m_ui.filterType->addItem(GameListModel::getIconForType(static_cast<GameList::EntryType>(type)),
-				GameList::EntryTypeToString(static_cast<GameList::EntryType>(type), true));
+				GameList::EntryTypeToString(static_cast<GameList::EntryType>(type), true), type);
 		}
 	}
 
@@ -321,7 +321,7 @@ void GameListWidget::initialize()
 	connect(m_ui.viewGridTitles, &QPushButton::toggled, this, &GameListWidget::setShowCoverTitles);
 	connect(m_ui.viewFullGridTitles, &QPushButton::toggled, this, &GameListWidget::setShowFullCoverTitles);
 	connect(m_ui.filterType, &QComboBox::currentIndexChanged, this, [this](int index) {
-		m_sort_model->setFilterType((index == 0) ? GameList::EntryType::Count : static_cast<GameList::EntryType>(index - 1));
+		m_sort_model->setFilterType((index == 0) ? GameList::EntryType::Count : static_cast<GameList::EntryType>(m_ui.filterType->itemData(index).toUInt()));
 	});
 	connect(m_ui.filterRegion, &QComboBox::currentIndexChanged, this, [this](int index) {
 		m_sort_model->setFilterRegion((index == 0) ? GameList::Region::Count : static_cast<GameList::Region>(index - 1));
